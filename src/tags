@@ -1,0 +1,334 @@
+!_TAG_FILE_FORMAT	2	/extended format; --format=1 will not append ;" to lines/
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted, 2=foldcase/
+!_TAG_OUTPUT_EXCMD	mixed	/number, pattern, mixed, or combineV2/
+!_TAG_OUTPUT_FILESEP	slash	/slash or backslash/
+!_TAG_OUTPUT_MODE	u-ctags	/u-ctags or e-ctags/
+!_TAG_PATTERN_LENGTH_LIMIT	96	/0 for no limit/
+!_TAG_PROC_CWD	W:/other/daily/src/	//
+!_TAG_PROGRAM_AUTHOR	Universal Ctags Team	//
+!_TAG_PROGRAM_NAME	Universal Ctags	/Derived from Exuberant Ctags/
+!_TAG_PROGRAM_URL	https://ctags.io/	/official site/
+!_TAG_PROGRAM_VERSION	5.9.0	/80ee839/
+ABS	game_math.h	/^#define ABS(/;"	d
+ARRAY_COUNT	win32_game.c	/^#define ARRAY_COUNT(/;"	d	file:
+ASSERT	win32_game.c	/^#define ASSERT(/;"	d	file:
+ASTEROID_LARGE	game.h	/^	ASTEROID_LARGE,$/;"	e	enum:__anonff3b1fb51803
+ASTEROID_MEDIUM	game.h	/^	ASTEROID_MEDIUM,$/;"	e	enum:__anonff3b1fb51803
+ASTEROID_SIZE_COUNT	game.h	/^	ASTEROID_SIZE_COUNT$/;"	e	enum:__anonff3b1fb51803
+ASTEROID_SMALL	game.h	/^	ASTEROID_SMALL,$/;"	e	enum:__anonff3b1fb51803
+Asteroids	game.h	/^	asteroid Asteroids[16];$/;"	m	struct:__anonff3b1fb51f08	typeref:typename:asteroid[16]
+BoundingBox	game.h	/^	bounding_box BoundingBox;$/;"	m	struct:__anonff3b1fb51908	typeref:typename:bounding_box
+BoundingBox	game.h	/^	bounding_box BoundingBox;$/;"	m	struct:__anonff3b1fb51b08	typeref:typename:bounding_box
+Buttons	game.h	/^		game_button_state Buttons[6];$/;"	m	union:__anonff3b1fb51208::__anonff3b1fb5130a	typeref:typename:game_button_state[6]
+CUBE	game_math.h	/^#define CUBE(/;"	d
+ColorValue	game.h	/^	v3f ColorValue;$/;"	m	struct:__anonff3b1fb50b08	typeref:typename:v3f
+ColorWu	game.h	/^	color_wu ColorWu;$/;"	m	struct:__anonff3b1fb51b08	typeref:typename:color_wu
+ColorWu	game.h	/^	color_wu ColorWu[WU_COLOR_COUNT];$/;"	m	struct:__anonff3b1fb51f08	typeref:typename:color_wu[]
+Colors	game.h	/^	color Colors[4];$/;"	m	struct:__anonff3b1fb51f08	typeref:typename:color[4]
+CommonCompilerFlags	build.bat	/^REM		CORRECT:	set CommonCompilerFlags=$/;"	v
+CommonCompilerFlags	build.bat	/^REM		WRONG:		set CommonCompilerFlags =$/;"	v
+Controller	game.h	/^	game_controller_input Controller;$/;"	m	struct:__anonff3b1fb51508	typeref:typename:game_controller_input
+DIRECT_SOUND_CREATE	win32_game.c	/^#define DIRECT_SOUND_CREATE(/;"	d	file:
+DIRECT_SOUND_CREATE	win32_game.c	/^typedef DIRECT_SOUND_CREATE(direct_sound_create);$/;"	t	file:
+Direction	game.h	/^	v2f Direction;$/;"	m	struct:__anonff3b1fb51908	typeref:typename:v2f
+Direction	game.h	/^	v2f Direction;$/;"	m	struct:__anonff3b1fb51b08	typeref:typename:v2f
+Direction	game.h	/^	v2f Direction;$/;"	m	struct:__anonff3b1fb51e08	typeref:typename:v2f
+Down	game.h	/^			game_button_state Down;$/;"	m	struct:__anonff3b1fb51208::__anonff3b1fb5130a::__anonff3b1fb51408	typeref:typename:game_button_state
+FALSE	win32_game.c	/^#define FALSE /;"	d	file:
+FIXED_DIV	game.c	/^#define FIXED_DIV(/;"	d	file:
+FIXED_MULT	game.c	/^#define FIXED_MULT(/;"	d	file:
+FIXED_POINT_ONE	game.c	/^#define FIXED_POINT_ONE /;"	d	file:
+FIXED_TO_FLOAT	game.c	/^#define FIXED_TO_FLOAT(/;"	d	file:
+FIXED_TO_INT	game.c	/^#define FIXED_TO_INT(/;"	d	file:
+FLOAT_TO_FIXED	game.c	/^#define FLOAT_TO_FIXED(/;"	d	file:
+GAME_EDITOR	game.h	/^	GAME_EDITOR$/;"	e	enum:__anonff3b1fb51d03
+GAME_H	game.h	/^#define GAME_H$/;"	d
+GAME_INTRINSICS_H	game_intrinsics.h	/^#define GAME_INTRINSICS_H$/;"	d
+GAME_MATH_H	game_math.h	/^#define GAME_MATH_H$/;"	d
+GAME_PLATFORM_H	game_platform.h	/^#define GAME_PLATFORM_H$/;"	d
+GAME_PLAYING	game.h	/^	GAME_PLAYING,$/;"	e	enum:__anonff3b1fb51d03
+GIGABYTES	win32_game.c	/^#define GIGABYTES(/;"	d	file:
+HALF_ROOT_TWO	game.c	/^#define HALF_ROOT_TWO /;"	d	file:
+INT_TO_FIXED	game.c	/^#define INT_TO_FIXED(/;"	d	file:
+Info	win32_game.h	/^	BITMAPINFO Info;$/;"	m	struct:__anon6b329e270408	typeref:typename:BITMAPINFO
+KEY_A	game.h	/^	KEY_A,$/;"	e	enum:__anonff3b1fb51003
+KEY_COUNT	game.h	/^	KEY_COUNT$/;"	e	enum:__anonff3b1fb51003
+KEY_D	game.h	/^	KEY_D,$/;"	e	enum:__anonff3b1fb51003
+KEY_S	game.h	/^	KEY_S,$/;"	e	enum:__anonff3b1fb51003
+KEY_SPACE	game.h	/^	KEY_SPACE,$/;"	e	enum:__anonff3b1fb51003
+KEY_W	game.h	/^	KEY_W,$/;"	e	enum:__anonff3b1fb51003
+KILOBYTES	win32_game.c	/^#define KILOBYTES(/;"	d	file:
+Left	game.h	/^			game_button_state Left;$/;"	m	struct:__anonff3b1fb51208::__anonff3b1fb5130a::__anonff3b1fb51408	typeref:typename:game_button_state
+LocalVertices	game.h	/^	v2f LocalVertices[6];$/;"	m	struct:__anonff3b1fb51908	typeref:typename:v2f[6]
+MAKE_FLOAT_FIXED	game.c	/^#define MAKE_FLOAT_FIXED(/;"	d	file:
+MAX	game_math.h	/^#define MAX(/;"	d
+MEGABYTES	win32_game.c	/^#define MEGABYTES(/;"	d	file:
+MIN	game_math.h	/^#define MIN(/;"	d
+Max	game.h	/^	v2f Max;$/;"	m	struct:__anonff3b1fb50c08	typeref:typename:v2f
+Min	game.h	/^	v2f Min;$/;"	m	struct:__anonff3b1fb50c08	typeref:typename:v2f
+ONES_COMP	game.c	/^#define ONES_COMP(/;"	d	file:
+PI	win32_game.c	/^#define PI /;"	d	file:
+PI32	game.c	/^#define PI32 /;"	d	file:
+PLAYER_BEZIER_TOP	game.h	/^	PLAYER_BEZIER_TOP,$/;"	e	enum:__anonff3b1fb51a03
+PLAYER_LEFT	game.h	/^	PLAYER_LEFT,$/;"	e	enum:__anonff3b1fb51a03
+PLAYER_RIGHT	game.h	/^	PLAYER_RIGHT,$/;"	e	enum:__anonff3b1fb51a03
+PLAYER_TOP	game.h	/^	PLAYER_TOP,$/;"	e	enum:__anonff3b1fb51a03
+PLAYER_VERTEX_COUNT	game.h	/^	PLAYER_VERTEX_COUNT$/;"	e	enum:__anonff3b1fb51a03
+Player	game.h	/^	player Player;$/;"	m	struct:__anonff3b1fb51f08	typeref:typename:player
+Pos	game.h	/^	v2f Pos;$/;"	m	struct:__anonff3b1fb51908	typeref:typename:v2f
+Pos	game.h	/^	v2f Pos;$/;"	m	struct:__anonff3b1fb51b08	typeref:typename:v2f
+Pos	game.h	/^	v2f Pos;$/;"	m	struct:__anonff3b1fb51e08	typeref:typename:v2f
+Projectiles	game.h	/^	projectile Projectiles[64];$/;"	m	struct:__anonff3b1fb51f08	typeref:typename:projectile[64]
+Right	game.h	/^			game_button_state Right;$/;"	m	struct:__anonff3b1fb51208::__anonff3b1fb5130a::__anonff3b1fb51408	typeref:typename:game_button_state
+Right	game.h	/^	v2f Right;$/;"	m	struct:__anonff3b1fb51b08	typeref:typename:v2f
+SHIFT_AMOUNT	game.c	/^#define SHIFT_AMOUNT /;"	d	file:
+SHIFT_MASK	game.c	/^#define SHIFT_MASK /;"	d	file:
+SQURE	game_math.h	/^#define SQURE(/;"	d
+Space	game.h	/^			game_button_state Space;$/;"	m	struct:__anonff3b1fb51208::__anonff3b1fb5130a::__anonff3b1fb51408	typeref:typename:game_button_state
+TERABYTES	win32_game.c	/^#define TERABYTES(/;"	d	file:
+TRUE	win32_game.c	/^#define TRUE /;"	d	file:
+TWOS_COMP	game.c	/^#define TWOS_COMP(/;"	d	file:
+Up	game.h	/^			game_button_state Up;$/;"	m	struct:__anonff3b1fb51208::__anonff3b1fb5130a::__anonff3b1fb51408	typeref:typename:game_button_state
+Vertices	game.h	/^	v2f Vertices[4];$/;"	m	struct:__anonff3b1fb51b08	typeref:typename:v2f[4]
+WIN32_GAME_H	win32_game.h	/^#define WIN32_GAME_H$/;"	d
+WU_BLACK	game.h	/^	WU_BLACK,$/;"	e	enum:__anonff3b1fb51603
+WU_BLUE	game.h	/^	WU_BLUE,$/;"	e	enum:__anonff3b1fb51603
+WU_COLOR_COUNT	game.h	/^	WU_COLOR_COUNT$/;"	e	enum:__anonff3b1fb51603
+WU_GREEN	game.h	/^	WU_GREEN,$/;"	e	enum:__anonff3b1fb51603
+WU_RED	game.h	/^	WU_RED,$/;"	e	enum:__anonff3b1fb51603
+WU_WHITE	game.h	/^	WU_WHITE,$/;"	e	enum:__anonff3b1fb51603
+Win32GlobalBackBuffer	win32_game.c	/^global_variable win32_back_buffer	Win32GlobalBackBuffer;$/;"	v	typeref:typename:global_variable win32_back_buffer
+Win32GlobalRunning	win32_game.c	/^global_variable b32					Win32GlobalRunning;$/;"	v	typeref:typename:global_variable b32
+Win32GlobalSecondaryBuffer	win32_game.c	/^global_variable LPDIRECTSOUNDBUFFER Win32GlobalSecondaryBuffer;$/;"	v	typeref:typename:global_variable LPDIRECTSOUNDBUFFER
+WinMain	win32_game.c	/^WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR CmdLine, int nCmdShow)$/;"	f	typeref:typename:int WINAPI
+WndProc	win32_game.c	/^WndProc(HWND WindowHandle, UINT Message, WPARAM wParam, LPARAM lParam)$/;"	f	typeref:typename:LRESULT CALLBACK
+WorldDim	game.h	/^	v2f WorldDim;$/;"	m	struct:__anonff3b1fb51f08	typeref:typename:v2f
+__anon6b329e270108	win32_game.h	/^{$/;"	s
+__anon6b329e270208	win32_game.h	/^{$/;"	s
+__anon6b329e270308	win32_game.h	/^{$/;"	s
+__anon6b329e270408	win32_game.h	/^{$/;"	s
+__anon9c95dc390108	game_platform.h	/^{$/;"	s
+__anonff3b1fb50108	game.h	/^{$/;"	s
+__anonff3b1fb50208	game.h	/^{$/;"	s
+__anonff3b1fb50308	game.h	/^{$/;"	s
+__anonff3b1fb50408	game.h	/^{$/;"	s
+__anonff3b1fb5050a	game.h	/^{$/;"	u
+__anonff3b1fb50608	game.h	/^	{$/;"	s	union:__anonff3b1fb5050a
+__anonff3b1fb50708	game.h	/^	{$/;"	s	union:__anonff3b1fb5050a
+__anonff3b1fb5080a	game.h	/^{$/;"	u
+__anonff3b1fb50908	game.h	/^	{$/;"	s	union:__anonff3b1fb5080a
+__anonff3b1fb50a08	game.h	/^	{$/;"	s	union:__anonff3b1fb5080a
+__anonff3b1fb50b08	game.h	/^{$/;"	s
+__anonff3b1fb50c08	game.h	/^{$/;"	s
+__anonff3b1fb50d08	game.h	/^{$/;"	s
+__anonff3b1fb50e08	game.h	/^{$/;"	s
+__anonff3b1fb50f08	game.h	/^{$/;"	s
+__anonff3b1fb51003	game.h	/^{$/;"	g
+__anonff3b1fb51108	game.h	/^{$/;"	s
+__anonff3b1fb51208	game.h	/^{$/;"	s
+__anonff3b1fb5130a	game.h	/^	{$/;"	u	struct:__anonff3b1fb51208
+__anonff3b1fb51408	game.h	/^		{$/;"	s	union:__anonff3b1fb51208::__anonff3b1fb5130a
+__anonff3b1fb51508	game.h	/^{$/;"	s
+__anonff3b1fb51603	game.h	/^{$/;"	g
+__anonff3b1fb51708	game.h	/^{$/;"	s
+__anonff3b1fb51803	game.h	/^{$/;"	g
+__anonff3b1fb51908	game.h	/^{$/;"	s
+__anonff3b1fb51a03	game.h	/^{$/;"	g
+__anonff3b1fb51b08	game.h	/^{$/;"	s
+__anonff3b1fb51c08	game.h	/^{$/;"	s
+__anonff3b1fb51d03	game.h	/^{$/;"	g
+__anonff3b1fb51e08	game.h	/^{$/;"	s
+__anonff3b1fb51f08	game.h	/^{$/;"	s
+__anonff3b1fb52008	game.h	/^{$/;"	s
+active	game.h	/^	b32 active;$/;"	m	struct:__anonff3b1fb51e08	typeref:typename:b32
+asteroid	game.h	/^} asteroid;$/;"	t	typeref:struct:__anonff3b1fb51908
+asteroid_count	game.h	/^	u32 asteroid_count;$/;"	m	struct:__anonff3b1fb51f08	typeref:typename:u32
+asteroid_size	game.h	/^} asteroid_size;$/;"	t	typeref:enum:__anonff3b1fb51803
+b	win32_game.h	/^	f32 r, g, b;$/;"	m	struct:__anon6b329e270208	typeref:typename:f32
+b32	win32_game.c	/^typedef s32			b32;$/;"	t	typeref:typename:s32	file:
+back_buffer	game.h	/^} back_buffer;$/;"	t	typeref:struct:__anonff3b1fb50f08
+base	game.h	/^	u8 *base;$/;"	m	struct:__anonff3b1fb50108	typeref:typename:u8 *
+base_color	game.h	/^	u32 base_color;$/;"	m	struct:__anonff3b1fb51708	typeref:typename:u32
+base_half_width	game.h	/^	f32 base_half_width;$/;"	m	struct:__anonff3b1fb51b08	typeref:typename:f32
+bezier_curve_draw	game.c	/^bezier_curve_draw(back_buffer *BackBuffer, v2f P1, v2f P2, v2f P3, f32 t)$/;"	f	typeref:typename:internal void
+blue_mask	game.h	/^	u32 blue_mask;$/;"	m	struct:__anonff3b1fb51708	typeref:typename:u32
+bounding_box	game.h	/^} bounding_box;$/;"	t	typeref:struct:__anonff3b1fb50c08
+bytes_per_pixel	game.h	/^	int bytes_per_pixel;$/;"	m	struct:__anonff3b1fb50f08	typeref:typename:int
+bytes_per_pixel	game_platform.h	/^	int bytes_per_pixel;$/;"	m	struct:__anon9c95dc390108	typeref:typename:int
+bytes_per_pixel	win32_game.h	/^	int bytes_per_pixel;$/;"	m	struct:__anon6b329e270408	typeref:typename:int
+bytes_per_sample	win32_game.h	/^	int bytes_per_sample;$/;"	m	struct:__anon6b329e270108	typeref:typename:int
+center_x	game.h	/^	f32 center_x, center_y;$/;"	m	struct:__anonff3b1fb50d08	typeref:typename:f32
+center_y	game.h	/^	f32 center_x, center_y;$/;"	m	struct:__anonff3b1fb50d08	typeref:typename:f32
+circle	game.h	/^} circle;$/;"	t	typeref:struct:__anonff3b1fb50d08
+circle_bounding_box_find	game.c	/^circle_bounding_box_find(circle Circle)$/;"	f	typeref:typename:internal bounding_box
+circle_draw	game.c	/^circle_draw(back_buffer *BackBuffer, circle *Circle,$/;"	f	typeref:typename:internal void
+color	game.h	/^} color;$/;"	t	typeref:struct:__anonff3b1fb50b08
+color_get	game.c	/^color_get(game_state *GameState, char *name)$/;"	f	typeref:typename:internal v3f
+color_make	game.c	/^color_make(f32 r, f32 g, f32 b)$/;"	f	typeref:typename:internal u32
+color_wu	game.h	/^} color_wu;$/;"	t	typeref:struct:__anonff3b1fb51708
+common_compiler_flags	build.bat	/^set common_compiler_flags= -DGAME_SLOW=1 -MTd -nologo -Od -Oi -TC -W4 -FC -Zi -wd4201 -wd4100 -w/;"	v
+common_linker_flags	build.bat	/^set common_linker_flags= -incremental:no -opt:ref user32.lib Gdi32.lib Winmm.lib Kernel32.lib$/;"	v
+dPos	game.h	/^	v2f dPos;$/;"	m	struct:__anonff3b1fb51908	typeref:typename:v2f
+dPos	game.h	/^	v2f dPos;$/;"	m	struct:__anonff3b1fb51b08	typeref:typename:v2f
+dPos	game.h	/^	v2f dPos;$/;"	m	struct:__anonff3b1fb51e08	typeref:typename:v2f
+data	game.h	/^	u8 *data;$/;"	m	struct:__anonff3b1fb51c08	typeref:typename:u8 *
+distance_remaining	game.h	/^	f32 distance_remaining;$/;"	m	struct:__anonff3b1fb51e08	typeref:typename:f32
+dt_for_frame	game.h	/^	f32 dt_for_frame;$/;"	m	struct:__anonff3b1fb51508	typeref:typename:f32
+e	game.h	/^	f32 e[2];$/;"	m	union:__anonff3b1fb5050a	typeref:typename:f32[2]
+e	game.h	/^	f32 e[2][2];$/;"	m	struct:__anonff3b1fb50408	typeref:typename:f32[2][2]
+e	game.h	/^	f32 e[3];$/;"	m	union:__anonff3b1fb5080a	typeref:typename:f32[3]
+e	game.h	/^	f32 e[3][3];$/;"	m	struct:__anonff3b1fb50208	typeref:typename:f32[3][3]
+ended_down	game.h	/^	b32 ended_down;$/;"	m	struct:__anonff3b1fb51108	typeref:typename:b32
+f32	win32_game.c	/^typedef float		f32;$/;"	t	typeref:typename:float	file:
+f32_fractional_part	game_intrinsics.h	/^f32_fractional_part(f32 x)$/;"	f	typeref:typename:internal f32
+f32_round_to_s16	game_intrinsics.h	/^f32_round_to_s16(f32 x)$/;"	f	typeref:typename:internal s16
+f32_round_to_s32	game_intrinsics.h	/^f32_round_to_s32(f32 x)$/;"	f	typeref:typename:internal s32
+f32_round_to_u32	game_intrinsics.h	/^f32_round_to_u32(f32 x)$/;"	f	typeref:typename:internal u32
+f32_truncate_to_s32	game_intrinsics.h	/^f32_truncate_to_s32(f32 x)$/;"	f	typeref:typename:internal s32
+f64	win32_game.c	/^typedef double		f64;$/;"	t	typeref:typename:double	file:
+g	win32_game.h	/^	f32 r, g, b;$/;"	m	struct:__anon6b329e270208	typeref:typename:f32
+game_back_buffer	game_platform.h	/^} game_back_buffer;$/;"	t	typeref:struct:__anon9c95dc390108
+game_button_state	game.h	/^} game_button_state;$/;"	t	typeref:struct:__anonff3b1fb51108
+game_controller_input	game.h	/^} game_controller_input;$/;"	t	typeref:struct:__anonff3b1fb51208
+game_input	game.h	/^} game_input;$/;"	t	typeref:struct:__anonff3b1fb51508
+game_memory	game.h	/^} game_memory;$/;"	t	typeref:struct:__anonff3b1fb52008
+game_state	game.h	/^} game_state;$/;"	t	typeref:struct:__anonff3b1fb51f08
+get_screen_pos	game.c	/^get_screen_pos(back_buffer *BackBuffer, v2f Pos)$/;"	f	typeref:typename:internal v2f
+global_variable	win32_game.c	/^#define global_variable /;"	d	file:
+green_mask	game.h	/^	u32 green_mask;$/;"	m	struct:__anonff3b1fb51708	typeref:typename:u32
+half_transition_count	game.h	/^	u32 half_transition_count;$/;"	m	struct:__anonff3b1fb51108	typeref:typename:u32
+height	game.h	/^	f32 height;$/;"	m	struct:__anonff3b1fb51b08	typeref:typename:f32
+height	game.h	/^	int height;$/;"	m	struct:__anonff3b1fb50f08	typeref:typename:int
+height	game_platform.h	/^	int height;$/;"	m	struct:__anon9c95dc390108	typeref:typename:int
+height	win32_game.h	/^	int height;$/;"	m	struct:__anon6b329e270308	typeref:typename:int
+height	win32_game.h	/^	int height;$/;"	m	struct:__anon6b329e270408	typeref:typename:int
+hit	game.h	/^	b32 hit;$/;"	m	struct:__anonff3b1fb51908	typeref:typename:b32
+inline	win32_game.c	/^#define inline /;"	d	file:
+intensity_bits	game.h	/^	u32 intensity_bits;$/;"	m	struct:__anonff3b1fb51708	typeref:typename:u32
+internal	win32_game.c	/^#define internal	/;"	d	file:
+is_initialized	game.h	/^	b32 is_initialized;$/;"	m	struct:__anonff3b1fb51f08	typeref:typename:b32
+is_initialized	game.h	/^	b32 is_initialized;$/;"	m	struct:__anonff3b1fb52008	typeref:typename:b32
+is_shooting	game.h	/^	b32 is_shooting;$/;"	m	struct:__anonff3b1fb51b08	typeref:typename:b32
+length	game.h	/^	u32 length;$/;"	m	struct:__anonff3b1fb51c08	typeref:typename:u32
+lerp_color	game.c	/^lerp_color(v3f ColorA, v3f ColorB, f32 t)$/;"	f	typeref:typename:internal v3f
+lerp_points	game.c	/^lerp_points(v2f P1, v2f P2, f32 t)$/;"	f	typeref:typename:internal v2f
+line_lerp_draw	game.c	/^line_lerp_draw(back_buffer *BackBuffer, v2f P1, v2f P2, u32 color)$/;"	f	typeref:typename:internal void
+line_wu_draw	game.c	/^line_wu_draw(back_buffer *BackBuffer, v2f P1, v2f P2, color_wu *ColorWu)$/;"	f	typeref:typename:internal void
+local_persist	win32_game.c	/^#define local_persist	/;"	d	file:
+m2x2	game.h	/^} m2x2;$/;"	t	typeref:struct:__anonff3b1fb50408
+m2x2_rotation_create	game_math.h	/^m2x2_rotation_create(f32 angle)$/;"	f	typeref:typename:m2x2
+m2x2_scale_create	game_math.h	/^m2x2_scale_create(f32 c)$/;"	f	typeref:typename:m2x2
+m2x2_transform_v2f	game_math.h	/^m2x2_transform_v2f(m2x2 M, v2f V)$/;"	f	typeref:typename:v2f
+m3x3	game.h	/^} m3x3;$/;"	t	typeref:struct:__anonff3b1fb50208
+m3x3_identity_create	game_math.h	/^m3x3_identity_create()$/;"	f	typeref:typename:m3x3
+m3x3_matrix_mult	game_math.h	/^m3x3_matrix_mult(m3x3 A, m3x3 B)$/;"	f	typeref:typename:m3x3
+m3x3_rectangle_transform_create	game_math.h	/^m3x3_rectangle_transform_create(int width, int height)$/;"	f	typeref:typename:m3x3
+m3x3_rotate_about_origin	game_math.h	/^m3x3_rotate_about_origin(f32 angle)$/;"	f	typeref:typename:m3x3
+m3x3_transform_v2f	game_math.h	/^m3x3_transform_v2f(m3x3 M, v2f V)$/;"	f	typeref:typename:v2f
+m3x3_transform_v3f	game_math.h	/^m3x3_transform_v3f(m3x3 M, v3f V)$/;"	f	typeref:typename:v3f
+m3x3_translate_v2f	game_math.h	/^m3x3_translate_v2f(m3x3 T, v2f V)$/;"	f	typeref:typename:v2f
+m3x3_translation_create	game_math.h	/^m3x3_translation_create(v2f V)$/;"	f	typeref:typename:m3x3
+mass	game.h	/^	f32 mass;$/;"	m	struct:__anonff3b1fb51908	typeref:typename:f32
+memory	game.h	/^	void *memory;$/;"	m	struct:__anonff3b1fb50f08	typeref:typename:void *
+memory	game_platform.h	/^	void *memory;$/;"	m	struct:__anon9c95dc390108	typeref:typename:void *
+memory	win32_game.h	/^	void *memory;$/;"	m	struct:__anon6b329e270408	typeref:typename:void *
+memory_arena	game.h	/^} memory_arena;$/;"	t	typeref:struct:__anonff3b1fb50108
+memory_arena_initialize	game.h	/^memory_arena_initialize(memory_arena *MemoryArena, memory_index arena_size, u8 *base)$/;"	f	typeref:typename:internal void
+memory_block	game.h	/^	void *memory_block;$/;"	m	struct:__anonff3b1fb52008	typeref:typename:void *
+memory_index	game.h	/^typedef size_t memory_index;$/;"	t	typeref:typename:size_t
+name	game.h	/^	char *name;$/;"	m	struct:__anonff3b1fb50b08	typeref:typename:char *
+num_levels	game.h	/^	s32 num_levels;$/;"	m	struct:__anonff3b1fb51708	typeref:typename:s32
+pixel_count_between_points	game.c	/^pixel_count_between_points(v2f P1, v2f P2)$/;"	f	typeref:typename:internal u32
+pixel_set	game.c	/^pixel_set(back_buffer *BackBuffer, s32 screen_x, s32 screen_y, u32 color)$/;"	f	typeref:typename:internal void
+pixels_per_meter	game.h	/^	f32 pixels_per_meter;$/;"	m	struct:__anonff3b1fb51f08	typeref:typename:f32
+player	game.h	/^} player;$/;"	t	typeref:struct:__anonff3b1fb51b08
+player_bounding_box_draw	game.c	/^player_bounding_box_draw(game_state *GameState, back_buffer *BackBuffer, player *Player)$/;"	f	typeref:typename:internal void
+player_draw	game.c	/^player_draw(game_state *GameState, back_buffer *BackBuffer, player *Player)$/;"	f	typeref:typename:internal void
+point_clip_to_world	game.c	/^point_clip_to_world(v2f *WorldDim, v2f Point)$/;"	f	typeref:typename:internal v2f
+point_map_to_screen	game.c	/^point_map_to_screen(game_state *GameState, back_buffer *BackBuffer, v2f Point)$/;"	f	typeref:typename:internal v2f
+projectile	game.h	/^} projectile;$/;"	t	typeref:struct:__anonff3b1fb51e08
+projectile_count	game.h	/^	u32 projectile_count;$/;"	m	struct:__anonff3b1fb51f08	typeref:typename:u32
+projectile_half_width	game.h	/^	f32 projectile_half_width;$/;"	m	struct:__anonff3b1fb51f08	typeref:typename:f32
+projectile_speed	game.h	/^	f32 projectile_speed;$/;"	m	struct:__anonff3b1fb51f08	typeref:typename:f32
+push_array	game.h	/^#define push_array(/;"	d
+push_size	game.h	/^#define push_size(/;"	d
+push_size_	game.h	/^push_size_(memory_arena *MemoryArena, memory_index size)$/;"	f	typeref:typename:void *
+r	win32_game.h	/^	f32 r, g, b;$/;"	m	struct:__anon6b329e270208	typeref:typename:f32
+radius	game.h	/^	f32 radius;$/;"	m	struct:__anonff3b1fb50d08	typeref:typename:f32
+rectangle_draw	game.c	/^rectangle_draw(back_buffer *BackBuffer, v2f Min, v2f Max, f32 r, f32 g, f32 b)$/;"	f	typeref:typename:internal void
+red_mask	game.h	/^	u32 red_mask;$/;"	m	struct:__anonff3b1fb51708	typeref:typename:u32
+s16	win32_game.c	/^typedef int16_t 	s16;$/;"	t	typeref:typename:int16_t	file:
+s32	win32_game.c	/^typedef int32_t 	s32;$/;"	t	typeref:typename:int32_t	file:
+s32_fixed	game.c	/^typedef s32 s32_fixed;$/;"	t	typeref:typename:s32	file:
+s64	win32_game.c	/^typedef int64_t 	s64;$/;"	t	typeref:typename:int64_t	file:
+s8	win32_game.c	/^typedef int8_t		s8;$/;"	t	typeref:typename:int8_t	file:
+sample_count	game.h	/^	int sample_count;$/;"	m	struct:__anonff3b1fb50e08	typeref:typename:int
+sample_count	win32_game.h	/^	int sample_count;$/;"	m	struct:__anon6b329e270108	typeref:typename:int
+sample_count_latency	win32_game.h	/^	int sample_count_latency;$/;"	m	struct:__anon6b329e270108	typeref:typename:int
+samples	game.h	/^	s16 *samples;$/;"	m	struct:__anonff3b1fb50e08	typeref:typename:s16 *
+samples_per_period	win32_game.h	/^	int samples_per_period;$/;"	m	struct:__anon6b329e270108	typeref:typename:int
+samples_per_second	game.h	/^	int samples_per_second;$/;"	m	struct:__anonff3b1fb50e08	typeref:typename:int
+samples_per_second	win32_game.h	/^	int samples_per_second;$/;"	m	struct:__anon6b329e270108	typeref:typename:int
+secondary_buffer_size	win32_game.h	/^	DWORD secondary_buffer_size;$/;"	m	struct:__anon6b329e270108	typeref:typename:DWORD
+size	game.h	/^	asteroid_size size;$/;"	m	struct:__anonff3b1fb51908	typeref:typename:asteroid_size
+size	game.h	/^	memory_index size;$/;"	m	struct:__anonff3b1fb50108	typeref:typename:memory_index
+sound_buffer	game.h	/^} sound_buffer;$/;"	t	typeref:struct:__anonff3b1fb50e08
+sound_buffer_fill	game.c	/^sound_buffer_fill(sound_buffer *SoundBuffer)$/;"	f	typeref:typename:internal void
+speed	game.h	/^	f32 speed;$/;"	m	struct:__anonff3b1fb51908	typeref:typename:f32
+speed	game.h	/^	f32 speed;$/;"	m	struct:__anonff3b1fb51b08	typeref:typename:f32
+stride	game.h	/^	int stride;$/;"	m	struct:__anonff3b1fb50f08	typeref:typename:int
+stride	game_platform.h	/^	int stride;$/;"	m	struct:__anon9c95dc390108	typeref:typename:int
+stride	win32_game.h	/^	int stride;$/;"	m	struct:__anon6b329e270408	typeref:typename:int
+string	game.h	/^} string;$/;"	t	typeref:struct:__anonff3b1fb51c08
+string_length	game.c	/^string_length(char *str)$/;"	f	typeref:typename:internal u32
+strings_are_same	game.c	/^strings_are_same(char *str1, char *str2)$/;"	f	typeref:typename:internal b32
+tick_frequency	win32_game.c	/^global_variable LARGE_INTEGER		tick_frequency;$/;"	v	typeref:typename:global_variable LARGE_INTEGER
+time_between_new_projectiles	game.h	/^	f32 time_between_new_projectiles;$/;"	m	struct:__anonff3b1fb51f08	typeref:typename:f32
+total_size	game.h	/^	u64 total_size;$/;"	m	struct:__anonff3b1fb52008	typeref:typename:u64
+u	game.h	/^		f32 u, v, w;$/;"	m	struct:__anonff3b1fb5080a::__anonff3b1fb50a08	typeref:typename:f32
+u	game.h	/^		f32 u, v;$/;"	m	struct:__anonff3b1fb5050a::__anonff3b1fb50708	typeref:typename:f32
+u16	win32_game.c	/^typedef uint16_t	u16;$/;"	t	typeref:typename:uint16_t	file:
+u32	win32_game.c	/^typedef uint32_t	u32;$/;"	t	typeref:typename:uint32_t	file:
+u64	win32_game.c	/^typedef uint64_t	u64;$/;"	t	typeref:typename:uint64_t	file:
+u8	win32_game.c	/^typedef uint8_t		u8;$/;"	t	typeref:typename:uint8_t	file:
+update_and_render	game.c	/^update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer *SoundBuffer, g/;"	f	typeref:typename:internal void
+used	game.h	/^	memory_index used;$/;"	m	struct:__anonff3b1fb50108	typeref:typename:memory_index
+v	game.h	/^		f32 u, v, w;$/;"	m	struct:__anonff3b1fb5080a::__anonff3b1fb50a08	typeref:typename:f32
+v	game.h	/^		f32 u, v;$/;"	m	struct:__anonff3b1fb5050a::__anonff3b1fb50708	typeref:typename:f32
+v2f	game.h	/^} v2f;$/;"	t	typeref:union:__anonff3b1fb5050a
+v2f_add	game_math.h	/^v2f_add(v2f V1, v2f V2)$/;"	f	typeref:typename:v2f
+v2f_create	game_math.h	/^v2f_create(f32 x, f32 y)$/;"	f	typeref:typename:v2f
+v2f_dot	game_math.h	/^v2f_dot(v2f V1, v2f V2)$/;"	f	typeref:typename:f32
+v2f_length	game_math.h	/^v2f_length(v2f V)$/;"	f	typeref:typename:f32
+v2f_normalize	game_math.h	/^v2f_normalize(v2f V)$/;"	f	typeref:typename:v2f
+v2f_scale	game_math.h	/^v2f_scale(f32 c, v2f V)$/;"	f	typeref:typename:v2f
+v2f_subtract	game_math.h	/^v2f_subtract(v2f V1, v2f V2)$/;"	f	typeref:typename:v2f
+v2i	game.h	/^} v2i;$/;"	t	typeref:struct:__anonff3b1fb50308
+v2i_add	game_math.h	/^v2i_add(v2i V1, v2i V2)$/;"	f	typeref:typename:v2i
+v2i_subtract	game_math.h	/^v2i_subtract(v2i V1, v2i V2)$/;"	f	typeref:typename:v2i
+v3f	game.h	/^} v3f;$/;"	t	typeref:union:__anonff3b1fb5080a
+v3f_create	game_math.h	/^v3f_create(f32 x, f32 y, f32 z)$/;"	f	typeref:typename:v3f
+v3f_scale	game_math.h	/^v3f_scale(f32 c, v3f V)$/;"	f	typeref:typename:v3f
+w	game.h	/^		f32 u, v, w;$/;"	m	struct:__anonff3b1fb5080a::__anonff3b1fb50a08	typeref:typename:f32
+wave_amplitude	win32_game.h	/^	int wave_amplitude;$/;"	m	struct:__anon6b329e270108	typeref:typename:int
+wave_frequency	win32_game.h	/^	int wave_frequency;$/;"	m	struct:__anon6b329e270108	typeref:typename:int
+width	game.h	/^	int width;$/;"	m	struct:__anonff3b1fb50f08	typeref:typename:int
+width	game_platform.h	/^	int width;$/;"	m	struct:__anon9c95dc390108	typeref:typename:int
+width	win32_game.h	/^	int width;$/;"	m	struct:__anon6b329e270308	typeref:typename:int
+width	win32_game.h	/^	int width;$/;"	m	struct:__anon6b329e270408	typeref:typename:int
+win32_back_buffer	win32_game.h	/^} win32_back_buffer;$/;"	t	typeref:struct:__anon6b329e270408
+win32_back_buffer_resize	win32_game.c	/^win32_back_buffer_resize(win32_back_buffer *Win32GlobalBackBuffer, int width, int height)$/;"	f	typeref:typename:internal void
+win32_client_dimensions	win32_game.h	/^} win32_client_dimensions;$/;"	t	typeref:struct:__anon6b329e270308
+win32_color	win32_game.h	/^} win32_color;$/;"	t	typeref:struct:__anon6b329e270208
+win32_dsound_init	win32_game.c	/^win32_dsound_init(HWND WindowHandle, s32 secondary_buffer_size)$/;"	f	typeref:typename:internal void
+win32_process_pending_messgaes	win32_game.c	/^win32_process_pending_messgaes(game_controller_input *KeyboardController)$/;"	f	typeref:typename:internal void
+win32_sound_buffer	win32_game.h	/^} win32_sound_buffer;$/;"	t	typeref:struct:__anon6b329e270108
+win32_sound_buffer_clear	win32_game.c	/^win32_sound_buffer_clear(win32_sound_buffer *Win32SoundBuffer)$/;"	f	typeref:typename:internal void
+win32_sound_buffer_fill	win32_game.c	/^win32_sound_buffer_fill(win32_sound_buffer *Win32SoundBuffer, DWORD byte_to_lock, DWORD bytes_to/;"	f	typeref:typename:internal void
+x	game.h	/^		f32 x, y, z;$/;"	m	struct:__anonff3b1fb5080a::__anonff3b1fb50908	typeref:typename:f32
+x	game.h	/^		f32 x, y;$/;"	m	struct:__anonff3b1fb5050a::__anonff3b1fb50608	typeref:typename:f32
+x	game.h	/^	s32 x, y;$/;"	m	struct:__anonff3b1fb50308	typeref:typename:s32
+y	game.h	/^		f32 x, y, z;$/;"	m	struct:__anonff3b1fb5080a::__anonff3b1fb50908	typeref:typename:f32
+y	game.h	/^		f32 x, y;$/;"	m	struct:__anonff3b1fb5050a::__anonff3b1fb50608	typeref:typename:f32
+y	game.h	/^	s32 x, y;$/;"	m	struct:__anonff3b1fb50308	typeref:typename:s32
+z	game.h	/^		f32 x, y, z;$/;"	m	struct:__anonff3b1fb5080a::__anonff3b1fb50908	typeref:typename:f32
