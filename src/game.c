@@ -9,69 +9,8 @@
  * - vfx
  * -...
 */
+
 #include "game.h"
-#include "game_math.h"
-#include "game_intrinsics.h"
-
-typedef s32 s32_fixed;
-#define SHIFT_AMOUNT 16 // number of bits used to represent fractional part, 2^16 = 65536
-#define SHIFT_MASK ((1 << SHIFT_AMOUNT) - 1) // Sets LSB to all 1's and MSB to all 0's
-#define FIXED_POINT_ONE (1 << SHIFT_AMOUNT)
-#define INT_TO_FIXED(x) ((x) << SHIFT_AMOUNT)
-#define MAKE_FLOAT_FIXED(x) ((s32_fixed)((x) * FIXED_POINT_ONE))
-#define FIXED_TO_INT(x) ((x) >> SHIFT_AMOUNT)
-#define FLOAT_TO_FIXED(x) (s32_fixed)(x * (f32)(FIXED_POINT_ONE))
-#define FIXED_TO_FLOAT(x) (((f32)(x) / FIXED_POINT_ONE))
-
-
-#define ONES_COMP(x) ~x
-#define TWOS_COMP(x) ~x + 1
-
-
-#define FIXED_MULT(x, y) ((s32_fixed))((((s64)x) * ((s64)y)) >> SHIFT_AMOUNT)
-
-//#define FIXED_MULT(x, y) (((x) * (y)) >> SHIFT_AMOUNT)
-#define FIXED_DIV(x, y) (((x) << SHIFT_AMOUNT) / (y))
-
-
-#define HALF_ROOT_TWO 0.707106780f
-#define PI32 3.1415926535897f
-
-
-#define NUM_WU_COLORS 2 /* # of colors we'll do antialiased drawing with */
-typedef struct
-{        
-   s16 BaseColor;       /* # of start of palette intensity block in DAC */
-   s16 NumLevels;       /* # of intensity levels */
-   s16 IntensityBits;   /* IntensityBits == log2 NumLevels */
-   s16 MaxRed;          /* red component of color at full intensity */
-   s16 MaxGreen;        /* green component of color at full intensity */
-   s16 MaxBlue;         /* blue component of color at full intensity */
-} WUWU;
-//enum {WU_BLUEBLUE=0, WU_WHITEWHITE=1};             /* drawing colors */
-WUWU Colors[NUM_WU_COLORS] =  /* blue and white */
-    {{192, 32, 5, 0, 0, 0x3F}, {224, 32, 5, 0x3F, 0x3F, 0x3F}};
-
-
-// If the number of different intensity levels chosen is 32 and we want to
-// interpolate white then the base_color is FF - 32 = CD FOR EACH COLOR CHANNEL.
-// We must increment each channel, in the case for white, otherwise incrementing
-// only one channel changes the inherent color itself. This does not hold for
-// other colors. 
-//
-// How to pipuldate struct
-// pick number of levels to be power of 2.
-// intensity bits is log_2 of num levels. 
-// The base color will be able to assume values from a chosen start color
-// plus 0 to num_levels of intensity for example if white is chosen as base
-// color and we have 32 levels of intensity then the range of colors is 0xCD to
-// 0xFF because the max intensity is 0xFF and the min intensity is 0xFF - 32 = 0xCD. Note
-// that each channel will range from 0xCD to 0xFF. That is for a white pixel, the pixel
-// is in [0xCDCDCD, 0xFFFFFF].
-
-//color_wu ColorWU[WU_COLOR_COUNT] = {{0x00000000, 256, 8, 0, 0, 0xFF}, {0x00FFFFFF, 32, 5, 0xFF, 0xFF, 0xFF}};
-
-
 
 internal void
 sound_buffer_fill(sound_buffer *SoundBuffer)
@@ -81,7 +20,7 @@ sound_buffer_fill(sound_buffer *SoundBuffer)
 	int samples_per_period = SoundBuffer->samples_per_second / wave_frequency;
 
 	local_persist f32 t = 0.0f;
-	f32 dt = 2.0f * PI / samples_per_period;
+	f32 dt = 2.0f * PI32 / samples_per_period;
 
 	s16 *sample = SoundBuffer->samples;
 	for (int sample_index = 0; sample_index < SoundBuffer->sample_count; sample_index++) {
@@ -95,22 +34,6 @@ sound_buffer_fill(sound_buffer *SoundBuffer)
 	}
 }
 
-internal u32
-color_make(f32 r, f32 g, f32 b)
-{
-	u32 result = 0;
-	if (0.0f <= (r * g * b) <= 1.0f) {
-		u32 red = (u32)(r * 255.0f);
-		u32 green = (u32)(g * 255.0f);
-		u32 blue = (u32)(b * 255.0f);
-
-		result = ((red << 16) | (green << 8) | (blue << 0));
-	}
-	return(result);
-}
-
-
-
 internal void 
 rectangle_draw(back_buffer *BackBuffer, v2f Min, v2f Max, f32 r, f32 g, f32 b)
 {
@@ -119,32 +42,28 @@ rectangle_draw(back_buffer *BackBuffer, v2f Min, v2f Max, f32 r, f32 g, f32 b)
 	s32 x_max = f32_round_to_s32(Max.x);
 	s32 y_max = f32_round_to_s32(Max.y);
 
-	// Check bounds
 	if (x_min < 0) {
-		//x_min = BackBuffer->width;
-		x_min = 0;
+		x_min = BackBuffer->width - 1;
 	}
 	if (x_max > BackBuffer->width) {
-		//x_max = 0;
-		x_max = BackBuffer->width;
+		x_max = 0;
 	}
 	if (y_min < 0) {
-		//y_min = BackBuffer->height;
-		y_min = 0;
+		y_min = BackBuffer->height - 1;
 	}
 	if (y_max > BackBuffer->height) {
-		//y_max = 0;
-		y_max = BackBuffer->height;
+		y_max = 0;
 	}
 
-	u32 color = color_make(r, g, b);
+	u32 red = f32_round_to_u32(255.0f * r);
+	u32 green = f32_round_to_u32(255.0f * g);
+	u32 blue = f32_round_to_u32(255.0f * b);
+	u32 color = ((red << 16) | (green << 8) | (blue << 0));
 
 	u8 *pixel_row = (u8 *)BackBuffer->memory + BackBuffer->stride * y_min + BackBuffer->bytes_per_pixel * x_min ;
 	for (int row = y_min; row < y_max; row++) {
-
 		u32 *pixel = (u32 *)pixel_row;
 		for (int col = x_min; col < x_max; col++)  {
-
 			*pixel++ = color;
 		}
 		pixel_row += BackBuffer->stride;
@@ -222,14 +141,6 @@ line_dda_draw(back_buffer *BackBuffer, v2f P1, v2f P2, v3f Color)
 }
 #endif
 
-
-// Without the bounding box the lowest frame rate was ~75 f/s. With the bounding
-// box the lowest frame rate was ~113 f/s. Huge difference!! The "area" of the
-// screen that we check without the bounding box is the ENTIRE screen. With the
-// bounding box the area is much smaller. We are calling the CRT sqrt() function
-// which is EXPENSIVE. Without the bounding box we call this function FOR EACH
-// pixel. VERY EXPENSIVE...
-
 internal bounding_box
 circle_bounding_box_find(circle Circle)
 {
@@ -300,24 +211,14 @@ circle_draw(game_state *GameState, back_buffer *BackBuffer, circle *Circle,
 	s32 x_max = f32_round_to_s32(CircleBoudingBox.Max.x);
 	s32 y_max = f32_round_to_s32(CircleBoudingBox.Max.y);
 
-#if 0
-	if (x_min < 0) {
-		x_min = BackBuffer->width;
-	}
-	if (x_max > BackBuffer->width) {
-		x_max = 0;
-	}
-	if (y_min < 0) {
-		y_min = BackBuffer->height;
-	}
-	if (y_max > BackBuffer->height) {
-		y_max = 0;
-	}
-#endif
+	u32 red = f32_round_to_u32(255.0f * r);
+	u32 green = f32_round_to_u32(255.0f * g);
+	u32 blue = f32_round_to_u32(255.0f * b);
+	u32 color = ((red << 16) | (green << 8) | (blue << 0));
 
-	u32 color = color_make(r, g, b);
+
 	u8 *pixel_row = (u8 *)BackBuffer->memory + BackBuffer->stride * y_min
-		+ BackBuffer->bytes_per_pixel * x_min;
+											 + BackBuffer->bytes_per_pixel * x_min;
 
 	v2f Center = point_map_to_screen(GameState, BackBuffer, Circle->Center);
 	f32 radius = GameState->pixels_per_meter * Circle->radius;
@@ -528,10 +429,9 @@ tile_relative_pos_map_to_screen(game_state *GameState, back_buffer *BackBuffer,
 {
 	v2f Result = {0};
 
-#if 1
 	v2f TileCenter;
-	TileCenter.x = (f32)TileMapPos.TilePos.x * GameState->meters_per_tile + GameState->meters_per_tile / 2.0f;
-	TileCenter.y = (f32)TileMapPos.TilePos.y * GameState->meters_per_tile + GameState->meters_per_tile / 2.0f;
+	TileCenter.x = (f32)TileMapPos.TilePos.x * GameState->meters_per_tile_side + GameState->meters_per_tile_side / 2.0f;
+	TileCenter.y = (f32)TileMapPos.TilePos.y * GameState->meters_per_tile_side + GameState->meters_per_tile_side / 2.0f;
 
 
 	v2f WorldXY;
@@ -542,16 +442,6 @@ tile_relative_pos_map_to_screen(game_state *GameState, back_buffer *BackBuffer,
 	ScreenXY.x = GameState->pixels_per_meter * WorldXY.x;
 	ScreenXY.y = GameState->pixels_per_meter * WorldXY.y;
 	Result = ScreenXY;
-#endif
-#if 0
-	Result.x = (f32)TileMapPos.TilePos.x * GameState->meters_per_tile + 
-		TileMapPos.TileRelativePos.x + PlayerVertex.x + (GameState->meters_per_tile / 2.0f);
-	Result.y = (f32)TileMapPos.TilePos.y * GameState->meters_per_tile + 
-		TileMapPos.TileRelativePos.y + PlayerVertex.y + (GameState->meters_per_tile / 2.0f);
-
-	Result = v2f_scale(GameState->pixels_per_meter, Result);
-#endif
-
 
 	return(Result);
 }
@@ -571,14 +461,6 @@ player_draw(game_state *GameState, back_buffer *BackBuffer, player *Player)
 	v2f PlayerScreenTop = tile_relative_pos_map_to_screen(GameState, BackBuffer, Player->TileMapPos, Player->Vertices[PLAYER_TOP]);
 	v2f PlayerScreenBezierTop = tile_relative_pos_map_to_screen(GameState, BackBuffer, Player->TileMapPos, Player->Vertices[PLAYER_BEZIER_TOP]);
 
-
-
-
-	//v2f PlayerScreenLeft = point_map_to_screen(GameState, BackBuffer, Player->Vertices[PLAYER_LEFT]);
-	//v2f PlayerScreenRight = point_map_to_screen(GameState, BackBuffer, Player->Vertices[PLAYER_RIGHT]);
-	//v2f PlayerScreenTop = point_map_to_screen(GameState, BackBuffer, Player->Vertices[PLAYER_TOP]);
-	//v2f PlayerScreenBezierTop = point_map_to_screen(GameState, BackBuffer, Player->Vertices[PLAYER_BEZIER_TOP]);
-
 	line_wu_draw(BackBuffer, PlayerScreenLeft, PlayerScreenTop, &Player->ColorWu);
 	line_wu_draw(BackBuffer, PlayerScreenRight, PlayerScreenTop, &Player->ColorWu);
 
@@ -588,9 +470,6 @@ player_draw(game_state *GameState, back_buffer *BackBuffer, player *Player)
 		f32 t = (f32)i / 100;
 		bezier_curve_draw(BackBuffer, PlayerScreenLeft, PlayerScreenBezierTop, PlayerScreenRight, t);
 	}
-
-	// Shield
-	//circle_draw(GameState, BackBuffer, &Player->Shield, 1.0f, 1.0f, 1.0f);
 
 #if DEBUG_VERTICES
 	v2f OffsetInPixels = {10.0f, 10.0f};
@@ -670,10 +549,6 @@ color_get(game_state *GameState, char *name)
 	return(Result);
 }
 
-
-
-
-
 internal void
 player_bounding_box_draw(game_state *GameState, back_buffer *BackBuffer, player *Player)
 {
@@ -747,12 +622,12 @@ internal void
 debug_tile_map_position_draw(game_state *GameState, back_buffer *BackBuffer, tile_map_position TileMapPos)
 {
 	v2f Min;
-	Min.x = (f32)TileMapPos.TilePos.x * GameState->meters_per_tile;
-	Min.y = (f32)TileMapPos.TilePos.y * GameState->meters_per_tile;
+	Min.x = (f32)TileMapPos.TilePos.x * GameState->meters_per_tile_side;
+	Min.y = (f32)TileMapPos.TilePos.y * GameState->meters_per_tile_side;
 
 	v2f Max;
-	Max.x = Min.x + GameState->meters_per_tile;
-	Max.y = Min.y + GameState->meters_per_tile;
+	Max.x = Min.x + GameState->meters_per_tile_side;
+	Max.y = Min.y + GameState->meters_per_tile_side;
 
 	Min = v2f_scale(GameState->pixels_per_meter, Min);
 	Max = v2f_scale(GameState->pixels_per_meter, Max);
@@ -820,22 +695,235 @@ rectangle_transparent_draw(back_buffer *BackBuffer, v2f Min, v2f Max, f32 r, f32
 	}
 }
 
+internal v2f
+get_world_position(game_state *GameState, tile_map_position TileMapPos)
+{
+	v2f Result = {0};
+
+	v2f TileMapXY;
+	TileMapXY.x = TileMapPos.TilePos.x * GameState->meters_per_tile_side + GameState->meters_per_tile_side / 2.0f  + TileMapPos.TileRelativePos.x;
+	TileMapXY.y = TileMapPos.TilePos.y * GameState->meters_per_tile_side + GameState->meters_per_tile_side / 2.0f  + TileMapPos.TileRelativePos.y;
+
+	Result = TileMapXY;
+	return(Result);
+}
+
+
+internal string_u8
+str_u8(char *str)
+{
+	string_u8 Result;
+	Result.data = (u8 *)str;
+	for (char *c = str; *c != '\0'; c++) {
+		Result.length++;
+	}
+	return(Result);
+}
+
+#pragma pack(push, 1)
+typedef struct
+{
+	u16 file_type;
+	u32 file_size;
+	u16 reserved_1;
+	u16 reserved_2;
+	u32 bitmap_offset;
+	u32 size;
+	s32 width;
+	s32 height;
+	u16 planes;
+	u16 bits_per_pixel; 
+	u32 compression;
+	u32 bitmap_size;
+	s32 horz_resolution;
+	s32 vert_resolution;  
+	u32 colors_used;
+	u32 colors_important;
+} bitmap_header;
+
+typedef struct
+{
+	u32 chunk_id;
+	u32 chunk_size;
+	u32 wave_id;
+} wave_header;
+
+#define RIFF_CODE(a, b, c, d) (((u32)(a) << 0) | ((u32)(b) << 8) | ((u32)(c) << 16) | ((u32)(d) << 24))
+
+enum
+{
+	 WAVE_CHUNK_ID_RIFF = RIFF_CODE('R', 'I', 'F', 'F'),
+	 WAVE_CHUNK_ID_FORMAT = RIFF_CODE('f', 'm', 't', ' '),
+	 WAVE_CHUNK_ID_WAVE = RIFF_CODE('W', 'A', 'V', 'E'),
+	 WAVE_CHUNK_ID_DATA = RIFF_CODE('d', 'a', 't', 'a')
+};
+
+typedef struct
+{
+	u32 id;
+	u32 size;
+	u16 format;
+	u16 channel_count;
+	u32 samples_per_second;
+	u32 avg_bytes_per_second;
+	u16 block_align;
+	u16 bits_per_sample;
+	u16 extension_size;
+	u16 valid_bits_per_sample;
+	u32 channel_mask;
+	u8 sub_format[16];
+
+} wave_format_chunk;
+
+typedef struct
+{
+	u32 id;
+	u32 size;
+} wave_chunk;
+#pragma pack(pop)
+
+typedef struct
+{
+	wave_chunk *Chunk;
+	u8 *at;
+	u8 *stop;
+
+} riff_iterator;
+
+inline riff_iterator
+parse_chunk_at(void *at, void *stop)
+{
+	riff_iterator Iter;
+	Iter.Chunk = (wave_chunk *)at;
+	Iter.at = (u8 *)at;
+	Iter.stop = (u8 *)stop;
+	return(Iter);
+}
+
+inline riff_iterator
+next_chunk(riff_iterator Iter)
+{
+	// Note(Justin): Chunk size does not include the size of the header.
+	Iter.at += sizeof(wave_chunk) + Iter.Chunk->size;
+	return(Iter);
+}
+
+inline b32
+is_valid(riff_iterator Iter)
+{
+	b32 Result = (Iter.at < Iter.stop);
+	return(Result);
+}
+
+inline void *
+get_chunk_data(riff_iterator Iter)
+{
+	void *Result = (Iter.at + sizeof(wave_chunk));
+	return(Result);
+}
+
+inline u32
+get_type(riff_iterator Iter)
+{
+	u32 Result = Iter.Chunk->id;
+	return(Result);
+}
+
+
+#if 1
+internal loaded_sound
+wav_file_read_entire(char *filename)
+{
+	loaded_sound Result = {0};
+	debug_file_read WavFile = platform_file_read_entire(filename);
+	if (WavFile.size != 0) {
+		wave_header *WaveHeader = (wave_header *)WavFile.contents;
+
+		ASSERT(WaveHeader->chunk_id == WAVE_CHUNK_ID_RIFF);
+		ASSERT(WaveHeader->wave_id == WAVE_CHUNK_ID_WAVE);
+
+		void *samples;
+		for (riff_iterator Iter = parse_chunk_at(WaveHeader + 1, (u8 *)(WaveHeader + 1) + WaveHeader->chunk_size);
+				is_valid(Iter);
+				Iter = next_chunk(Iter)) {
+			Iter = next_chunk(Iter);
+			switch (get_type(Iter)) {
+				case WAVE_CHUNK_ID_FORMAT:
+				{
+					wave_format_chunk *WaveFormat = (wave_format_chunk *)get_chunk_data(Iter);
+				} break;
+				case WAVE_CHUNK_ID_DATA:
+				{
+					samples = get_chunk_data(Iter);
+				} break;
+			}
+		}
+	}
+
+	return(Result);
+}
+#endif
+
+
+internal loaded_bitmap
+bitmap_file_read_entire(char *filename)
+{
+	loaded_bitmap Result = {0};
+
+	debug_file_read  BitmapFile = platform_file_read_entire(filename);
+	if (BitmapFile.contents) {
+		bitmap_header *BitmapHeader = (bitmap_header *)BitmapFile.contents;
+		if (BitmapHeader->size != 0) {
+			Result.memory = (void *)((u8 *)BitmapFile.contents + BitmapHeader->bitmap_offset);
+			Result.width = BitmapHeader->width;
+			Result.height = BitmapHeader->height;
+			Result.bytes_per_pixel = BitmapHeader->bits_per_pixel / 8;
+			Result.stride = BitmapHeader->width * Result.bytes_per_pixel;
+		}
+	}
+	return(Result);
+}
+
+
+internal void
+bitmap_draw(back_buffer *BackBuffer, loaded_bitmap *Bitmap)
+{
+	ASSERT(Bitmap->width <= BackBuffer->width);
+	ASSERT(Bitmap->height <= BackBuffer->height);
+
+	u8 *dest_row = (u8 *)BackBuffer->memory;
+	u8 *src_row = (u8 *)Bitmap->memory;
+	for (s32 y = 0; y < Bitmap->height; y++) {
+		u32 *src = (u32 *)src_row;
+		u32 *dest = (u32 *)dest_row;
+		for (s32 x = 0; x < Bitmap->width; x++) {
+			*dest++ = *src++;
+		}
+		dest_row += BackBuffer->stride;
+		src_row += Bitmap->stride;
+	}
+}
+
 internal void
 update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer *SoundBuffer, game_input *GameInput)
 {
+	wav_file_read_entire("bloop_00.wav");
+
 	game_state *GameState = (game_state *)GameMemory->memory_block;
 	if (!GameMemory->is_initialized) {
+
+		GameState->Background = bitmap_file_read_entire("space_background.bmp");
 
 		GameState->pixels_per_meter = 5.0f;
 		GameState->WorldHalfDim = v2f_create((f32)BackBuffer->width / (2.0f * GameState->pixels_per_meter),
 											 (f32)BackBuffer->height / (2.0f * GameState->pixels_per_meter));
 
-		GameState->tile_count_x = 17;
-		GameState->tile_count_y = 9;
-		GameState->meters_per_tile = 11.0f;
+		//GameState->tile_count_x = 17;
+		//GameState->tile_count_y = 9;
+		GameState->meters_per_tile_side = 12.0f;
 
-		//GameState->tile_count_x = f32_round_to_u32(2.0f * GameState->WorldHalfDim.x / GameState->meters_per_tile);
-		//GameState->tile_count_y = f32_round_to_u32(2.0f * GameState->WorldHalfDim.y / GameState->meters_per_tile);
+		GameState->tile_count_x = f32_round_to_u32(2.0f * GameState->WorldHalfDim.x / GameState->meters_per_tile_side);
+		GameState->tile_count_y = f32_round_to_u32(2.0f * GameState->WorldHalfDim.y / GameState->meters_per_tile_side);
 
 		v3f White = {1.0f, 1.0f, 1.0f};
 		v3f Red = {1.0f, 0.0f, 0.0f};
@@ -906,7 +994,6 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 		Player->Shield.Center = Player->TileMapPos.TileRelativePos;
 		Player->Shield.radius = Player->height / 2.0f;
 
-	
 		GameState->projectile_next = 0;
 		GameState->projectile_speed = 60.0f;
 		GameState->projectile_half_width = 1.0f;
@@ -966,7 +1053,8 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 			} else {
 				GameState->Asteroids[asteroid_index].size = ASTEROID_LARGE;
 			}
-
+			GameState->Asteroids[asteroid_index].mass = size_scale;
+		
 			GameState->Asteroids[asteroid_index].LocalVertices[0] = v2f_scale(size_scale, GameState->Asteroids[asteroid_index].LocalVertices[0]);
 			GameState->Asteroids[asteroid_index].LocalVertices[1] = v2f_scale(size_scale, GameState->Asteroids[asteroid_index].LocalVertices[1]);
 			GameState->Asteroids[asteroid_index].LocalVertices[2] = v2f_scale(size_scale, GameState->Asteroids[asteroid_index].LocalVertices[2]);
@@ -1015,9 +1103,7 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 		GameMemory->is_initialized = TRUE;
 	}
 
-	v2f BackBufferMin = {0};
-	v2f BackBufferMax = {(f32)BackBuffer->width, (f32)BackBuffer->height};
-	rectangle_draw(BackBuffer, BackBufferMin, BackBufferMax, 0.0f, 0.0f, 0.0f); 
+	bitmap_draw(BackBuffer, &GameState->Background);
 
 	v2f *WorldHalfDim = &GameState->WorldHalfDim;
 	if (WorldHalfDim->x != ((f32)BackBuffer->width / (2.0f * GameState->pixels_per_meter))) {
@@ -1030,11 +1116,11 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 
 #if DEBUG_TILE_MAP
 	for (s32 tile_y = 0; tile_y < GameState->tile_count_y; tile_y++) {
-		f32 horizontal_line_y = tile_y * GameState->meters_per_tile * GameState->pixels_per_meter;
+		f32 horizontal_line_y = tile_y * GameState->meters_per_tile_side * GameState->pixels_per_meter;
 		line_horizontal_draw(BackBuffer, horizontal_line_y, 1.0f, 1.0f, 1.0f);
 	}
 	for (s32 tile_x = 0; tile_x < GameState->tile_count_x; tile_x++) {
-		f32 vertical_line_x = tile_x * GameState->meters_per_tile * GameState->pixels_per_meter;
+		f32 vertical_line_x = tile_x * GameState->meters_per_tile_side * GameState->pixels_per_meter;
 		line_vertical_draw(BackBuffer, vertical_line_x, 1.0f, 1.0f, 1.0f);
 	}
 #endif
@@ -1204,33 +1290,33 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 	v2f PlayerNewTileRelativePos = v2f_add(Player->TileMapPos.TileRelativePos, PosOffset);
 	v2i PlayerNewTilePos = Player->TileMapPos.TilePos;
 
-	if (PlayerNewTileRelativePos.x > (GameState->meters_per_tile / 2.0f)) {
-		//PlayerNewTileRelativePos.x -= GameState->meters_per_tile;
-		PlayerNewTileRelativePos.x -= GameState->meters_per_tile / 2.0f;
+	if (PlayerNewTileRelativePos.x > (GameState->meters_per_tile_side / 2.0f)) {
+		//PlayerNewTileRelativePos.x -= GameState->meters_per_tile_side;
+		PlayerNewTileRelativePos.x -= GameState->meters_per_tile_side / 2.0f;
 		PlayerNewTilePos.x++;
 		if (PlayerNewTilePos.x >= GameState->tile_count_x) {
 			PlayerNewTilePos.x = 0;
 		}
 	}
-	if (PlayerNewTileRelativePos.x < (-GameState->meters_per_tile / 2.0f)) {
-		//PlayerNewTileRelativePos.x += GameState->meters_per_tile;
-		PlayerNewTileRelativePos.x += GameState->meters_per_tile / 2.0f;
+	if (PlayerNewTileRelativePos.x < (-GameState->meters_per_tile_side / 2.0f)) {
+		//PlayerNewTileRelativePos.x += GameState->meters_per_tile_side;
+		PlayerNewTileRelativePos.x += GameState->meters_per_tile_side / 2.0f;
 		PlayerNewTilePos.x--;
 		if (PlayerNewTilePos.x < 0) {
 			PlayerNewTilePos.x = GameState->tile_count_x - 1;
 		}
 	}
-	if (PlayerNewTileRelativePos.y > (GameState->meters_per_tile / 2.0f)) {
-		//PlayerNewTileRelativePos.y -= GameState->meters_per_tile;
-		PlayerNewTileRelativePos.y -= GameState->meters_per_tile / 2.0f;
+	if (PlayerNewTileRelativePos.y > (GameState->meters_per_tile_side / 2.0f)) {
+		//PlayerNewTileRelativePos.y -= GameState->meters_per_tile_side;
+		PlayerNewTileRelativePos.y -= GameState->meters_per_tile_side / 2.0f;
 		PlayerNewTilePos.y++;
 		if (PlayerNewTilePos.y >= GameState->tile_count_y) {
 			PlayerNewTilePos.y = 0;
 		}
 	}
-	if (PlayerNewTileRelativePos.y < (-GameState->meters_per_tile / 2.0f)) {
-		//PlayerNewTileRelativePos.y += GameState->meters_per_tile;
-		PlayerNewTileRelativePos.y += GameState->meters_per_tile / 2.0f;
+	if (PlayerNewTileRelativePos.y < (-GameState->meters_per_tile_side / 2.0f)) {
+		//PlayerNewTileRelativePos.y += GameState->meters_per_tile_side;
+		PlayerNewTileRelativePos.y += GameState->meters_per_tile_side / 2.0f;
 		PlayerNewTilePos.y--;
 		if (PlayerNewTilePos.y < 0) {
 			PlayerNewTilePos.y = GameState->tile_count_y - 1;
@@ -1247,9 +1333,9 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 
 
 	//PlayerNewPos = point_clip_to_world(WorldHalfDim, PlayerNewPos);
-	//PlayerNewPos = v2i_scale(GameState->meters_per_tile, Player->TileMapPos);
-	//PlayerNewPos.x = (f32)PlayerNewTilePos.x * GameState->meters_per_tile + PlayerNewTileRelativePos.x;
-	//PlayerNewPos.y = (f32)PlayerNewTilePos.y * GameState->meters_per_tile + PlayerNewTileRelativePos.y;
+	//PlayerNewPos = v2i_scale(GameState->meters_per_tile_side, Player->TileMapPos);
+	//PlayerNewPos.x = (f32)PlayerNewTilePos.x * GameState->meters_per_tile_side + PlayerNewTileRelativePos.x;
+	//PlayerNewPos.y = (f32)PlayerNewTilePos.y * GameState->meters_per_tile_side + PlayerNewTileRelativePos.y;
 
 	v2f PlayerNewVertices[PLAYER_VERTEX_COUNT];
 
@@ -1444,6 +1530,8 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 
 	Player->TileMapPos.TilePos = PlayerNewTilePos;
 	Player->TileMapPos.TileRelativePos = PlayerNewTileRelativePos;
+
+	//v2f Temp = get_world_position(GameState, Player->TileMapPos);
 
 	player_draw(GameState, BackBuffer, &GameState->Player);
 
