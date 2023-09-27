@@ -15,12 +15,6 @@ typedef struct
 
 typedef struct
 {
-	f32 r, g, b;
-
-} win32_color;
-
-typedef struct
-{
 	int width;
 	int height;
 

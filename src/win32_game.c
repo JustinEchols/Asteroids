@@ -38,7 +38,6 @@ Play
 sfx
 */
 
-#include <stdint.h>
 
 #include <windows.h>
 #include <stdio.h>
@@ -48,54 +47,9 @@ sfx
 
 
 
-
-#if GAME_SLOW
-#define ASSERT(expression) if (!(expression)) {*(int *)0 = 0;}
-#else
-#define ASSERT(expression)
-#endif
-
-// NOTE(Justin): The inline keyword is a C99 keyword and is not fully supported
-// with MSVC. It is only available in C++. Therefore we have to use __inline
-// TODO(Justin): Guard this macro
-#define inline __inline
-
-#define ARRAY_COUNT(a) (sizeof(a) / sizeof((a)[0]))
-
-
-#define KILOBYTES(kilobyte_count) 1024 * kilobyte_count
-#define MEGABYTES(megabyte_count) 1024 * KILOBYTES(megabyte_count)
-#define GIGABYTES(gigabyte_count) 1024 * MEGABYTES(gigabyte_count)
-#define TERABYTES(terabyte_count) 1024 * GIGABYTES(terabyte_count)
-
-
-#define PI 3.14159265359f
-
-#define internal		static
-#define local_persist	static
-#define global_variable static
-
-
-#define TRUE 1
-#define FALSE 0
-
-typedef int8_t		s8;
-typedef int16_t 	s16;
-typedef int32_t 	s32;
-typedef int64_t 	s64;
-typedef s32			b32;
-
-typedef uint8_t		u8;
-typedef uint16_t	u16;
-typedef uint32_t	u32;
-typedef uint64_t	u64;
-
-typedef float		f32;
-typedef double		f64;
-
-
-#include "win32_game.h"
 #include "game.c"
+#include "win32_game.h"
+
 
 
 global_variable b32					Win32GlobalRunning;
@@ -112,15 +66,12 @@ win32_dsound_init(HWND WindowHandle, s32 secondary_buffer_size)
 {
 	HMODULE dsound_dll = LoadLibraryA("dsound.dll");
 	if (dsound_dll) {
-		// DLL retrieved successfully
 		direct_sound_create *dsound_create =
 			(direct_sound_create *)GetProcAddress(dsound_dll, "DirectSoundCreate");
 
 		LPDIRECTSOUND DSound;
 		if (dsound_create) {
-			// Function ptr to create DSound instance retrieved successfully
 			if (SUCCEEDED(dsound_create(0, &DSound, 0))) {
-				// Setting wave format here so both sound buffers can use it
 				WAVEFORMATEX WaveFormat = {0};
 				WaveFormat.wFormatTag = WAVE_FORMAT_PCM;
 				WaveFormat.nChannels = 2;
@@ -161,7 +112,7 @@ win32_dsound_init(HWND WindowHandle, s32 secondary_buffer_size)
 				BufferDesc.lpwfxFormat = &WaveFormat;
 				BufferDesc.guid3DAlgorithm = GUID_NULL;
 
-				// Using Win32GlobalSecondaryBuffer here!!
+				// NOTE(Justin): Using Win32GlobalSecondaryBuffer here!!
 				if (SUCCEEDED(DSound->lpVtbl->CreateSoundBuffer(DSound, &BufferDesc, &Win32GlobalSecondaryBuffer, 0))) {
 					OutputDebugStringA("Secondary buffer created successfully.\n");
 				} else {
@@ -315,51 +266,50 @@ LRESULT CALLBACK
 WndProc(HWND WindowHandle, UINT Message, WPARAM wParam, LPARAM lParam)
 {
 	LRESULT result = 0;
-	switch(Message)
-	{
+	switch (Message) {
 		case WM_CLOSE:
-			{
-				Win32GlobalRunning = FALSE;
-			} break;
+		{
+			Win32GlobalRunning = FALSE;
+		} break;
 		case WM_DESTROY:
-			{
-				// TODO: Handle as an error. Why?
-			} break;
+		{
+			// TODO: Handle as an error. Why?
+		} break;
 		case WM_QUIT:
-			{
-			} break;
+		{
+		} break;
 		case WM_SIZE:
-			{
-				RECT ClientRect;
-				GetClientRect(WindowHandle, &ClientRect);
-				int client_width = ClientRect.right - ClientRect.left;
-				int client_height = ClientRect.bottom - ClientRect.top;
-				win32_back_buffer_resize(&Win32GlobalBackBuffer, client_width, client_height);
-			} break;
+		{
+			RECT ClientRect;
+			GetClientRect(WindowHandle, &ClientRect);
+			int client_width = ClientRect.right - ClientRect.left;
+			int client_height = ClientRect.bottom - ClientRect.top;
+			win32_back_buffer_resize(&Win32GlobalBackBuffer, client_width, client_height);
+		} break;
 		case WM_SYSKEYDOWN:
 		case WM_SYSKEYUP:
 		case WM_KEYDOWN:
 		case WM_KEYUP:
-			{
-				// TODO(Justin): Assert macro
-			} break;
+		{
+			// TODO(Justin): Assert macro
+		} break;
 		case WM_PAINT:
-			{
-				PAINTSTRUCT PaintStruct;
-				HDC DeviceContext = BeginPaint(WindowHandle, &PaintStruct);
+		{
+			PAINTSTRUCT PaintStruct;
+			HDC DeviceContext = BeginPaint(WindowHandle, &PaintStruct);
 
-				StretchDIBits(DeviceContext,
-						0, 0, Win32GlobalBackBuffer.width, Win32GlobalBackBuffer.height,
-						0, 0, Win32GlobalBackBuffer.width, Win32GlobalBackBuffer.height,
-						Win32GlobalBackBuffer.memory, &Win32GlobalBackBuffer.Info,
-						DIB_RGB_COLORS, SRCCOPY);
+			StretchDIBits(DeviceContext,
+					0, 0, Win32GlobalBackBuffer.width, Win32GlobalBackBuffer.height,
+					0, 0, Win32GlobalBackBuffer.width, Win32GlobalBackBuffer.height,
+					Win32GlobalBackBuffer.memory, &Win32GlobalBackBuffer.Info,
+					DIB_RGB_COLORS, SRCCOPY);
 
-				EndPaint(WindowHandle, &PaintStruct);
-			} break;
+			EndPaint(WindowHandle, &PaintStruct);
+		} break;
 		default:
-			{
-				result = DefWindowProc(WindowHandle, Message, wParam, lParam);
-			} break;
+		{
+			result = DefWindowProc(WindowHandle, Message, wParam, lParam);
+		} break;
 	}
 	return(result);
 }
@@ -369,14 +319,11 @@ win32_process_pending_messgaes(game_controller_input *KeyboardController)
 {
 	MSG Message; 
 	while (PeekMessageA(&Message, 0, 0, 0, PM_REMOVE)) {
-
-		switch(Message.message)
-		{
+		switch(Message.message) {
 			case WM_QUIT:
-				{
-					Win32GlobalRunning = FALSE;
-				} break;
-
+			{
+				Win32GlobalRunning = FALSE;
+			} break;
 			case WM_SYSKEYDOWN:
 			case WM_SYSKEYUP:
 			case WM_KEYDOWN:
@@ -386,8 +333,7 @@ win32_process_pending_messgaes(game_controller_input *KeyboardController)
 				s32 key_was_down = ((Message.lParam & (1 << 30)) != 0);
 				s32 key_is_down = ((Message.lParam & (1 << 31)) == 0);
 				if (key_was_down != key_is_down) {
-					switch(vk_code)
-					{
+					switch(vk_code) {
 						case VK_LBUTTON:
 						{
 						} break;
@@ -447,6 +393,49 @@ win32_process_pending_messgaes(game_controller_input *KeyboardController)
 		}
 	}
 }
+
+
+
+internal void
+platform_file_free_memory(void *file_memory)
+{
+	if (file_memory) {
+		VirtualFree(file_memory, 0, MEM_RELEASE);
+	}
+}
+
+internal debug_file_read
+platform_file_read_entire(char *filename)
+{
+	debug_file_read  Result = {0};
+	HANDLE FileHandle = CreateFileA(filename, GENERIC_READ, FILE_SHARE_READ, 0, OPEN_EXISTING, 0, 0);
+	if (FileHandle != INVALID_HANDLE_VALUE) {
+		DWORD FileSize = GetFileSize(FileHandle, &FileSize);
+		if (FileSize != 0) {
+			Result.contents = VirtualAlloc(0, FileSize, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+			if (Result.contents) {
+				DWORD BytesRead;
+				ReadFile(FileHandle, Result.contents, FileSize, &BytesRead, 0);
+				if (FileSize == BytesRead) {
+					Result.size = FileSize;
+				} else {
+
+					platform_file_free_memory(Result.contents);
+					Result.contents = 0;
+				}
+			} else {
+
+			}
+		} else {
+
+		}
+	} else {
+		CloseHandle(FileHandle);
+	}
+	return(Result);
+}
+
+
 
 int WINAPI
 WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR CmdLine, int nCmdShow)

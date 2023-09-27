@@ -1,5 +1,22 @@
 #if !defined(GAME_H)
 
+#include "game_platform.h"
+
+
+// WAV PCM is 16 bits per sample, either one or two channels, and samples are
+// interleaved (rlrlrlrl).
+typedef struct
+{
+	s32 sample_count;
+	s32 channel_count;
+	s16 *samples;
+} loaded_sound;
+
+typedef struct
+{
+	u8 *data;
+	u64 length;
+} string_u8;
 
 typedef size_t memory_index;
 
@@ -30,60 +47,14 @@ push_size_(memory_arena *MemoryArena, memory_index size)
 	return(Result);
 }
 
-
-
-typedef struct
-{
-	f32 e[3][3];
-} m3x3;
-
-typedef struct 
-{
-	s32 x, y;
-} v2i;
-
-typedef struct
-{
-	u32 x, y;
-} v2u;
-
-typedef struct
-{
-	f32 e[2][2];
-} m2x2;
-
-typedef union
-{
-	struct
-	{
-		f32 x, y;
-	};
-	struct
-	{
-		f32 u, v;
-	};
-	f32 e[2];
-} v2f;
-
-typedef union
-{
-	struct
-	{
-		f32 x, y, z;
-	};
-	struct
-	{
-		f32 u, v, w;
-	};
-	f32 e[3];
-} v3f;
+#include "game_math.h"
+#include "game_intrinsics.h"
 
 typedef struct
 {
 	char *name;
 	v3f ColorValue;
 } color;
-
 
 typedef struct 
 {
@@ -98,68 +69,7 @@ typedef struct
 
 } circle;
 
-typedef struct
-{
-	s16 *samples;
-	int sample_count;
-	int samples_per_second;
 
-} sound_buffer;
-
-typedef struct
-{
-	void *memory;
-	int width;
-	int height;
-	int bytes_per_pixel;
-	int stride;
-
-} back_buffer;
-
-enum 
-{
-	KEY_W,
-	KEY_A,
-	KEY_S,
-	KEY_D,
-	KEY_SPACE,
-
-	KEY_COUNT
-};
-
-
-
-typedef struct
-{
-	u32 half_transition_count;
-	b32 ended_down;
-} game_button_state;
-
-typedef struct
-{
-	union
-	{
-		game_button_state Buttons[6];
-		struct
-		{
-			game_button_state Up;
-			game_button_state Down;
-			game_button_state Left;
-			game_button_state Right;
-			game_button_state Space;
-			game_button_state ArrowUp;
-			game_button_state ArrowDown;
-		};
-	};
-} game_controller_input;
-
-
-
-typedef struct
-{
-	game_controller_input Controller;
-	f32 dt_for_frame;
-} game_input;
 
 enum
 {
@@ -248,18 +158,6 @@ typedef struct
 
 typedef struct
 {
-	u32 length;
-	u8 *data;
-} string;
-
-enum
-{
-	GAME_PLAYING,
-	GAME_EDITOR
-};
-
-typedef struct
-{
 	v2f Pos;
 	f32 time_left;
 } projectile_trail;
@@ -279,14 +177,23 @@ typedef struct
 	f32 time_between_next_trail;
 } projectile;
 
+typedef struct
+{
+	void *memory;
+	s32 width;
+	s32 height;
+	u32 bytes_per_pixel;
+	u32 stride;
 
+} loaded_bitmap;
 
 typedef struct
 {
+	loaded_bitmap Background;
 	f32 pixels_per_meter;
 	v2f WorldHalfDim;
 
-	f32 meters_per_tile;
+	f32 meters_per_tile_side;
 	s32 tile_count_x;
 	s32 tile_count_y;
 
@@ -307,18 +214,7 @@ typedef struct
 	u32 asteroid_count;
 	asteroid Asteroids[16];
 
-
-
-
 } game_state;
-
-typedef struct
-{
-	u64 total_size;
-	b32 is_initialized;
-	void *memory_block;
-
-} game_memory;
 
 #define GAME_H
 #endif

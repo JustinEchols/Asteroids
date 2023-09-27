@@ -1,12 +1,50 @@
 #if !defined(GAME_MATH_H)
 
-#include <stdlib.h>
+typedef struct
+{
+	f32 e[3][3];
+} m3x3;
 
-#define ABS(x) (((x) > 0) ? (x) : -(x))
-#define MIN(a, b) ((a < b) ? (a) : (b))
-#define MAX(a, b) ((a < b) ? (b) : (a))
-#define SQURE(x) ((x) * (x))
-#define CUBE(x) ((x) * (x) * (x))
+typedef struct 
+{
+	s32 x, y;
+} v2i;
+
+typedef struct
+{
+	u32 x, y;
+} v2u;
+
+typedef struct
+{
+	f32 e[2][2];
+} m2x2;
+
+typedef union
+{
+	struct
+	{
+		f32 x, y;
+	};
+	struct
+	{
+		f32 u, v;
+	};
+	f32 e[2];
+} v2f;
+
+typedef union
+{
+	struct
+	{
+		f32 x, y, z;
+	};
+	struct
+	{
+		f32 u, v, w;
+	};
+	f32 e[3];
+} v3f;
 
 inline v2i
 v2i_create(s32 x, s32 y)
