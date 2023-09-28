@@ -7,9 +7,9 @@
 // interleaved (rlrlrlrl).
 typedef struct
 {
-	s32 sample_count;
-	s32 channel_count;
-	s16 *samples;
+	u32 sample_count;
+	u32 channel_count;
+	s16 *samples[2];
 } loaded_sound;
 
 typedef struct
@@ -47,8 +47,10 @@ push_size_(memory_arena *MemoryArena, memory_index size)
 	return(Result);
 }
 
-#include "game_math.h"
 #include "game_intrinsics.h"
+#include "game_math.h"
+#include "game_asset.h"
+
 
 typedef struct
 {
@@ -214,6 +216,8 @@ typedef struct
 	u32 asteroid_count;
 	asteroid Asteroids[16];
 
+	loaded_sound TestSound;
+	u32 test_sample_index;
 } game_state;
 
 #define GAME_H

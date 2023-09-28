@@ -11,9 +11,10 @@
 */
 
 #include "game.h"
+#include "game_asset.cpp"
 
 internal void
-sound_buffer_fill(sound_buffer *SoundBuffer)
+debug_sound_buffer_fill(sound_buffer *SoundBuffer)
 {
 	s16 wave_amplitude = 3000;
 	int wave_frequency = 256;
@@ -32,6 +33,19 @@ sound_buffer_fill(sound_buffer *SoundBuffer)
 
 		t += dt;
 	}
+}
+
+internal void
+sound_buffer_fill(game_state *GameState, sound_buffer *SoundBuffer)
+{
+	s16 *sample_out = SoundBuffer->samples;
+	for (s32 sample_index = 0; sample_index < SoundBuffer->sample_count; sample_index++) {
+		s16 sample_value = GameState->TestSound.samples[0][(GameState->test_sample_index + sample_index) %
+															GameState->TestSound.sample_count];
+		*sample_out++ = sample_value;
+		*sample_out++ = sample_value;
+	}
+	GameState->test_sample_index += SoundBuffer->sample_count;
 }
 
 internal void 
@@ -720,169 +734,7 @@ str_u8(char *str)
 	return(Result);
 }
 
-#pragma pack(push, 1)
-typedef struct
-{
-	u16 file_type;
-	u32 file_size;
-	u16 reserved_1;
-	u16 reserved_2;
-	u32 bitmap_offset;
-	u32 size;
-	s32 width;
-	s32 height;
-	u16 planes;
-	u16 bits_per_pixel; 
-	u32 compression;
-	u32 bitmap_size;
-	s32 horz_resolution;
-	s32 vert_resolution;  
-	u32 colors_used;
-	u32 colors_important;
-} bitmap_header;
 
-typedef struct
-{
-	u32 chunk_id;
-	u32 chunk_size;
-	u32 wave_id;
-} wave_header;
-
-#define RIFF_CODE(a, b, c, d) (((u32)(a) << 0) | ((u32)(b) << 8) | ((u32)(c) << 16) | ((u32)(d) << 24))
-
-enum
-{
-	 WAVE_CHUNK_ID_RIFF = RIFF_CODE('R', 'I', 'F', 'F'),
-	 WAVE_CHUNK_ID_FORMAT = RIFF_CODE('f', 'm', 't', ' '),
-	 WAVE_CHUNK_ID_WAVE = RIFF_CODE('W', 'A', 'V', 'E'),
-	 WAVE_CHUNK_ID_DATA = RIFF_CODE('d', 'a', 't', 'a')
-};
-
-typedef struct
-{
-	u32 id;
-	u32 size;
-	u16 format;
-	u16 channel_count;
-	u32 samples_per_second;
-	u32 avg_bytes_per_second;
-	u16 block_align;
-	u16 bits_per_sample;
-	u16 extension_size;
-	u16 valid_bits_per_sample;
-	u32 channel_mask;
-	u8 sub_format[16];
-
-} wave_format_chunk;
-
-typedef struct
-{
-	u32 id;
-	u32 size;
-} wave_chunk;
-#pragma pack(pop)
-
-typedef struct
-{
-	wave_chunk *Chunk;
-	u8 *at;
-	u8 *stop;
-
-} riff_iterator;
-
-inline riff_iterator
-parse_chunk_at(void *at, void *stop)
-{
-	riff_iterator Iter;
-	Iter.Chunk = (wave_chunk *)at;
-	Iter.at = (u8 *)at;
-	Iter.stop = (u8 *)stop;
-	return(Iter);
-}
-
-inline riff_iterator
-next_chunk(riff_iterator Iter)
-{
-	// Note(Justin): Chunk size does not include the size of the header.
-	Iter.at += sizeof(wave_chunk) + Iter.Chunk->size;
-	return(Iter);
-}
-
-inline b32
-is_valid(riff_iterator Iter)
-{
-	b32 Result = (Iter.at < Iter.stop);
-	return(Result);
-}
-
-inline void *
-get_chunk_data(riff_iterator Iter)
-{
-	void *Result = (Iter.at + sizeof(wave_chunk));
-	return(Result);
-}
-
-inline u32
-get_type(riff_iterator Iter)
-{
-	u32 Result = Iter.Chunk->id;
-	return(Result);
-}
-
-
-#if 1
-internal loaded_sound
-wav_file_read_entire(char *filename)
-{
-	loaded_sound Result = {0};
-	debug_file_read WavFile = platform_file_read_entire(filename);
-	if (WavFile.size != 0) {
-		wave_header *WaveHeader = (wave_header *)WavFile.contents;
-
-		ASSERT(WaveHeader->chunk_id == WAVE_CHUNK_ID_RIFF);
-		ASSERT(WaveHeader->wave_id == WAVE_CHUNK_ID_WAVE);
-
-		void *samples;
-		for (riff_iterator Iter = parse_chunk_at(WaveHeader + 1, (u8 *)(WaveHeader + 1) + WaveHeader->chunk_size);
-				is_valid(Iter);
-				Iter = next_chunk(Iter)) {
-			Iter = next_chunk(Iter);
-			switch (get_type(Iter)) {
-				case WAVE_CHUNK_ID_FORMAT:
-				{
-					wave_format_chunk *WaveFormat = (wave_format_chunk *)get_chunk_data(Iter);
-				} break;
-				case WAVE_CHUNK_ID_DATA:
-				{
-					samples = get_chunk_data(Iter);
-				} break;
-			}
-		}
-	}
-
-	return(Result);
-}
-#endif
-
-
-internal loaded_bitmap
-bitmap_file_read_entire(char *filename)
-{
-	loaded_bitmap Result = {0};
-
-	debug_file_read  BitmapFile = platform_file_read_entire(filename);
-	if (BitmapFile.contents) {
-		bitmap_header *BitmapHeader = (bitmap_header *)BitmapFile.contents;
-		if (BitmapHeader->size != 0) {
-			Result.memory = (void *)((u8 *)BitmapFile.contents + BitmapHeader->bitmap_offset);
-			Result.width = BitmapHeader->width;
-			Result.height = BitmapHeader->height;
-			Result.bytes_per_pixel = BitmapHeader->bits_per_pixel / 8;
-			Result.stride = BitmapHeader->width * Result.bytes_per_pixel;
-		}
-	}
-	return(Result);
-}
 
 
 internal void
@@ -907,11 +759,13 @@ bitmap_draw(back_buffer *BackBuffer, loaded_bitmap *Bitmap)
 internal void
 update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer *SoundBuffer, game_input *GameInput)
 {
-	wav_file_read_entire("bloop_00.wav");
+
+
 
 	game_state *GameState = (game_state *)GameMemory->memory_block;
 	if (!GameMemory->is_initialized) {
 
+		GameState->TestSound = wav_file_read_entire("bloop_00.wav");
 		GameState->Background = bitmap_file_read_entire("space_background.bmp");
 
 		GameState->pixels_per_meter = 5.0f;
@@ -1535,6 +1389,6 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 
 	player_draw(GameState, BackBuffer, &GameState->Player);
 
-	//sound_buffer_fill(SoundBuffer);
+	sound_buffer_fill(GameState, SoundBuffer);
 
 }
