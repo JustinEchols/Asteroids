@@ -18,6 +18,10 @@ typedef struct
 	s32 vert_resolution;  
 	u32 colors_used;
 	u32 colors_important;
+
+	u32 red_mask;
+	u32 green_mask;
+	u32 blue_mask;
 } bitmap_header;
 
 typedef struct
@@ -59,20 +63,94 @@ typedef struct
 } wave_format_chunk;
 #pragma pack(pop)
 
+typedef struct
+{
+	u32 index;
+	b32 found;
+} bit_scan_result;
+
+internal bit_scan_result
+find_first_bit_set_u32(u32 x)
+{
+	bit_scan_result Result = {0};
+	for (u32 scan_index = 0; scan_index < 32; scan_index++) {
+		if ((1 << scan_index) & x) {
+			Result.index = scan_index;
+			Result.found = TRUE;
+			break;
+		}
+	}
+	return(Result);
+}
+
 internal loaded_bitmap
 bitmap_file_read_entire(char *filename)
 {
 	loaded_bitmap Result = {0};
 
 	debug_file_read  BitmapFile = platform_file_read_entire(filename);
-	if (BitmapFile.contents) {
+	if (BitmapFile.size != 0) {
 		bitmap_header *BitmapHeader = (bitmap_header *)BitmapFile.contents;
-		if (BitmapHeader->size != 0) {
-			Result.memory = (void *)((u8 *)BitmapFile.contents + BitmapHeader->bitmap_offset);
-			Result.width = BitmapHeader->width;
-			Result.height = BitmapHeader->height;
-			Result.bytes_per_pixel = BitmapHeader->bits_per_pixel / 8;
-			Result.stride = BitmapHeader->width * Result.bytes_per_pixel;
+		u32 *pixels = (u32 *)((u8 *)BitmapFile.contents + BitmapHeader->bitmap_offset);
+		Result.memory = (void *)pixels;
+		Result.width = BitmapHeader->width;
+		Result.height = BitmapHeader->height;
+		Result.bytes_per_pixel = BitmapHeader->bits_per_pixel / 8;
+		Result.stride = BitmapHeader->width * Result.bytes_per_pixel;
+
+		// NOTE(Justin): If the bitmap contains 16 or 32 bits per pixel, then only a Compression value of 
+		// 3 is supported, per the BMP file format docs.
+
+		ASSERT(BitmapHeader->compression == 3);
+
+		// NOTE(Justin): The masks contained in the header specify which bits in
+		// the pixel of the bitmap correspond to a color channel. That is for
+		// red_mask the set bits tell us where the red color channel is in the
+		// pixel value. The backbuffer expects pixels to be in AARRGGBB format.
+		// Thereforw we need to, for each pixel in the bitmap, convert it to the
+		// correct format.
+		//
+		// The way this is done is by:
+		//	(1) use the masks to determine the shift amount for each color
+		//	channel
+		//
+		//	(2) For each color channel in a pixel value, shift it by this shift
+		//	amount.
+		//
+		//	(3) The value of the color channel is then obtained by masking the
+		//	shifted pixel value with 0xFF. This is because the color channel has
+		//	been shifted to the LSB.
+		//
+		//	(4) Bitwise OR each channel to create the pixel value that is in the
+		//	correct format
+
+		u32 red_mask = BitmapHeader->red_mask;
+		u32 green_mask = BitmapHeader->green_mask;
+		u32 blue_mask = BitmapHeader->blue_mask;
+		u32 alpha_mask = ~(red_mask | green_mask | blue_mask);
+
+		bit_scan_result red_shift_amount = find_first_bit_set_u32(red_mask);
+		bit_scan_result green_shift_amount = find_first_bit_set_u32(green_mask);
+		bit_scan_result blue_shift_amount = find_first_bit_set_u32(blue_mask);
+		bit_scan_result alpha_shift_amount = find_first_bit_set_u32(alpha_mask);
+
+		ASSERT(red_shift_amount.found);
+		ASSERT(green_shift_amount.found);
+		ASSERT(blue_shift_amount.found);
+		ASSERT(alpha_shift_amount.found);
+
+		u32 *pixel = pixels;
+		for (s32 y = 0; y < BitmapHeader->height; y++) {
+			for (s32 x = 0; x < BitmapHeader->width; x++) {
+				u32 c = *pixel;
+
+				u32 red = ((c >> red_shift_amount.index) & 0xFF);
+				u32 green = ((c >> green_shift_amount.index) & 0xFF);
+				u32 blue = ((c >> blue_shift_amount.index) & 0xFF);
+				u32 alpha = ((c >> alpha_shift_amount.index) & 0xFF);
+
+				*pixel++ = ((alpha << 24) | (red << 16) | (green << 8) | (blue << 0));
+			}
 		}
 	}
 	return(Result);
@@ -184,7 +262,6 @@ wav_file_read_entire(char *filename)
 				samples[2 * sample_index] = samples[sample_index];
 				samples[sample_index] = source;
 			}
-
 		} else {
 			ASSERT(!"Invalid channel count in WAV file");
 		}
