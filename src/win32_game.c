@@ -505,10 +505,10 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR CmdLine, int nCmdSho
 
 			game_memory GameMemory = {0};
 			GameMemory.total_size = KILOBYTES(16);
-			GameMemory.memory_block = VirtualAlloc((LPVOID)0, GameMemory.total_size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+			GameMemory.permanent_storage = VirtualAlloc((LPVOID)0, GameMemory.total_size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
 
 
-			if (GameMemory.memory_block && samples) {
+			if (GameMemory.permanent_storage && samples) {
 
 				win32_dsound_init(WindowHandle, Win32SoundBuffer.secondary_buffer_size);
 
