@@ -7,13 +7,6 @@
 // interleaved (rlrlrlrl).
 typedef struct
 {
-	u32 sample_count;
-	u32 channel_count;
-	s16 *samples[2];
-} loaded_sound;
-
-typedef struct
-{
 	u8 *data;
 	u64 length;
 } string_u8;
@@ -179,19 +172,12 @@ typedef struct
 	f32 time_between_next_trail;
 } projectile;
 
-typedef struct
-{
-	void *memory;
-	s32 width;
-	s32 height;
-	u32 bytes_per_pixel;
-	u32 stride;
 
-} loaded_bitmap;
 
 typedef struct
 {
 	loaded_bitmap Background;
+	loaded_bitmap Ship;
 	f32 pixels_per_meter;
 	v2f WorldHalfDim;
 

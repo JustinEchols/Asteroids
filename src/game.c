@@ -738,18 +738,51 @@ str_u8(char *str)
 
 
 internal void
-bitmap_draw(back_buffer *BackBuffer, loaded_bitmap *Bitmap)
+bitmap_draw(back_buffer *BackBuffer, loaded_bitmap *Bitmap, f32 x, f32 y)
 {
-	ASSERT(Bitmap->width <= BackBuffer->width);
-	ASSERT(Bitmap->height <= BackBuffer->height);
+	s32 x_min = f32_round_to_s32(x);
+	s32 y_min = f32_round_to_s32(y);
 
-	u8 *dest_row = (u8 *)BackBuffer->memory;
+	s32 x_max = x_min + Bitmap->width;
+	s32 y_max = y_min + Bitmap->height;
+
+	if (x_min < 0) {
+		x_min += BackBuffer->width;
+	}
+	if (y_min < 0) {
+		y_min += BackBuffer->height;
+	}
+	if (x_max > BackBuffer->width) {
+		x_max -= BackBuffer->width;
+	}
+	if (y_max > BackBuffer->height) {
+		y_max -= BackBuffer->height;
+	}
+
+	u8 *dest_row = (u8 *)BackBuffer->memory + y_min * BackBuffer->stride + x_min * BackBuffer->bytes_per_pixel;
 	u8 *src_row = (u8 *)Bitmap->memory;
-	for (s32 y = 0; y < Bitmap->height; y++) {
+	for (s32 y = y_min; y < y_max; y++) {
 		u32 *src = (u32 *)src_row;
 		u32 *dest = (u32 *)dest_row;
-		for (s32 x = 0; x < Bitmap->width; x++) {
-			*dest++ = *src++;
+		for (s32 x = x_min; x < x_max; x++) {
+
+			f32 alpha = (f32)((*src >> 24) & 0xFF) / 255.0f;
+			f32 src_r = (f32)((*src >> 16) & 0xFF);
+			f32 src_g = (f32)((*src >> 8) & 0xFF);
+			f32 src_b = (f32)((*src >> 0) & 0xFF);
+
+			f32 dest_r = (f32)((*dest >> 16) & 0xFF);
+			f32 dest_g = (f32)((*dest >> 8) & 0xFF);
+			f32 dest_b = (f32)((*dest >> 0) & 0xFF);
+
+			f32 r = (1.0f - alpha) * dest_r + alpha * src_r;
+			f32 g = (1.0f - alpha) * dest_g + alpha * src_g; 
+			f32 b = (1.0f - alpha) * dest_b + alpha * src_b;
+
+			*dest = (((u32)(r + 0.5f) << 16) | ((u32)(g + 0.5f) << 8) | ((u32)(b + 0.5f) << 0));
+
+			dest++;
+			src++;
 		}
 		dest_row += BackBuffer->stride;
 		src_row += Bitmap->stride;
@@ -759,14 +792,14 @@ bitmap_draw(back_buffer *BackBuffer, loaded_bitmap *Bitmap)
 internal void
 update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer *SoundBuffer, game_input *GameInput)
 {
-
-
-
-	game_state *GameState = (game_state *)GameMemory->memory_block;
+	ASSERT(sizeof(game_state) <= GameMemory->total_size);
+	game_state *GameState = (game_state *)GameMemory->permanent_storage;
 	if (!GameMemory->is_initialized) {
 
-		GameState->TestSound = wav_file_read_entire("bloop_00.wav");
+		//GameState->TestSound = wav_file_read_entire("bloop_00.wav");
+		//GameState->Background = bitmap_file_read_entire("test_background.bmp");
 		GameState->Background = bitmap_file_read_entire("space_background.bmp");
+		GameState->Ship = bitmap_file_read_entire("ship/blueships1.bmp");
 
 		GameState->pixels_per_meter = 5.0f;
 		GameState->WorldHalfDim = v2f_create((f32)BackBuffer->width / (2.0f * GameState->pixels_per_meter),
@@ -952,12 +985,13 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 		}
 
 		memory_arena_initialize(&GameState->WorldArena, GameMemory->total_size - sizeof(game_state),
-										(u8 *)GameMemory->memory_block + sizeof(game_state));
+										(u8 *)GameMemory->permanent_storage + sizeof(game_state));
 
 		GameMemory->is_initialized = TRUE;
 	}
 
-	bitmap_draw(BackBuffer, &GameState->Background);
+	//bitmap_draw(BackBuffer, &GameState->Background, 0.0f, 0.0f);k
+	
 
 	v2f *WorldHalfDim = &GameState->WorldHalfDim;
 	if (WorldHalfDim->x != ((f32)BackBuffer->width / (2.0f * GameState->pixels_per_meter))) {
@@ -966,6 +1000,7 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 	if (WorldHalfDim->y != ((f32)BackBuffer->height / (2.0f * GameState->pixels_per_meter))) {
 		WorldHalfDim->y = ((f32)BackBuffer->height / (2.0f * GameState->pixels_per_meter));
 	}
+
 
 
 #if DEBUG_TILE_MAP
@@ -1385,10 +1420,11 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 	Player->TileMapPos.TilePos = PlayerNewTilePos;
 	Player->TileMapPos.TileRelativePos = PlayerNewTileRelativePos;
 
-	//v2f Temp = get_world_position(GameState, Player->TileMapPos);
 
-	player_draw(GameState, BackBuffer, &GameState->Player);
+	v2f Temp = get_world_position(GameState, Player->TileMapPos);
+	bitmap_draw(BackBuffer, &GameState->Ship, Temp.x, Temp.y);
+	//player_draw(GameState, BackBuffer, &GameState->Player);
 
-	sound_buffer_fill(GameState, SoundBuffer);
+	//sound_buffer_fill(GameState, SoundBuffer);
 
 }
