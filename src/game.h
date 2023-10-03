@@ -30,7 +30,6 @@ memory_arena_initialize(memory_arena *MemoryArena, memory_index arena_size, u8 *
 
 #define push_size(MemoryArena, type) (type *)push_size_(MemoryArena, sizeof(type))
 #define push_array(MemoryArena, count, type) (type *)push_size_(MemoryArena, (count) * sizeof(type))
-
 void *
 push_size_(memory_arena *MemoryArena, memory_index size)
 {
@@ -44,11 +43,10 @@ push_size_(memory_arena *MemoryArena, memory_index size)
 #include "game_math.h"
 #include "game_asset.h"
 
-
 typedef struct
 {
 	char *name;
-	v3f ColorValue;
+	v3f Value;
 } color;
 
 typedef struct 
@@ -63,31 +61,6 @@ typedef struct
 	f32 radius;
 
 } circle;
-
-
-
-enum
-{
-	WU_BLACK,
-	WU_WHITE,
-	WU_RED,
-	WU_GREEN,
-	WU_BLUE,
-	WU_YELLOW,
-	WU_PURPLE,
-
-	WU_COLOR_COUNT
-};
-
-typedef struct
-{
-	u32 base_color;
-	s32 num_levels;
-	u32 intensity_bits;
-	u32 red_mask;
-	u32 green_mask;
-	u32 blue_mask;
-} color_wu;
 
 typedef enum
 {
@@ -113,7 +86,6 @@ typedef struct
 	b32 hit;
 } asteroid;
 
-
 enum 
 {
 	PLAYER_LEFT,
@@ -127,14 +99,12 @@ enum
 
 typedef struct
 {
-	v2i TilePos;
-	v2f TileRelativePos;
+	v2i Tile;
+	v2f TileRel;
 } tile_map_position;
-
 
 typedef struct
 {
-	v2f Pos;
 	f32 height;
 	f32 base_half_width;
 	v2f Vertices[4];
@@ -143,10 +113,9 @@ typedef struct
 	v2f dPos;
 	f32 speed;
 	b32 is_shooting;
-	color_wu ColorWu;
+
 	bounding_box BoundingBox;
 	circle Shield;
-
 
 	tile_map_position TileMapPos;
 } player;
@@ -173,6 +142,22 @@ typedef struct
 } projectile;
 
 
+typedef struct
+{
+	s32 tile_count_x;
+	s32 tile_count_y;
+	s32 tile_side_in_pixels;
+	f32 tile_side_in_meters;
+	f32 meters_to_pixels;
+
+
+	u32* tiles;
+} tile_map;
+
+typedef struct
+{
+	f32 tile_side_in_meters;
+} world;
 
 typedef struct
 {
@@ -181,15 +166,10 @@ typedef struct
 	f32 pixels_per_meter;
 	v2f WorldHalfDim;
 
-	f32 meters_per_tile_side;
-	s32 tile_count_x;
-	s32 tile_count_y;
+	memory_arena TileMapArena;
+	tile_map *TileMap;
 
-	memory_arena WorldArena;
 
-	color Colors[4];
-	color_wu ColorWu[WU_COLOR_COUNT];
-	b32 is_initialized;
 	player Player;
 
 	projectile Projectiles[64];
@@ -204,6 +184,8 @@ typedef struct
 
 	loaded_sound TestSound;
 	u32 test_sample_index;
+
+	b32 is_initialized;
 } game_state;
 
 #define GAME_H
