@@ -40,6 +40,13 @@ f32_fractional_part(f32 x)
 	return(Result);
 }
 
+internal s32
+f32_floor_to_s32(f32 x)
+{
+	s32 Result = (s32)floorf(x);
+	return(Result);
+}
+
 
 #define GAME_INTRINSICS_H
 #endif
