@@ -41,13 +41,13 @@ tile_map_coord_remap(tile_map *TileMap, s32 tile_count, s32 *tile, f32 *tile_rel
 	}
 }
 
-internal tile_map_position
+inline tile_map_position
 tile_map_position_remap(tile_map *TileMap, tile_map_position TileMapPos)
 {
 	tile_map_position Result = TileMapPos;
 
-	tile_map_coord_remap(TileMap, TileMap->tile_count_x, &Result.Tile.x, &Result.TileRel.x);
-	tile_map_coord_remap(TileMap, TileMap->tile_count_y, &Result.Tile.y, &Result.TileRel.y);
+	tile_map_coord_remap(TileMap, TileMap->tile_count_x, &Result.Tile.x, &Result.TileOffset.x);
+	tile_map_coord_remap(TileMap, TileMap->tile_count_y, &Result.Tile.y, &Result.TileOffset.y);
 
 	return(Result);
 }
