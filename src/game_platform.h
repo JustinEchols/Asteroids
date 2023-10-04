@@ -1,5 +1,5 @@
 // Header file that interfaces between win32 and game layers.
-// Contains services that the game needs from the platform layer.
+// Contains services that the game provides to the platform layer.
 #if !defined(GAME_PLATFORM_H)
 
 #include <stdint.h>
@@ -123,7 +123,7 @@ typedef struct
 {
 	u64 total_size;
 	b32 is_initialized;
-	void *memory_block;
+	void *permanent_storage;
 
 } game_memory;
 

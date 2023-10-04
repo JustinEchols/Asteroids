@@ -1,6 +1,6 @@
 @echo off
 
-set common_compiler_flags= -DGAME_SLOW=1 -MTd -nologo -Od -Oi -TC -W4 -FC -Zi -wd4201 -wd4100 -wd4204 -wd4459 -DDEBUG_BOUNDING_BOX=1 -DDEBUG_VERTICES=1 -DDEBUG_TILE_MAP=1
+set common_compiler_flags= -DGAME_SLOW=1 -MTd -nologo -Od -Oi -TC -W4 -FC -Zi -wd4201 -wd4100 -wd4204 -wd4459 -DDEBUG_BOUNDING_BOX=1 -DDEBUG_VERTICES=1 -DDEBUG_TILE_MAP=0
 set common_linker_flags= -incremental:no -opt:ref user32.lib Gdi32.lib Winmm.lib Kernel32.lib
 
 IF NOT EXIST ..\build mkdir ..\build
