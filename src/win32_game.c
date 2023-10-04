@@ -45,17 +45,13 @@ sfx
 
 #include <math.h>
 
-
-
 #include "game.c"
 #include "win32_game.h"
-
-
 
 global_variable b32					Win32GlobalRunning;
 global_variable win32_back_buffer	Win32GlobalBackBuffer;
 global_variable LPDIRECTSOUNDBUFFER Win32GlobalSecondaryBuffer;
-global_variable LARGE_INTEGER		tick_frequency;
+global_variable LARGE_INTEGER		Win32GlobalTickFrequency;
 
 
 #define DIRECT_SOUND_CREATE(name) HRESULT WINAPI name(LPCGUID pcGuidDevice, LPDIRECTSOUND *ppDS, LPUNKNOWN pUnkOuter)
@@ -77,12 +73,12 @@ win32_dsound_init(HWND WindowHandle, s32 secondary_buffer_size)
 				WaveFormat.nChannels = 2;
 				WaveFormat.nSamplesPerSec = 44100;
 				WaveFormat.wBitsPerSample = 16;	
-				WaveFormat.nBlockAlign = (WaveFormat.nChannels * WaveFormat.wBitsPerSample) / 8; // 8 bits per byte
-				WaveFormat.nAvgBytesPerSec = WaveFormat.nSamplesPerSec * WaveFormat.nBlockAlign;// #samples * bytes/sample
+				WaveFormat.nBlockAlign = (WaveFormat.nChannels * WaveFormat.wBitsPerSample) / 8;
+				WaveFormat.nAvgBytesPerSec = WaveFormat.nSamplesPerSec * WaveFormat.nBlockAlign;
 				WaveFormat.cbSize = 0;
 
 				if (SUCCEEDED(DSound->lpVtbl->SetCooperativeLevel(DSound, WindowHandle, DSSCL_PRIORITY))) {
-					DSBUFFERDESC BufferDesc;// = {0};
+					DSBUFFERDESC BufferDesc;
 					BufferDesc.dwSize = sizeof(BufferDesc);
 					BufferDesc.dwFlags = DSBCAPS_PRIMARYBUFFER;
 					BufferDesc.dwBufferBytes = 0;//required for primary buffer
@@ -107,12 +103,12 @@ win32_dsound_init(HWND WindowHandle, s32 secondary_buffer_size)
 				DSBUFFERDESC BufferDesc = {0};
 				BufferDesc.dwSize = sizeof(BufferDesc);
 				BufferDesc.dwFlags = DSBCAPS_GLOBALFOCUS;
-				BufferDesc.dwBufferBytes = secondary_buffer_size;//(4 * WaveFormat.nChannels) * WaveFormat.nSamplesPerSec;
+				BufferDesc.dwBufferBytes = secondary_buffer_size;
 				BufferDesc.dwReserved = 0;
 				BufferDesc.lpwfxFormat = &WaveFormat;
 				BufferDesc.guid3DAlgorithm = GUID_NULL;
 
-				// NOTE(Justin): Using Win32GlobalSecondaryBuffer here!!
+				// NOTE(Justin): Using Win32GlobalSecondaryBuffer here!
 				if (SUCCEEDED(DSound->lpVtbl->CreateSoundBuffer(DSound, &BufferDesc, &Win32GlobalSecondaryBuffer, 0))) {
 					OutputDebugStringA("Secondary buffer created successfully.\n");
 				} else {
@@ -262,6 +258,8 @@ win32_back_buffer_resize(win32_back_buffer *Win32GlobalBackBuffer, int width, in
 			MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
 }
 
+
+
 LRESULT CALLBACK
 WndProc(HWND WindowHandle, UINT Message, WPARAM wParam, LPARAM lParam)
 {
@@ -394,6 +392,22 @@ win32_process_pending_messgaes(game_controller_input *KeyboardController)
 	}
 }
 
+#if 0
+inline f32
+win32_get_seconds_elapsed(LARGE_INTEGER Start, LARGE_INTEGER End)
+{
+	f32 Result = ((f32)(End.QuadPart - Start.QuadPart)) / (f32)(Win32GlobalTickFrequency.QuadPart);
+}
+#endif
+
+inline LARGE_INTEGER
+win32_get_wall_clock(void)
+{
+	LARGE_INTEGER Result;
+	QueryPerformanceCounter(&Result);
+	return(Result);
+}
+
 
 
 internal void
@@ -441,7 +455,7 @@ int WINAPI
 WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR CmdLine, int nCmdShow)
 {
 	const char window_class_name[]	= "TestWindowClass";
-	const char window_title[]		= "Test";
+	const char window_title[]		= "Asteroids";
 
 	WNDCLASSEX WindowClass;
 	HWND WindowHandle;
@@ -463,8 +477,8 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR CmdLine, int nCmdSho
 
 	// f	= 10MHz,
 	// 1/f	= 1e-7  = 0.1 µs
-	QueryPerformanceFrequency(&tick_frequency);
-	s64 ticks_per_second = tick_frequency.QuadPart;
+	QueryPerformanceFrequency(&Win32GlobalTickFrequency);
+	s64 ticks_per_second = Win32GlobalTickFrequency.QuadPart;
 	f32 time_for_each_tick = 1.0f / (f32)ticks_per_second;
 
 	u32 min_miliseconds_to_sleep = 1;
@@ -535,14 +549,14 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR CmdLine, int nCmdSho
 				//
 				f32 seconds_per_frame_actual = 0.0f;
 				while (Win32GlobalRunning) {
-
 					game_controller_input *NewKeyboardController = &NewInput->Controller;
 					game_controller_input *OldKeyboardController = &OldInput->Controller;
 					game_controller_input ZeroController = {0}; 
+
 					*NewKeyboardController = ZeroController;
 					for (u32 button_index = 0;
 							button_index < ARRAY_COUNT(NewKeyboardController->Buttons);
-							button_index++) {
+								button_index++) {
 						NewKeyboardController->Buttons[button_index].ended_down =
 							OldKeyboardController->Buttons[button_index].ended_down;
 					}
@@ -638,8 +652,8 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR CmdLine, int nCmdSho
 					f32 megacycles_per_frame = (f32)(cycles_elapsed / (1000.0f * 1000.0f));
 
 					char textbuffer[256];
-					sprintf_s(textbuffer, sizeof(textbuffer), "%0.2fms/f %0.2ff/s %0.2fMc/f\n", miliseconds_elapsed, fps, megacycles_per_frame);
-					//OutputDebugStringA(textbuffer);
+					sprintf_s(textbuffer, sizeof(textbuffer),
+							"%0.2fms/f %0.2ff/s %0.2fMc/f\n", miliseconds_elapsed, fps, megacycles_per_frame);
 
 					tick_count_last = tick_count_end;
 					cycle_count_last = cycle_count_end;
