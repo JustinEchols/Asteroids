@@ -1,5 +1,8 @@
 /*
  * TODO:
+ * - Threading
+ *   Asset loading
+ *   Warp animation
  * - Explosion animation
  * - Game of life?
  * - sfx
@@ -7,7 +10,6 @@
  * - menu
  * - optimization pass
  * - vfx
- * -...
 */
 
 #include "game.h"
@@ -589,9 +591,8 @@ bitmap_draw(back_buffer *BackBuffer, loaded_bitmap *Bitmap, f32 x, f32 y)
 {
 	s32 x_min = f32_round_to_s32(x);
 	s32 y_min = f32_round_to_s32(y);
-
-	s32 x_max = x_min + Bitmap->width;
-	s32 y_max = y_min + Bitmap->height;
+	s32 x_max = f32_round_to_s32(x + (f32)Bitmap->width);
+	s32 y_max = f32_round_to_s32(y + (f32)Bitmap->height);
 
 	if (x_min < 0) {
 		x_min += BackBuffer->width;
@@ -644,13 +645,21 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 	if (!GameMemory->is_initialized) {
 
 		//GameState->TestSound = wav_file_read_entire("bloop_00.wav");
-		//GameState->Background = bitmap_file_read_entire("test_background.bmp");
-		//GameState->Background = bitmap_file_read_entire("space_background.bmp");
-		//GameState->Ship = bitmap_file_read_entire("ship/blueships1.bmp");
+		GameState->Background = bitmap_file_read_entire("space_background.bmp");
+		GameState->Ship = bitmap_file_read_entire("ship/blueships1.bmp");
+
+		GameState->WarpFrames[0] = bitmap_file_read_entire("vfx/warp_01.bmp");
+		GameState->WarpFrames[1] = bitmap_file_read_entire("vfx/warp_02.bmp");
+		GameState->WarpFrames[2] = bitmap_file_read_entire("vfx/warp_03.bmp");
+		GameState->WarpFrames[3] = bitmap_file_read_entire("vfx/warp_04.bmp");
+		GameState->WarpFrames[4] = bitmap_file_read_entire("vfx/warp_05.bmp");
+		GameState->WarpFrames[5] = bitmap_file_read_entire("vfx/warp_06.bmp");
+		GameState->WarpFrames[6] = bitmap_file_read_entire("vfx/warp_07.bmp");
+		GameState->WarpFrames[7] = bitmap_file_read_entire("vfx/warp_08.bmp");
+
 
 		memory_arena_initialize(&GameState->TileMapArena, GameMemory->total_size - sizeof(game_state),
 								(u8 *)GameMemory->permanent_storage + sizeof(game_state));
-
 
 
 		GameState->TileMap = push_array(&GameState->TileMapArena, 1, tile_map);
@@ -667,15 +676,10 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 											 (f32)BackBuffer->height / (2.0f * GameState->pixels_per_meter));
 
 
-		// NOTE(Justin): The world coordinate system is defined by [-w/2, w/2] X [-h/2, h/2]. So (0,0)
-		// is the center of the screen. Anytime we go to render a game object,
-		// first we must map the objects position back into the coordinate
-		// system of the screen. The routine get_screen_pos is used for this purpose.
-
 		player *Player = &GameState->Player;
 
 		Player->TileMapPos.Tile = v2i_create(1, 1);
-		Player->TileMapPos.TileRel = v2f_create(0.0f, 0.0f);
+		Player->TileMapPos.TileOffset = v2f_create(0.0f, 0.0f);
 
 		Player->height = 10.0f;
 		Player->base_half_width = 4.0f;
@@ -774,14 +778,15 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 			GameState->Asteroids[asteroid_index].BoundingBox.Max = v2f_add(GameState->Asteroids[asteroid_index].Pos, BoundingBoxMax);
 
 		}
-
 		GameMemory->is_initialized = TRUE;
 	}
 
 
+#if 1
 	v2f Min = {0};
 	v2f Max = v2f_create((f32)BackBuffer->width, (f32)BackBuffer->height);
 	rectangle_draw(BackBuffer, Min, Max, 0.0f, 0.0f, 0.0f);
+#endif
 
 	// NOTE(Justin): Since the backbuffer is bottom up, the first row of the
 	// tilemap is the row that gets drawn first and gets drawn at the very
@@ -790,13 +795,9 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 	// The reason why the backbuffer is bottom up is so that as y values
 	// increase, objects move further up the screen.
 
-
-
-
 	tile_map *TileMap = GameState->TileMap;
-
-
 	v2f BottomLeft = v2f_create(5.0f, 5.0f);
+#if DEBUG_TILE_MAP
 	for (s32 row = 0; row < TileMap->tile_count_y; row++) {
 		for (s32 col = 0; col < TileMap->tile_count_x ; col++) {
 			u32 tile_value = TileMap->tiles[row * TileMap->tile_count_x + col];
@@ -817,6 +818,10 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 			rectangle_draw(BackBuffer, Min, Max, gray, gray, gray);
 		}
 	}
+#else
+	bitmap_draw(BackBuffer, &GameState->Background, 0.0f, 0.0f);
+#endif
+
 
 	v2f *WorldHalfDim = &GameState->WorldHalfDim;
 	if (WorldHalfDim->x != ((f32)BackBuffer->width / (2.0f * GameState->pixels_per_meter))) {
@@ -827,9 +832,8 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 	}
 
 	f32 dt_for_frame = GameInput->dt_for_frame;
-
 	player *Player = &GameState->Player;
-#if 0
+
 	v2f PlayerNewRight = Player->Right;
 	v2f PlayerNewDirection = Player->Direction;
 	if (GameInput->Controller.Left.ended_down) {
@@ -859,11 +863,8 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 		PlayerNewRight = m3x3_transform_v2f(Rotation, PlayerNewRight);
 		PlayerNewDirection = m3x3_transform_v2f(Rotation, PlayerNewDirection);
 	}
-
-
 	Player->Right = PlayerNewRight;
 	Player->Direction = PlayerNewDirection;
-#endif
 
 	//
 	// NOTE(Justin): Player projectiles
@@ -882,17 +883,18 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 	// make this happen are the size of the projectile buffer and the time
 	// between consecutive projecitles. 
 
+	
 	if (GameInput->Controller.Space.ended_down) {
 		if (!Player->is_shooting) {
 			projectile *Projectile = GameState->Projectiles + GameState->projectile_next++;
 			if (GameState->projectile_next >= ARRAY_COUNT(GameState->Projectiles)) {
 				GameState->projectile_next = 0;
 			}
-			Projectile->Pos = Player->Vertices[PLAYER_TOP];
+			Projectile->TileMapPos = Player->TileMapPos;
 			Projectile->distance_remaining = 100.0f;
 			Projectile->Direction = Player->Direction;
 			Projectile->dPos = v2f_scale(GameState->projectile_speed, Projectile->Direction);
-			Projectile->active = TRUE;
+			Projectile->is_active = TRUE;
 			Projectile->time_between_next_trail = 0.1f;
 			Player->is_shooting = TRUE;
 		} else if (Player->is_shooting) {
@@ -904,14 +906,13 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 				if (GameState->projectile_next >= ARRAY_COUNT(GameState->Projectiles)) {
 					GameState->projectile_next = 0;
 				}
-				Projectile->Pos = Player->Vertices[PLAYER_TOP];
+				Projectile->TileMapPos = Player->TileMapPos;
 				Projectile->distance_remaining = 100.0f;
 				Projectile->Direction = Player->Direction;
 				Projectile->dPos = v2f_scale(GameState->projectile_speed, Projectile->Direction);
-				Projectile->active = TRUE;
+				Projectile->is_active = TRUE;
 				Projectile->time_between_next_trail = 0.1f;
 				Player->is_shooting = TRUE;
-
 				GameState->time_between_new_projectiles = 0.0f;
 			}
 		}
@@ -921,19 +922,22 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 
 	for (u32 projectile_index = 0; projectile_index < ARRAY_COUNT(GameState->Projectiles); projectile_index++) {
 		projectile *Projectile = GameState->Projectiles + projectile_index;
-		if (Projectile->active) {
+		if (Projectile->is_active) {
 			v2f DeltaPos = v2f_scale(dt_for_frame, Projectile->dPos);
-			Projectile->Pos = v2f_add(Projectile->Pos, DeltaPos);
-			Projectile->Pos = point_clip_to_world(WorldHalfDim, Projectile->Pos);
+			Projectile->TileMapPos.TileOffset = v2f_add(Projectile->TileMapPos.TileOffset, DeltaPos);
+			Projectile->TileMapPos = tile_map_position_remap(TileMap, Projectile->TileMapPos);
 
 			Projectile->distance_remaining -= v2f_length(DeltaPos);
 			if (Projectile->distance_remaining > 0.0f) {
 				v2f OffsetInPixels = v2f_create(5.0f, 5.0f);
-				v2f Min = point_map_to_screen(GameState, BackBuffer, Projectile->Pos);
+				v2f Min;
+				Min.x = BottomLeft.x + Projectile->TileMapPos.Tile.x * TileMap->tile_side_in_pixels + TileMap->meters_to_pixels * Projectile->TileMapPos.TileOffset.x;
+				Min.y = BottomLeft.y + Projectile->TileMapPos.Tile.y * TileMap->tile_side_in_pixels + TileMap->meters_to_pixels * Projectile->TileMapPos.TileOffset.y;
+
 				v2f Max = v2f_add(Min, OffsetInPixels);
 				rectangle_draw(BackBuffer, Min, Max, 1.0f, 1.0f, 1.0f);
 			} else {
-				Projectile->active = FALSE;
+				Projectile->is_active = FALSE;
 			}
 
 			// TODO(Justin): Do this only if the projectile has distance
@@ -944,7 +948,7 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 				if (Projectile->trail_next >= ARRAY_COUNT(Projectile->Trails)) {
 					Projectile->trail_next = 0;
 				}
-				Trail->Pos = Projectile->Pos;
+				Trail->TileMapPos = Projectile->TileMapPos;
 				// NOTE(Justin): A projectile trail is just a sequence of
 				// projectiles that start fully opaque and increase in
 				// transparency until the last projectile is fully transparent.
@@ -965,7 +969,10 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 				Trail->time_left -= dt_for_frame;
 				if (Trail->time_left > 0.0f) {
 					v2f OffsetInPixels = v2f_create(5.0f, 5.0f);
-					v2f Min = point_map_to_screen(GameState, BackBuffer, Trail->Pos);
+					v2f Min;
+					Min.x = BottomLeft.x + Trail->TileMapPos.Tile.x * TileMap->tile_side_in_pixels + TileMap->meters_to_pixels * Trail->TileMapPos.TileOffset.x;
+					Min.y = BottomLeft.y + Trail->TileMapPos.Tile.y * TileMap->tile_side_in_pixels + TileMap->meters_to_pixels * Trail->TileMapPos.TileOffset.y;
+
 					v2f Max = v2f_add(Min, OffsetInPixels);
 					rectangle_transparent_draw(BackBuffer, Min, Max, 1.0f, 1.0f, 1.0f, Trail->time_left);
 				}
@@ -978,33 +985,14 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 	//
 
 	v2f ddPos = {0};
-#if 0
 	if (GameInput->Controller.Up.ended_down) {
 		ddPos = v2f_create(PlayerNewDirection.x, PlayerNewDirection.y);
 	}
 	if ((ddPos.x != 0.0f) && (ddPos.y != 0.0f)) {
 		ddPos = v2f_scale(HALF_ROOT_TWO, ddPos);
 	}
-#endif
-
-	if (GameInput->Controller.Right.ended_down) {
-		ddPos = v2f_create(1.0f, 0.0f);
-	}
-	if (GameInput->Controller.Left.ended_down) {
-		ddPos = v2f_create(-1.0f, 0.0f);
-	}
-	if (GameInput->Controller.Up.ended_down) {
-		ddPos = v2f_create(0.0f, 1.0f);
-	}
-	if (GameInput->Controller.Down.ended_down) {
-		ddPos = v2f_create(0.0f, -1.0f);
-	}
-	if ((ddPos.x != 0.0f) && (ddPos.y != 0.0f)) {
-		ddPos = v2f_scale(HALF_ROOT_TWO, ddPos);
-	}
 	ddPos = v2f_scale(Player->speed, ddPos);
 
-#if 0
 	v2f dPos;
 	dPos.x = ddPos.x * dt_for_frame + Player->dPos.x;
 	dPos.y = ddPos.y * dt_for_frame + Player->dPos.y;
@@ -1014,20 +1002,17 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 	v2f PosOffset;
 	PosOffset.x = 0.5f * ddPos.x * SQURE(dt_for_frame) + Player->dPos.x * dt_for_frame;
 	PosOffset.y = 0.5f * ddPos.y * SQURE(dt_for_frame) + Player->dPos.y * dt_for_frame;
-#endif
-	v2f PosOffset;
-	PosOffset = v2f_scale(dt_for_frame, ddPos);
 
 	tile_map_position PlayerNewPos = Player->TileMapPos;
-	PlayerNewPos.TileRel = v2f_add(PlayerNewPos.TileRel, PosOffset);
+	PlayerNewPos.TileOffset = v2f_add(PlayerNewPos.TileOffset, PosOffset);
 	PlayerNewPos = tile_map_position_remap(TileMap, PlayerNewPos);
 
 	tile_map_position PlayerLeft = PlayerNewPos;
-	PlayerLeft.TileRel.x -= 0.5f * TileMap->tile_side_in_meters;
+	PlayerLeft.TileOffset.x -= 0.5f * TileMap->tile_side_in_meters;
 	PlayerLeft = tile_map_position_remap(TileMap, PlayerLeft);
 
 	tile_map_position PlayerRight = PlayerNewPos;
-	PlayerRight.TileRel.x += 0.5f * TileMap->tile_side_in_meters;
+	PlayerRight.TileOffset.x += 0.5f * TileMap->tile_side_in_meters;
 	PlayerRight = tile_map_position_remap(TileMap, PlayerRight);
 
 	if (tile_map_tile_is_empty(TileMap, PlayerNewPos) &&
@@ -1039,15 +1024,18 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 
 	v2f PlayerMin;
 	PlayerMin.x = BottomLeft.x + Player->TileMapPos.Tile.x * TileMap->tile_side_in_pixels +
-		TileMap->meters_to_pixels * Player->TileMapPos.TileRel.x - TileMap->tile_side_in_pixels / 2.0f;
+		TileMap->meters_to_pixels * Player->TileMapPos.TileOffset.x - TileMap->tile_side_in_pixels / 2.0f;
 	PlayerMin.y = BottomLeft.y + Player->TileMapPos.Tile.y * TileMap->tile_side_in_pixels +
-		TileMap->meters_to_pixels * Player->TileMapPos.TileRel.y;
+		TileMap->meters_to_pixels * Player->TileMapPos.TileOffset.y;
 
 	v2f PlayerMax;
 	PlayerMax.x = PlayerMin.x + TileMap->tile_side_in_pixels;
 	PlayerMax.y = PlayerMin.y + TileMap->tile_side_in_pixels;
 
-	rectangle_draw(BackBuffer, PlayerMin, PlayerMax, 1.0f, 1.0f, 0.0f);
+	bitmap_draw(BackBuffer, &GameState->Ship, PlayerMin.x, PlayerMin.y);
+
+	//rectangle_draw(BackBuffer, PlayerMin, , 1.0f, 1.0f, 0.0f);
+
 
 	// NOTE(Justin): Assume that the bounding box min and max are the left and
 	// right vertices of the player, respectively. Then check if it is true and

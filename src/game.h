@@ -67,7 +67,7 @@ typedef enum
 	ASTEROID_SMALL,
 	ASTEROID_MEDIUM,
 	ASTEROID_LARGE,
-
+ 
 	ASTEROID_SIZE_COUNT
 
 } asteroid_size;
@@ -100,7 +100,7 @@ enum
 typedef struct
 {
 	v2i Tile;
-	v2f TileRel;
+	v2f TileOffset;
 } tile_map_position;
 
 typedef struct
@@ -113,6 +113,7 @@ typedef struct
 	v2f dPos;
 	f32 speed;
 	b32 is_shooting;
+	b32 is_warping;
 
 	bounding_box BoundingBox;
 	circle Shield;
@@ -122,18 +123,18 @@ typedef struct
 
 typedef struct
 {
-	v2f Pos;
+	tile_map_position TileMapPos;
 	f32 time_left;
 } projectile_trail;
 
 typedef struct
 {
-	v2f Pos;
+	tile_map_position TileMapPos;
 	v2f Direction;
 	v2f dPos;
 
 	f32 distance_remaining;
-	b32 active;
+	b32 is_active;
 
 
 	projectile_trail Trails[4];
@@ -163,6 +164,10 @@ typedef struct
 {
 	loaded_bitmap Background;
 	loaded_bitmap Ship;
+	loaded_bitmap WarpFrames[8];
+	loaded_bitmap Test;
+
+	u32 warp_frame_index;
 	f32 pixels_per_meter;
 	v2f WorldHalfDim;
 
