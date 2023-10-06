@@ -1,14 +1,14 @@
 @echo off
 
-set common_compiler_flags= -DGAME_SLOW=1 -MTd -nologo -Od -Oi -TC -W4 -FC -Zi -wd4201 -wd4100 -wd4204 -wd4459 -DDEBUG_BOUNDING_BOX=1 -DDEBUG_VERTICES=1 -DDEBUG_TILE_MAP=0
-set common_linker_flags= -incremental:no -opt:ref user32.lib Gdi32.lib Winmm.lib Kernel32.lib
+set common_compiler_flags= -MTd -nologo -Gm- -GR- -EHa- -Od -Oi -WX -W4 -FC -Z7 -wd4201 -wd4100 -wd4204 -wd4459 -wd4505 -DDEBUG_BOUNDING_BOX=1 -DDEBUG_VERTICES=1 -DDEBUG_TILE_MAP=1
+set common_linker_flags= -incremental:no -opt:ref user32.lib gdi32.lib winmm.lib
 
 IF NOT EXIST ..\build mkdir ..\build
 pushd ..\build
 REM 64-bit build
 del *.pdb > NUL 2> NUL
-REM cl %common_compiler_flags% ..\src\game.c -Fgame.map /LD /link -incremental:no -opt:ref /PDB:game%random%.pdb /EXPORT:update_and_render
-cl %common_compiler_flags% ..\src\win32_game.c -Fmwin32_game.map /link %common_linker_flags%
+REM cl %common_compiler_flags% ..\src\game.cpp -Fgame.map /LD /link -incremental:no -opt:ref /PDB:game%random%.pdb /EXPORT:update_and_render
+cl %common_compiler_flags% ..\src\win32_game.cpp -Fmwin32_game.map /link %common_linker_flags%
 
 
 REM ---------------------------COMPILER FLAGS------------------------------
@@ -31,3 +31,5 @@ REM		CORRECT:	set CommonCompilerFlags=
 REM
 REM ---------------------LINKER FLAGS------------------------------
 REM
+REM ----------------------Optimization Switches--------------------
+REM  /O2 /oi /fp:fast
