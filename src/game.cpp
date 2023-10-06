@@ -969,6 +969,8 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 
 		Player->TileMapPos = PlayerNewPos;
 	   } else {
+		   v2f R = {-1, 0};
+		   GameState->Player.dPos = GameState->Player.dPos - 2.0f * v2f_dot(GameState->Player.dPos, R) * R;
 	   }
 
 	v2f PlayerMin;
