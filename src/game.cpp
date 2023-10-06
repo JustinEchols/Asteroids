@@ -963,15 +963,39 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 	PlayerRight.TileOffset.x += 0.5f * TileMap->tile_side_in_meters;
 	PlayerRight = tile_map_position_remap(TileMap, PlayerRight);
 
-	if (tile_map_tile_is_empty(TileMap, PlayerNewPos) &&
- 	    tile_map_tile_is_empty(TileMap, PlayerLeft) &&
-	    tile_map_tile_is_empty(TileMap, PlayerRight)) {
-
-		Player->TileMapPos = PlayerNewPos;
-	   } else {
-		   v2f R = {-1, 0};
+	b32 collided = false;
+	tile_map_position CollidedPos = {};
+	if (!tile_map_tile_is_empty(TileMap, PlayerNewPos)) {
+		CollidedPos = PlayerNewPos;
+		collided = true;
+	}
+	if (!tile_map_tile_is_empty(TileMap, PlayerLeft)) {
+		CollidedPos = PlayerLeft;
+		collided = true;
+	}
+	if (!tile_map_tile_is_empty(TileMap, PlayerRight)) {
+		CollidedPos = PlayerRight;
+		collided = true;
+	}
+	if (collided) {
+		v2f R = {};
+		if (CollidedPos.Tile.x < GameState->Player.TileMapPos.Tile.x) {
+			R = {1, 0};
+		}
+		if (CollidedPos.Tile.x > GameState->Player.TileMapPos.Tile.x) {
+			R = {-1, 0};
+		}
+		if (CollidedPos.Tile.y < GameState->Player.TileMapPos.Tile.y) {
+			R = {0, 1};
+		}
+		if (CollidedPos.Tile.y > GameState->Player.TileMapPos.Tile.y) {
+			R = {0, -1};
+		}
 		   GameState->Player.dPos = GameState->Player.dPos - 2.0f * v2f_dot(GameState->Player.dPos, R) * R;
-	   }
+	} else {
+		Player->TileMapPos = PlayerNewPos;
+	}
+
 
 	v2f PlayerMin;
 	PlayerMin.x = BottomLeft.x + Player->TileMapPos.Tile.x * TileMap->tile_side_in_pixels +
