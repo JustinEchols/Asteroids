@@ -1,26 +1,26 @@
 #if !defined(GAME_MATH_H)
 
-typedef struct
+struct m3x3
 {
 	f32 e[3][3];
-} m3x3;
+};
 
-typedef struct 
+struct v2i
 {
 	s32 x, y;
-} v2i;
+};
 
-typedef struct
+struct v2u
 {
 	u32 x, y;
-} v2u;
+};
 
-typedef struct
+struct m2x2
 {
 	f32 e[2][2];
-} m2x2;
+};
 
-typedef union
+union v2f
 {
 	struct
 	{
@@ -31,9 +31,9 @@ typedef union
 		f32 u, v;
 	};
 	f32 e[2];
-} v2f;
+};
 
-typedef union
+union v3f
 {
 	struct
 	{
@@ -44,7 +44,7 @@ typedef union
 		f32 u, v, w;
 	};
 	f32 e[3];
-} v3f;
+};
 
 inline v2i
 v2i_create(s32 x, s32 y)
@@ -62,80 +62,6 @@ v2i_scale(f32 c, v2i V)
 	v2i Result = {0};
 	Result.x = (s32)(c * V.x);
 	Result.y = (s32)(c * V.y);
-	return(Result);
-}
-
-inline v2f
-v2f_create(f32 x, f32 y)
-{
-	v2f Result = {0};
-
-	Result.x = x;
-	Result.y = y;
-
-	return(Result);
-}
-
-inline v2f
-v2f_scale(f32 c, v2f V)
-{
-	v2f Result = {0};
-
-	Result.x = c * V.x;
-	Result.y = c * V.y;
-
-	return(Result);
-}
-
-inline v2f
-v2f_add(v2f V1, v2f V2)
-{
-	v2f Result = {0};
-
-	Result.x = V1.x + V2.x;
-	Result.y = V1.y + V2.y;
-
-	return(Result);
-}
-
-inline v2f
-v2f_subtract(v2f V1, v2f V2)
-{
-	v2f Result = {0};
-
-	Result.x = V1.x - V2.x;
-	Result.y = V1.y - V2.y;
-
-	return(Result);
-}
-
-inline f32
-v2f_dot(v2f V1, v2f V2)
-{
-	f32 Result = 0.0f;
-	Result = V1.x * V2.x + V1.y * V2.y;
-	return(Result);
-}
-
-inline v2f
-v2f_normalize(v2f V)
-{
-	v2f Result = {0};
-
-	f32 c = sqrtf(v2f_dot(V, V));
-
-	Result = v2f_scale(1 / c, V);
-
-	return(Result);
-}
-
-inline f32
-v2f_length(v2f V)
-{
-	f32 Result = 0.0f;
-
-	Result = sqrtf(v2f_dot(V, V));
-
 	return(Result);
 }
 
@@ -160,6 +86,99 @@ v2i_subtract(v2i V1, v2i V2)
 
 	return(Result);
 }
+
+inline v2f
+v2f_create(f32 x, f32 y)
+{
+	v2f Result;
+	Result.x = x;
+	Result.y = y;
+
+	return(Result);
+}
+
+inline v2f
+operator *(f32 c, v2f V)
+{
+	v2f Result;
+	Result.x = c * V.x;
+	Result.y = c * V.y;
+
+	return(Result);
+}
+
+inline v2f
+operator *(v2f V, f32 c)
+{
+	v2f Result = c * V;
+
+	return(Result);
+}
+
+inline v2f &
+operator *=(v2f &V, f32 c)
+{
+	V = c * V;
+	return(V);
+}
+
+inline v2f
+operator +(v2f U, v2f V)
+{
+	v2f Result;
+	Result.x = U.x + V.x;
+	Result.y = U.y + V.y;
+
+	return(Result);
+}
+
+inline v2f &
+operator +=(v2f &U, v2f V)
+{
+	U = U + V;
+
+	return(U);
+}
+
+inline v2f
+operator -(v2f U, v2f V)
+{
+	v2f Result;
+	Result.x = U.x - V.x;
+	Result.y = U.y - V.y;
+	
+	return(Result);
+}
+
+inline f32
+v2f_dot(v2f V1, v2f V2)
+{
+	f32 Result = V1.x * V2.x + V1.y * V2.y;
+
+	return(Result);
+}
+
+inline v2f
+v2f_normalize(v2f V)
+{
+	v2f Result;
+
+	f32 c = sqrtf(v2f_dot(V, V));
+
+	Result = c * V;
+
+	return(Result);
+}
+
+inline f32
+v2f_length(v2f V)
+{
+	f32 Result = f32_sqrt(v2f_dot(V, V));
+
+	return(Result);
+}
+
+
 
 inline v2f
 m2x2_transform_v2f(m2x2 M, v2f V)

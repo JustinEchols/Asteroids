@@ -2,12 +2,34 @@
 // Contains services that the game provides to the platform layer.
 #if !defined(GAME_PLATFORM_H)
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
+
+
 #include <stdint.h>
 
 // NOTE(Justin): The inline keyword is a C99 keyword and is not fully supported
 // with MSVC. It is only available in C++. Therefore we have to use __inline
 // TODO(Justin): Guard this macro
-#define inline __inline
+//#define inline __inline
+
+
+
+typedef int8_t		s8;
+typedef int16_t 	s16;
+typedef int32_t 	s32;
+typedef int64_t 	s64;
+typedef s32			b32;
+
+typedef uint8_t		u8;
+typedef uint16_t	u16;
+typedef uint32_t	u32;
+typedef uint64_t	u64;
+
+typedef float		f32;
 
 #if GAME_SLOW
 #define ASSERT(expression) if (!(expression)) {*(int *)0 = 0;}
@@ -35,22 +57,8 @@
 #define ABS(x) (((x) > 0) ? (x) : -(x))
 #define MIN(a, b) ((a < b) ? (a) : (b))
 #define MAX(a, b) ((a < b) ? (b) : (a))
-#define SQURE(x) ((x) * (x))
+#define SQUARE(x) ((x) * (x))
 #define CUBE(x) ((x) * (x) * (x))
-
-typedef int8_t		s8;
-typedef int16_t 	s16;
-typedef int32_t 	s32;
-typedef int64_t 	s64;
-typedef s32			b32;
-
-typedef uint8_t		u8;
-typedef uint16_t	u16;
-typedef uint32_t	u32;
-typedef uint64_t	u64;
-
-typedef float		f32;
-typedef double		f64;
 
 typedef struct
 {
@@ -127,5 +135,8 @@ typedef struct
 
 } game_memory;
 
+#ifdef __cplusplus
+}
+#endif
 #define GAME_PLATFORM_H
 #endif

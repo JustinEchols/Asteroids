@@ -5,7 +5,7 @@
 
 // WAV PCM is 16 bits per sample, either one or two channels, and samples are
 // interleaved (rlrlrlrl).
-typedef struct
+typedef struct 
 {
 	u8 *data;
 	u64 length;
@@ -13,7 +13,7 @@ typedef struct
 
 typedef size_t memory_index;
 
-typedef struct
+typedef struct 
 {
 	memory_index size;
 	u8 *base;
