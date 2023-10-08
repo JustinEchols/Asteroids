@@ -1,6 +1,6 @@
 @echo off
 
-set common_compiler_flags= -MTd -nologo -Gm- -GR- -EHa- -Od -Oi -WX -W4 -FC -Z7 -wd4201 -wd4100 -wd4204 -wd4459 -wd4505 -DDEBUG_BOUNDING_BOX=1 -DDEBUG_VERTICES=1 -DDEBUG_TILE_MAP=1
+set common_compiler_flags= -MTd -nologo -Gm- -GR- -EHa- -Od -Oi -WX -W4 -FC -Z7 -wd4201 -wd4100 -wd4189 -wd4505 -DDEBUG_BOUNDING_BOX=1 -DDEBUG_VERTICES=1 -DDEBUG_TILE_MAP=1
 set common_linker_flags= -incremental:no -opt:ref user32.lib gdi32.lib winmm.lib
 
 IF NOT EXIST ..\build mkdir ..\build
