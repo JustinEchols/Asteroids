@@ -178,6 +178,14 @@ v2f_length(v2f V)
 	return(Result);
 }
 
+inline f32
+v2f_length_squared(v2f V)
+{
+	f32 Result = v2f_dot(V, V);
+
+	return(Result);
+}
+
 
 
 inline v2f

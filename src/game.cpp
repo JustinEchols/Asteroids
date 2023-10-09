@@ -88,8 +88,11 @@ rectangle_draw(back_buffer *BackBuffer, v2f Min, v2f Max, f32 r, f32 g, f32 b)
 }
 
 internal void
-pixel_set(back_buffer *BackBuffer, s32 screen_x, s32 screen_y, u32 color)
+pixel_set(back_buffer *BackBuffer, v2f ScreenXY, u32 color)
 {
+	s32 screen_x = f32_round_to_s32(ScreenXY.x);
+	s32 screen_y = f32_round_to_s32(ScreenXY.y);
+
 	if (screen_x >= BackBuffer->width) {
 		screen_x = screen_x - BackBuffer->width;
 	}
@@ -107,39 +110,15 @@ pixel_set(back_buffer *BackBuffer, s32 screen_x, s32 screen_y, u32 color)
 	*pixel = color;
 }
 
+#if 1
 internal void
-pixel_set_v2(back_buffer *BackBuffer, s16 screen_x, s16 screen_y, s16 color)
-{
-	s32 X = (s32)screen_x;
-	s32 Y = (s32)screen_y;
-
-	if (screen_x >= BackBuffer->width) {
-		X = screen_x - BackBuffer->width;
-	}
-	if (screen_x < 0) { 
-		X = screen_x + BackBuffer->width;
-	}
-	if (screen_y >= BackBuffer->height) {
-		Y = screen_y - BackBuffer->height;
-	}
-	if (screen_y < 0) {
-		Y = screen_y + BackBuffer->height;
-	}
-	u8 *start = (u8 *)BackBuffer->memory + BackBuffer->stride * Y + BackBuffer->bytes_per_pixel * X;
-	u32 *pixel = (u32 *)start;
-	*pixel = color;
-}
-
-
-#if 0
-internal void
-line_dda_draw(back_buffer *BackBuffer, v2f P1, v2f P2, v3f Color)
+line_dda_draw(back_buffer *BackBuffer, v2f P1, v2f P2, f32 r, f32 g, f32 b)
 {
 	u32 step_count;
 
 	v2f Pos = P1;
 
-	v2f Delta = v2f_subtract(P2, P1);
+	v2f Delta = P2 - P1;
 
 	if (ABS(Delta.x) > ABS(Delta.y)) {
 		step_count = (u32)ABS(Delta.x);
@@ -147,13 +126,15 @@ line_dda_draw(back_buffer *BackBuffer, v2f P1, v2f P2, v3f Color)
 		step_count = (u32)ABS(Delta.y);
 	}
 
-	v2f Step = v2f_scale(1.0f / (f32)step_count, Delta);
+	u32 red = f32_round_to_u32(255.0f * r);
+	u32 green = f32_round_to_u32(255.0f * g);
+	u32 blue = f32_round_to_u32(255.0f * b);
+	u32 color = ((red << 16) | (green << 8) | (blue << 0));
 
+	v2f Step = (1.0f / (f32)step_count) * Delta;
 	for (u32 k = 0; k < step_count; k++) {
-		Pos.x += Step.x;
-		Pos.y += Step.y;
-
-		pixel_set(BackBuffer, Pos, Color);
+		Pos += Step;
+		pixel_set(BackBuffer, Pos, color);
 	}
 }
 #endif
@@ -170,36 +151,6 @@ circle_bounding_box_find(circle Circle)
 
 	return(Result);
 }
-
-internal v2f
-point_clip_to_world(v2f *WorldHalfDim, v2f Point)
-{
-	v2f Result = Point;
-	if (Result.x > WorldHalfDim->x) {
-		Result.x -= 2.0f * WorldHalfDim->x;
-	}
-	if (Result.x < -WorldHalfDim->x) {
-		Result.x += 2.0f * WorldHalfDim->x;
-	}
-	if (Result.y > WorldHalfDim->y) {
-		Result.y -= 2.0f * WorldHalfDim->y;
-	}
-	if (Result.y < -WorldHalfDim->y) {
-		Result.y += 2.0f * WorldHalfDim->y;
-	}
-	return(Result);
-}
-
-internal v2f
-get_screen_pos(back_buffer *BackBuffer, v2f Pos)
-{
-	v2f Result = {0};
-
-	Result.x = Pos.x + ((f32)BackBuffer->width / 2.0f);
-	Result.y = Pos.y + ((f32)BackBuffer->height / 2.0f);
-	return(Result);
-}
-
 
 
 #if 0
@@ -282,7 +233,8 @@ bezier_curve_draw(back_buffer *BackBuffer, v2f P1, v2f P2, v2f P3, f32 t)
 	v2f C2 = lerp_points(P2, P3, t);
 	v2f C3 = lerp_points(C1, C2, t);
 
-	pixel_set(BackBuffer, f32_round_to_s32(C3.x), f32_round_to_s32(C3.y), 0xFFFFFF);
+	u32 color = 0xFFFFFF;
+	pixel_set(BackBuffer, C3, color);
 }
 
 
@@ -571,6 +523,41 @@ bitmap_draw(back_buffer *BackBuffer, loaded_bitmap *Bitmap, f32 x, f32 y)
 }
 
 internal void
+debug_vector_draw_at_point(back_buffer * BackBuffer, v2f Point, v2f Direction)
+{
+	f32 c = 60.0f;
+	line_dda_draw(BackBuffer, Point, Point + c * Direction, 1.0f, 1.0f, 1.0f);
+}
+
+internal v2f
+tile_map_get_screen_coordinates(tile_map *TileMap, tile_map_position *TileMapPos, v2f BottomLeft)
+{
+	v2f Result = {};
+
+	Result.x = BottomLeft.x + TileMap->tile_side_in_pixels * TileMapPos->Tile.x + 
+		(TileMap->tile_side_in_pixels / 2) + TileMap->meters_to_pixels * TileMapPos->TileOffset.x;
+	Result.y = BottomLeft.y + TileMap->tile_side_in_pixels * TileMapPos->Tile.y +
+		(TileMap->tile_side_in_pixels / 2) + TileMap->meters_to_pixels * TileMapPos->TileOffset.y;
+
+	return(Result);
+}
+
+internal void
+test_wall(f32 max_corner_x, f32 rel_x, f32 rel_y, f32 *t_min,
+		  f32 player_delta_x, f32 player_delta_y, f32 min_corner_y, f32 max_corner_y)
+{
+	f32 wall_x = max_corner_x;
+	if (player_delta_x != 0) {
+		f32 t_result = (wall_x - rel_x) / player_delta_x;
+		f32 y = rel_y + t_result * player_delta_y;
+		if ((t_result >= 0.0f) && (*t_min > t_result)) {
+			if ((y >= min_corner_y) && (y <= max_corner_y)) {
+				*t_min = t_result;
+			}
+		}
+	}
+}
+internal void
 update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer *SoundBuffer, game_input *GameInput)
 {
 	ASSERT(sizeof(game_state) <= GameMemory->total_size);
@@ -612,11 +599,19 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 		v2i TileUpperRight = v2i_create(16, 8);
 		v2i TileMiddle = v2i_create(9, 5);
 
-		tile_map_tile_set_value(TileMap, TileUpperLeft, 1);
-		tile_map_tile_set_value(TileMap, TileBottomLeft, 1);
-		tile_map_tile_set_value(TileMap, TileBottomRight, 1);
-		tile_map_tile_set_value(TileMap, TileUpperRight, 1);
-		tile_map_tile_set_value(TileMap, TileMiddle, 1);
+		u32 tile_value = 1;
+		tile_map_tile_set_value(TileMap, TileUpperLeft, tile_value);
+		tile_map_tile_set_value(TileMap, TileBottomLeft, tile_value);
+		tile_map_tile_set_value(TileMap, TileBottomRight, tile_value);
+		tile_map_tile_set_value(TileMap, TileUpperRight, tile_value);
+		tile_map_tile_set_value(TileMap, TileMiddle, tile_value);
+
+		for (s32 tile_x = 2; tile_x < TileMap->tile_count_x; tile_x++) {
+			if (tile_x % 2 == 0) {
+				v2i Tile = {tile_x, 0};
+				tile_map_tile_set_value(TileMap, Tile, tile_value);
+			}
+		}
 
 
 		GameState->WorldHalfDim = v2f_create((f32)BackBuffer->width / (2.0f * GameState->pixels_per_meter),
@@ -624,7 +619,7 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 
 		player *Player = &GameState->Player;
 
-		Player->TileMapPos.Tile = v2i_create(1, 1);
+		Player->TileMapPos.Tile = v2i_create(2, 1);
 		Player->TileMapPos.TileOffset = v2f_create(0.0f, 0.0f);
 
 		Player->height = 10.0f;
@@ -764,14 +759,17 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 			rectangle_draw(BackBuffer, Min, Max, gray, gray, gray);
 		}
 	}
-#else
-	bitmap_draw(BackBuffer, &GameState->Background, 0.0f, 0.0f);
-#endif
+
 	Min.x = BottomLeft.x + GameState->Player.TileMapPos.Tile.x * TileMap->tile_side_in_pixels;
 	Min.y = BottomLeft.y + (f32)GameState->Player.TileMapPos.Tile.y * TileMap->tile_side_in_pixels;
 	Max.x = Min.x + TileMap->tile_side_in_pixels;
 	Max.y = Min.y + TileMap->tile_side_in_pixels;
 	rectangle_draw(BackBuffer, Min, Max, 1.0f, 1.0f, 0.0f);
+
+#else
+	bitmap_draw(BackBuffer, &GameState->Background, 0.0f, 0.0f);
+#endif
+
 
 
 	v2f *WorldHalfDim = &GameState->WorldHalfDim;
@@ -816,6 +814,7 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 	}
 	Player->Right = PlayerNewRight;
 	Player->Direction = PlayerNewDirection;
+
 
 	//
 	// NOTE(Justin): Player projectiles
@@ -935,11 +934,12 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 	// NOTE(Justin): Move player.
 	//
 
-	v2f ddPos = {0};
+	v2f ddPos = {};
 	if (GameInput->Controller.Up.ended_down) {
 		ddPos = v2f_create(PlayerNewDirection.x, PlayerNewDirection.y);
 	}
-	if ((ddPos.x != 0.0f) && (ddPos.y != 0.0f)) {
+	f32 ddp_length_squared = v2f_length_squared(ddPos);
+	if (ddp_length_squared > 1.0f) {
 		ddPos *= HALF_ROOT_TWO;
 	}
 	ddPos *= Player->speed;
@@ -948,13 +948,15 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 	dPos = dt_for_frame * ddPos + Player->dPos;
 	Player->dPos = dPos;
 
-	v2f PosOffset;
-	PosOffset = 0.5f * ddPos * SQUARE(dt_for_frame) + dt_for_frame * Player->dPos;
+	v2f PlayerDelta = 0.5f * ddPos * SQUARE(dt_for_frame) + dt_for_frame * Player->dPos;
+
+	tile_map_position PlayerOldPos = Player->TileMapPos;
 
 	tile_map_position PlayerNewPos = Player->TileMapPos;
-	PlayerNewPos.TileOffset += PosOffset;
+	PlayerNewPos.TileOffset += PlayerDelta;
 	PlayerNewPos = tile_map_position_remap(TileMap, PlayerNewPos);
 
+#if 0
 	tile_map_position PlayerLeft = PlayerNewPos;
 	PlayerLeft.TileOffset.x -= 0.5f * TileMap->tile_side_in_meters;
 	PlayerLeft = tile_map_position_remap(TileMap, PlayerLeft);
@@ -965,18 +967,19 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 
 	b32 collided = false;
 	tile_map_position CollidedPos = {};
-	if (!tile_map_tile_is_empty(TileMap, PlayerNewPos)) {
+	if (!tile_map_tile_is_empty(TileMap, PlayerNewPos.Tile)) {
 		CollidedPos = PlayerNewPos;
 		collided = true;
 	}
-	if (!tile_map_tile_is_empty(TileMap, PlayerLeft)) {
+	if (!tile_map_tile_is_empty(TileMap, PlayerLeft.Tile)) {
 		CollidedPos = PlayerLeft;
 		collided = true;
 	}
-	if (!tile_map_tile_is_empty(TileMap, PlayerRight)) {
+	if (!tile_map_tile_is_empty(TileMap, PlayerRight.Tile)) {
 		CollidedPos = PlayerRight;
 		collided = true;
 	}
+
 	if (collided) {
 		v2f R = {};
 		if (CollidedPos.Tile.x < GameState->Player.TileMapPos.Tile.x) {
@@ -995,6 +998,60 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 	} else {
 		Player->TileMapPos = PlayerNewPos;
 	}
+#else
+	s32 tile_min_x = MIN(PlayerOldPos.Tile.x, PlayerNewPos.Tile.x);
+	s32 tile_min_y = MIN(PlayerOldPos.Tile.y, PlayerNewPos.Tile.y);
+	s32 tile_max_x_one_past = MAX(PlayerOldPos.Tile.x, PlayerNewPos.Tile.x) + 1;
+	s32 tile_max_y_one_past = MAX(PlayerOldPos.Tile.y, PlayerNewPos.Tile.y) + 1;
+
+
+
+	tile_map_position TargetPos = GameState->Player.TileMapPos;
+	f32 target_distance_squared = v2f_length_squared(PlayerDelta);
+
+	f32 t_min = 1.0f;
+	for (s32 tile_y = tile_min_y; tile_y != tile_max_y_one_past; tile_y++) {
+		for (s32 tile_x = tile_min_x; tile_x != tile_max_x_one_past; tile_x++) {
+			tile_map_position TestTilePos = tile_map_get_centered_position(tile_x, tile_y);
+			u32 tile_value = tile_map_get_tile_value_unchecked(TileMap, TestTilePos.Tile);
+			if (!tile_map_is_tile_value_empty(tile_value)) {
+				v2f MinCorner = -0.5f * v2f_create(TileMap->tile_side_in_meters, TileMap->tile_side_in_meters);
+				v2f MaxCorner = 0.5f * v2f_create(TileMap->tile_side_in_meters, TileMap->tile_side_in_meters);
+
+				tile_map_pos_delta TileRelDelta = tile_map_get_pos_delta(TileMap, &PlayerOldPos, &TestTilePos);
+				v2f Rel = TileRelDelta.dXY;
+
+				// Right wall
+				test_wall(MaxCorner.x, Rel.x, Rel.y, &t_min, PlayerDelta.x, PlayerDelta.y,
+						MinCorner.y, MaxCorner.y);
+
+				// Left wall
+				test_wall(MinCorner.x, Rel.x, Rel.y, &t_min, PlayerDelta.x, PlayerDelta.y,
+						MinCorner.y, MaxCorner.y);
+
+				// Bottom wall
+				test_wall(MinCorner.y, Rel.y, Rel.x, &t_min, PlayerDelta.y, PlayerDelta.x,
+						MinCorner.x, MaxCorner.x);
+
+				// Top wall
+				test_wall(MaxCorner.y, Rel.y, Rel.x, &t_min, PlayerDelta.y, PlayerDelta.x,
+						MinCorner.x, MaxCorner.x);
+			}
+		}
+	}
+	PlayerNewPos = PlayerOldPos;
+	PlayerNewPos.TileOffset += t_min * PlayerDelta;
+	PlayerNewPos = tile_map_position_remap(TileMap, PlayerNewPos);
+
+	Player->TileMapPos = PlayerNewPos;
+#endif
+
+#if 1
+	v2f PlayerScreenPos = tile_map_get_screen_coordinates(TileMap, &Player->TileMapPos, BottomLeft);
+	debug_vector_draw_at_point(BackBuffer, PlayerScreenPos, Player->Direction);
+#endif
+
+
 
 
 	v2f PlayerMin;
@@ -1007,6 +1064,10 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 	PlayerMax.x = PlayerMin.x + TileMap->tile_side_in_pixels;
 	PlayerMax.y = PlayerMin.y + TileMap->tile_side_in_pixels;
 
+	//v2f Alignment = v2f_create((f32)GameState->Ship.width / 2.0f, (f32)GameState->Ship.height / 2.0f);
+
+	//PlayerMin += -1.0f * Alignment;
+	//PlayerMax += -1.0f * Alignment;
 	bitmap_draw(BackBuffer, &GameState->Ship, PlayerMin.x, PlayerMin.y);
 
 	//rectangle_draw(BackBuffer, PlayerMin, , 1.0f, 1.0f, 0.0f);

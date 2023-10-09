@@ -6,17 +6,7 @@
 extern "C" {
 #endif
 
-
-
-
 #include <stdint.h>
-
-// NOTE(Justin): The inline keyword is a C99 keyword and is not fully supported
-// with MSVC. It is only available in C++. Therefore we have to use __inline
-// TODO(Justin): Guard this macro
-//#define inline __inline
-
-
 
 typedef int8_t		s8;
 typedef int16_t 	s16;
