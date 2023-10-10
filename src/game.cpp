@@ -542,20 +542,24 @@ tile_map_get_screen_coordinates(tile_map *TileMap, tile_map_position *TileMapPos
 	return(Result);
 }
 
-internal void
+internal b32
 test_wall(f32 max_corner_x, f32 rel_x, f32 rel_y, f32 *t_min,
 		  f32 player_delta_x, f32 player_delta_y, f32 min_corner_y, f32 max_corner_y)
 {
+	b32 hit = false;
+	f32 epsilon = 0.001f;
 	f32 wall_x = max_corner_x;
 	if (player_delta_x != 0) {
 		f32 t_result = (wall_x - rel_x) / player_delta_x;
 		f32 y = rel_y + t_result * player_delta_y;
 		if ((t_result >= 0.0f) && (*t_min > t_result)) {
 			if ((y >= min_corner_y) && (y <= max_corner_y)) {
-				*t_min = t_result;
+				*t_min = MAX(0.0f, t_result - epsilon);
+				hit = true;
 			}
 		}
 	}
+	return(hit);
 }
 internal void
 update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer *SoundBuffer, game_input *GameInput)
@@ -1004,12 +1008,16 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 	s32 tile_max_x_one_past = MAX(PlayerOldPos.Tile.x, PlayerNewPos.Tile.x) + 1;
 	s32 tile_max_y_one_past = MAX(PlayerOldPos.Tile.y, PlayerNewPos.Tile.y) + 1;
 
+	u32 player_tile_width = GameState->Ship.width / TileMap->tile_side_in_meters;
+	u32 player_tile_height = GameState->Ship.height / TileMap->tile_side_in_meters;
 
 
 	tile_map_position TargetPos = GameState->Player.TileMapPos;
 	f32 target_distance_squared = v2f_length_squared(PlayerDelta);
 
 	f32 t_min = 1.0f;
+	v2f WallNormal = {};
+
 	for (s32 tile_y = tile_min_y; tile_y != tile_max_y_one_past; tile_y++) {
 		for (s32 tile_x = tile_min_x; tile_x != tile_max_x_one_past; tile_x++) {
 			tile_map_position TestTilePos = tile_map_get_centered_position(tile_x, tile_y);
@@ -1022,20 +1030,31 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 				v2f Rel = TileRelDelta.dXY;
 
 				// Right wall
-				test_wall(MaxCorner.x, Rel.x, Rel.y, &t_min, PlayerDelta.x, PlayerDelta.y,
-						MinCorner.y, MaxCorner.y);
+				if (test_wall(MaxCorner.x, Rel.x, Rel.y, &t_min, PlayerDelta.x, PlayerDelta.y,
+						MinCorner.y, MaxCorner.y)) {
+					WallNormal = {1.0f, 0.0f};
+				}
 
 				// Left wall
-				test_wall(MinCorner.x, Rel.x, Rel.y, &t_min, PlayerDelta.x, PlayerDelta.y,
-						MinCorner.y, MaxCorner.y);
+				if (test_wall(MinCorner.x, Rel.x, Rel.y, &t_min, PlayerDelta.x, PlayerDelta.y,
+						MinCorner.y, MaxCorner.y)) {
+
+					WallNormal= {-1.0f, 0.0f};
+				}
 
 				// Bottom wall
-				test_wall(MinCorner.y, Rel.y, Rel.x, &t_min, PlayerDelta.y, PlayerDelta.x,
-						MinCorner.x, MaxCorner.x);
+				if (test_wall(MinCorner.y, Rel.y, Rel.x, &t_min, PlayerDelta.y, PlayerDelta.x,
+						MinCorner.x, MaxCorner.x)) {
+
+					WallNormal = {0.0f, 1.0f};
+				}
 
 				// Top wall
-				test_wall(MaxCorner.y, Rel.y, Rel.x, &t_min, PlayerDelta.y, PlayerDelta.x,
-						MinCorner.x, MaxCorner.x);
+				if (test_wall(MaxCorner.y, Rel.y, Rel.x, &t_min, PlayerDelta.y, PlayerDelta.x,
+						MinCorner.x, MaxCorner.x)) {
+
+					WallNormal = {0.0f, -1.0f};
+				}
 			}
 		}
 	}
@@ -1044,15 +1063,13 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 	PlayerNewPos = tile_map_position_remap(TileMap, PlayerNewPos);
 
 	Player->TileMapPos = PlayerNewPos;
+	Player->dPos = Player->dPos - 2.0f * v2f_dot(Player->dPos, WallNormal) * WallNormal;
 #endif
 
 #if 1
 	v2f PlayerScreenPos = tile_map_get_screen_coordinates(TileMap, &Player->TileMapPos, BottomLeft);
 	debug_vector_draw_at_point(BackBuffer, PlayerScreenPos, Player->Direction);
 #endif
-
-
-
 
 	v2f PlayerMin;
 	PlayerMin.x = BottomLeft.x + Player->TileMapPos.Tile.x * TileMap->tile_side_in_pixels +
