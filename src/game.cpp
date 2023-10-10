@@ -581,6 +581,9 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 		GameState->WarpFrames[6] = bitmap_file_read_entire("vfx/warp_07.bmp");
 		GameState->WarpFrames[7] = bitmap_file_read_entire("vfx/warp_08.bmp");
 
+		GameState->AsteroidSprite = bitmap_file_read_entire("asteroids/01.bmp");
+
+
 
 		memory_arena_initialize(&GameState->TileMapArena, GameMemory->total_size - sizeof(game_state),
 								(u8 *)GameMemory->permanent_storage + sizeof(game_state));
@@ -601,8 +604,9 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 		v2i TileBottomLeft = v2i_create(0, 0);
 		v2i TileBottomRight = v2i_create(16, 0);
 		v2i TileUpperRight = v2i_create(16, 8);
-		v2i TileMiddle = v2i_create(9, 5);
+		v2i TileMiddle = v2i_create(8, 4);
 
+#if 0
 		u32 tile_value = 1;
 		tile_map_tile_set_value(TileMap, TileUpperLeft, tile_value);
 		tile_map_tile_set_value(TileMap, TileBottomLeft, tile_value);
@@ -616,6 +620,7 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 				tile_map_tile_set_value(TileMap, Tile, tile_value);
 			}
 		}
+#endif
 
 
 		GameState->WorldHalfDim = v2f_create((f32)BackBuffer->width / (2.0f * GameState->pixels_per_meter),
@@ -644,31 +649,31 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 		srand(2023);
 		for (u32 asteroid_index = 0; asteroid_index < ARRAY_COUNT(GameState->Asteroids); asteroid_index++) {
 
-			// Position
-			f32 x_pos = (2 * ((f32)rand() / (f32)RAND_MAX) - 1);
-			x_pos *= GameState->WorldHalfDim.x;
-			f32 y_pos = (2 * ((f32)rand() / (f32)RAND_MAX) - 1);
-			y_pos *= GameState->WorldHalfDim.y;
+			// Tile offset
+			f32 x_offset = (12.0f * ((f32)rand() / (f32)RAND_MAX) - 6);
+			f32 y_offset = (12.0f * ((f32)rand() / (f32)RAND_MAX) - 6);
+
+			// Tile
+			s32 tile_x =  (s32)((TileMap->tile_count_x - 1) * ((f32)rand() / (f32)(RAND_MAX)));
+			s32 tile_y =  (s32)((TileMap->tile_count_y - 1) * ((f32)rand() / (f32)(RAND_MAX)));
+
+			GameState->Asteroids[asteroid_index].TileMapPos.TileOffset = {x_offset, y_offset};
+			GameState->Asteroids[asteroid_index].TileMapPos.Tile = {tile_x, tile_y};
+
 
 			// Direction
 			f32 x_dir = ((f32)rand() / (f32)RAND_MAX) - 0.5f;
 			f32 y_dir = ((f32)rand() / (f32)RAND_MAX) - 0.5f;
 
+		
+
 			f32 speed_scale = ((f32)rand() / (f32)RAND_MAX);
 
-			GameState->Asteroids[asteroid_index].Pos = v2f_create(x_pos, y_pos);
 			GameState->Asteroids[asteroid_index].Direction = v2f_create(x_dir, y_dir);
 			GameState->Asteroids[asteroid_index].speed = 9.0f;
 
 			f32 asteroid_speed = speed_scale * GameState->Asteroids[asteroid_index].speed;
 			GameState->Asteroids[asteroid_index].dPos = asteroid_speed * GameState->Asteroids[asteroid_index].Direction;
-			// Local Vertices
-			GameState->Asteroids[asteroid_index].LocalVertices[0] = v2f_create(1.7f, -0.6f);
-			GameState->Asteroids[asteroid_index].LocalVertices[1] = v2f_create(0.8f , 0.7f);
-			GameState->Asteroids[asteroid_index].LocalVertices[2] = v2f_create(-0.7f , 1.1f);
-			GameState->Asteroids[asteroid_index].LocalVertices[3] = v2f_create(-0.8f, -1.2f);
-			GameState->Asteroids[asteroid_index].LocalVertices[4] = v2f_create(0.4f, -0.6f);
-			GameState->Asteroids[asteroid_index].LocalVertices[5] = v2f_create(1.2f, -1.0f);
 
 			// Size scale
 			u32 scale_index = rand() % 3;
@@ -682,22 +687,9 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 			}
 			GameState->Asteroids[asteroid_index].mass = size_scale;
 		
-			GameState->Asteroids[asteroid_index].LocalVertices[0] = size_scale * GameState->Asteroids[asteroid_index].LocalVertices[0];
-			GameState->Asteroids[asteroid_index].LocalVertices[1] = size_scale * GameState->Asteroids[asteroid_index].LocalVertices[1];
-			GameState->Asteroids[asteroid_index].LocalVertices[2] = size_scale * GameState->Asteroids[asteroid_index].LocalVertices[2];
-			GameState->Asteroids[asteroid_index].LocalVertices[3] = size_scale * GameState->Asteroids[asteroid_index].LocalVertices[3];
-			GameState->Asteroids[asteroid_index].LocalVertices[4] = size_scale * GameState->Asteroids[asteroid_index].LocalVertices[4];
-			GameState->Asteroids[asteroid_index].LocalVertices[5] = size_scale * GameState->Asteroids[asteroid_index].LocalVertices[5];
-
 			// Orientation
 			f32 angle = 2.0f * PI32 * ((f32)rand() / (f32)RAND_MAX);
 			m3x3 Rotation = m3x3_rotate_about_origin(angle);
-			GameState->Asteroids[asteroid_index].LocalVertices[0] = m3x3_transform_v2f(Rotation, GameState->Asteroids[asteroid_index].LocalVertices[0]);
-			GameState->Asteroids[asteroid_index].LocalVertices[1] = m3x3_transform_v2f(Rotation, GameState->Asteroids[asteroid_index].LocalVertices[1]);
-			GameState->Asteroids[asteroid_index].LocalVertices[2] = m3x3_transform_v2f(Rotation, GameState->Asteroids[asteroid_index].LocalVertices[2]);
-			GameState->Asteroids[asteroid_index].LocalVertices[3] = m3x3_transform_v2f(Rotation, GameState->Asteroids[asteroid_index].LocalVertices[3]);
-			GameState->Asteroids[asteroid_index].LocalVertices[4] = m3x3_transform_v2f(Rotation, GameState->Asteroids[asteroid_index].LocalVertices[4]);
-			GameState->Asteroids[asteroid_index].LocalVertices[5] = m3x3_transform_v2f(Rotation, GameState->Asteroids[asteroid_index].LocalVertices[5]);
 
 			// Bounding Box
 			v2f BoundingBoxMin = GameState->Asteroids[asteroid_index].LocalVertices[0];
@@ -722,13 +714,22 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 			GameState->Asteroids[asteroid_index].BoundingBox.Min += GameState->Asteroids[asteroid_index].Pos; 
 			GameState->Asteroids[asteroid_index].BoundingBox.Max += GameState->Asteroids[asteroid_index].Pos; 
 
+			GameState->Asteroids[asteroid_index].is_active = true;
+
 		}
+
+		for (u32 asteroid_index = 0; asteroid_index < ARRAY_COUNT(GameState->Asteroids); asteroid_index++) {
+			asteroid *Asteroid = GameState->Asteroids + asteroid_index;
+			tile_map_tile_set_value(TileMap, Asteroid->TileMapPos.Tile, 1);
+		}
+
 		GameMemory->is_initialized = TRUE;
 	}
 
 
+
 #if 1
-	v2f Min = {0};
+	v2f Min = {};
 	v2f Max = v2f_create((f32)BackBuffer->width, (f32)BackBuffer->height);
 	rectangle_draw(BackBuffer, Min, Max, 0.0f, 0.0f, 0.0f);
 #endif
@@ -1008,8 +1009,8 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 	s32 tile_max_x_one_past = MAX(PlayerOldPos.Tile.x, PlayerNewPos.Tile.x) + 1;
 	s32 tile_max_y_one_past = MAX(PlayerOldPos.Tile.y, PlayerNewPos.Tile.y) + 1;
 
-	u32 player_tile_width = GameState->Ship.width / TileMap->tile_side_in_meters;
-	u32 player_tile_height = GameState->Ship.height / TileMap->tile_side_in_meters;
+	u32 player_tile_width = (u32)(GameState->Ship.width / TileMap->tile_side_in_meters);
+	u32 player_tile_height = (u32)(GameState->Ship.height / TileMap->tile_side_in_meters);
 
 
 	tile_map_position TargetPos = GameState->Player.TileMapPos;
@@ -1066,29 +1067,20 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 	Player->dPos = Player->dPos - 2.0f * v2f_dot(Player->dPos, WallNormal) * WallNormal;
 #endif
 
-#if 1
 	v2f PlayerScreenPos = tile_map_get_screen_coordinates(TileMap, &Player->TileMapPos, BottomLeft);
+#if 1
 	debug_vector_draw_at_point(BackBuffer, PlayerScreenPos, Player->Direction);
 #endif
 
-	v2f PlayerMin;
-	PlayerMin.x = BottomLeft.x + Player->TileMapPos.Tile.x * TileMap->tile_side_in_pixels +
-		TileMap->meters_to_pixels * Player->TileMapPos.TileOffset.x - TileMap->tile_side_in_pixels / 2.0f;
-	PlayerMin.y = BottomLeft.y + Player->TileMapPos.Tile.y * TileMap->tile_side_in_pixels +
-		TileMap->meters_to_pixels * Player->TileMapPos.TileOffset.y;
+	// NOTE(Justin): To center the player bitmap within a tile we need to first
+	// get the players screen position (above) and then offset this position by
+	// half the width and height of the player sprite. The result is that the
+	// player sprite is centered with the tile.
 
-	v2f PlayerMax;
-	PlayerMax.x = PlayerMin.x + TileMap->tile_side_in_pixels;
-	PlayerMax.y = PlayerMin.y + TileMap->tile_side_in_pixels;
+	v2f Alignment = {(f32)GameState->Ship.width / 2.0f, (f32)GameState->Ship.height / 2.0f};
+	PlayerScreenPos += -1.0f * Alignment;
 
-	//v2f Alignment = v2f_create((f32)GameState->Ship.width / 2.0f, (f32)GameState->Ship.height / 2.0f);
-
-	//PlayerMin += -1.0f * Alignment;
-	//PlayerMax += -1.0f * Alignment;
-	bitmap_draw(BackBuffer, &GameState->Ship, PlayerMin.x, PlayerMin.y);
-
-	//rectangle_draw(BackBuffer, PlayerMin, , 1.0f, 1.0f, 0.0f);
-
+	bitmap_draw(BackBuffer, &GameState->Ship, PlayerScreenPos.x, PlayerScreenPos.y);
 
 	// NOTE(Justin): Assume that the bounding box min and max are the left and
 	// right vertices of the player, respectively. Then check if it is true and
@@ -1105,54 +1097,28 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 	// vector of the asteroid by dt_for_frame and add the vector to the asteroids
 	// position. Note that this vector is dx = dt_for_frame * dPos. 
 
-#if 0
+#if 1
 	for (u32 asteroid_index = 0; asteroid_index < ARRAY_COUNT(GameState->Asteroids); asteroid_index++) {
-		asteroid *Asteroid = &GameState->Asteroids[asteroid_index];
-		PosOffset = v2f_scale(dt_for_frame, Asteroid->dPos);
-		v2f AsteroidNewPos = v2f_add(Asteroid->Pos, PosOffset);
-		AsteroidNewPos = point_clip_to_world(WorldHalfDim, AsteroidNewPos);
+		asteroid *Asteroid = GameState->Asteroids + asteroid_index;
+		v2f AsteroidDelta = dt_for_frame * Asteroid->dPos;
+		tile_map_position AsteroidNewPos = Asteroid->TileMapPos;
+		AsteroidNewPos.TileOffset += AsteroidDelta;
+		AsteroidNewPos = tile_map_position_remap(TileMap, AsteroidNewPos);
+
+		if (!tile_map_on_same_tile(&Asteroid->TileMapPos, &AsteroidNewPos)) {
+			tile_map_tile_set_value(TileMap, Asteroid->TileMapPos.Tile, 0);
+			tile_map_tile_set_value(TileMap, AsteroidNewPos.Tile, 1);
+		}
 
 		// TODO(Justin): Collision Detection after calculating offset and bounding box.
 
+#if 0
 		bounding_box AsteroidNewBoundingBox = Asteroid->BoundingBox;
 		AsteroidNewBoundingBox.Min = v2f_add(PosOffset, AsteroidNewBoundingBox.Min);
 		AsteroidNewBoundingBox.Max = v2f_add(PosOffset, AsteroidNewBoundingBox.Max);
 		AsteroidNewBoundingBox.Min = point_clip_to_world(WorldHalfDim, AsteroidNewBoundingBox.Min);
 		AsteroidNewBoundingBox.Max = point_clip_to_world(WorldHalfDim, AsteroidNewBoundingBox.Max);
 
-#if DEBUG_BOUNDING_BOX
-		f32 BoundingBoxDx = AsteroidNewBoundingBox.Max.x - AsteroidNewBoundingBox.Min.x;
-		f32 BoundingBoxDy = AsteroidNewBoundingBox.Max.y - AsteroidNewBoundingBox.Min.y;
-
-		v2f BoundingBoxP0 = AsteroidNewBoundingBox.Min;
-		v2f BoundingBoxP1 = v2f_create(AsteroidNewBoundingBox.Min.x + BoundingBoxDx, AsteroidNewBoundingBox.Min.y);
-		v2f BoundingBoxP2 = v2f_create(BoundingBoxP1.x, AsteroidNewBoundingBox.Min.y + BoundingBoxDy);
-		v2f BoundingBoxP3 = v2f_create(BoundingBoxP0.x, BoundingBoxP2.y);
-
-		// NOTE(Justin): We must clip the vertices to the world first, then
-		// transform the units from meters to pixels. Clipping vertices into
-		// the world is done in world space. And we measure distances in
-		// meters, not pixels, in the world.
-		BoundingBoxP0 = point_clip_to_world(WorldHalfDim, BoundingBoxP0); 
-		BoundingBoxP1 = point_clip_to_world(WorldHalfDim, BoundingBoxP1); 
-		BoundingBoxP2 = point_clip_to_world(WorldHalfDim, BoundingBoxP2); 
-		BoundingBoxP3 = point_clip_to_world(WorldHalfDim, BoundingBoxP3); 
-
-		BoundingBoxP0 = v2f_scale(GameState->pixels_per_meter, BoundingBoxP0); 
-		BoundingBoxP1 = v2f_scale(GameState->pixels_per_meter, BoundingBoxP1); 
-		BoundingBoxP2 = v2f_scale(GameState->pixels_per_meter, BoundingBoxP2); 
-		BoundingBoxP3 = v2f_scale(GameState->pixels_per_meter, BoundingBoxP3); 
-
-		BoundingBoxP0 = get_screen_pos(BackBuffer, BoundingBoxP0);
-		BoundingBoxP1 = get_screen_pos(BackBuffer, BoundingBoxP1);
-		BoundingBoxP2 = get_screen_pos(BackBuffer, BoundingBoxP2);
-		BoundingBoxP3 = get_screen_pos(BackBuffer, BoundingBoxP3);
-
-		line_wu_draw(BackBuffer, BoundingBoxP0, BoundingBoxP1, &GameState->ColorWu[WU_WHITE]);
-		line_wu_draw(BackBuffer, BoundingBoxP1, BoundingBoxP2, &GameState->ColorWu[WU_WHITE]);
-		line_wu_draw(BackBuffer, BoundingBoxP2, BoundingBoxP3, &GameState->ColorWu[WU_WHITE]);
-		line_wu_draw(BackBuffer, BoundingBoxP3, BoundingBoxP0, &GameState->ColorWu[WU_WHITE]);
-#endif
 
 		if ((PlayerNewBoundingBox.Min.x >= AsteroidNewBoundingBox.Min.x) &&
 				(PlayerNewBoundingBox.Min.x <= AsteroidNewBoundingBox.Max.x)) {
@@ -1189,37 +1155,18 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 				dPos = v2f_create(0.0f, 0.0f);
 			}
 		}
-		Asteroid->Pos = AsteroidNewPos;
 		Asteroid->BoundingBox = AsteroidNewBoundingBox;
-
-#if DEBUG_VERTICES
-		// Asteroid position
-		v2f Min = v2f_scale(GameState->pixels_per_meter, Asteroid->Pos);
-		Min = get_screen_pos(BackBuffer, Min);
-
-		v2f Offset = v2f_create(5.0f, 5.0f);
-		v2f Max = v2f_add(Min, Offset);
-		rectangle_draw(BackBuffer, Min, Max, 1.0f, 1.0f, 1.0f);
 #endif
-		for (u32 vertex_index = 0; vertex_index < ARRAY_COUNT(Asteroid->LocalVertices) - 1; vertex_index++) {
-			v2f P1 = v2f_add(Asteroid->Pos, Asteroid->LocalVertices[vertex_index]);
-			v2f P2 = v2f_add(Asteroid->Pos, Asteroid->LocalVertices[vertex_index + 1]);
+		Asteroid->TileMapPos = AsteroidNewPos;
 
-			P1 = v2f_scale(GameState->pixels_per_meter, P1);
-			P2 = v2f_scale(GameState->pixels_per_meter, P2);
+		v2f AsteroidScreenPos = tile_map_get_screen_coordinates(TileMap, &Asteroid->TileMapPos, BottomLeft);
 
-			P1 = get_screen_pos(BackBuffer, P1);
-			P2 = get_screen_pos(BackBuffer, P2);
+		v2f AsteroidAlignment = {(f32)GameState->AsteroidSprite.width / 2.0f, (f32)GameState->AsteroidSprite.height / 2.0f};
+		AsteroidScreenPos += -1.0f * AsteroidAlignment;
 
-			line_wu_draw(BackBuffer, P1, P2, &GameState->ColorWu[WU_WHITE]);
-		}
-		v2f P1 = v2f_add(Asteroid->Pos, Asteroid->LocalVertices[5]);
-		v2f P2 = v2f_add(Asteroid->Pos, Asteroid->LocalVertices[0]);
-		P1 = v2f_scale(GameState->pixels_per_meter, P1);
-		P2 = v2f_scale(GameState->pixels_per_meter, P2);
-		P1 = get_screen_pos(BackBuffer, P1);
-		P2 = get_screen_pos(BackBuffer, P2);
-		line_wu_draw(BackBuffer, P1, P2, &GameState->ColorWu[WU_WHITE]);
+		bitmap_draw(BackBuffer, &GameState->AsteroidSprite, AsteroidScreenPos.x, AsteroidScreenPos.y);
+
+
 	}
 #endif
 

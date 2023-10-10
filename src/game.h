@@ -62,29 +62,7 @@ typedef struct
 
 } circle;
 
-typedef enum
-{
-	ASTEROID_SMALL,
-	ASTEROID_MEDIUM,
-	ASTEROID_LARGE,
- 
-	ASTEROID_SIZE_COUNT
 
-} asteroid_size;
-
-typedef struct
-{
-	v2f Pos;
-	v2f Direction;
-	f32 speed;
-	v2f dPos;
-	v2f LocalVertices[6];
-	bounding_box BoundingBox;
-
-	f32 mass;
-	asteroid_size size;
-	b32 hit;
-} asteroid;
 
 enum 
 {
@@ -120,6 +98,32 @@ typedef struct
 
 	tile_map_position TileMapPos;
 } player;
+
+typedef enum
+{
+	ASTEROID_SMALL,
+	ASTEROID_MEDIUM,
+	ASTEROID_LARGE,
+ 
+	ASTEROID_SIZE_COUNT
+
+} asteroid_size;
+
+typedef struct
+{
+	v2f Pos;
+	tile_map_position TileMapPos;
+	v2f Direction;
+	f32 speed;
+	v2f dPos;
+	v2f LocalVertices[6];
+	bounding_box BoundingBox;
+
+	f32 mass;
+	asteroid_size size;
+	b32 hit;
+	b32 is_active;
+} asteroid;
 
 typedef struct
 {
@@ -165,7 +169,7 @@ typedef struct
 	loaded_bitmap Background;
 	loaded_bitmap Ship;
 	loaded_bitmap WarpFrames[8];
-	loaded_bitmap Test;
+	loaded_bitmap AsteroidSprite;
 
 	u32 warp_frame_index;
 	f32 pixels_per_meter;
