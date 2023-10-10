@@ -115,3 +115,14 @@ tile_map_get_pos_delta(tile_map *TileMap, tile_map_position *Pos1, tile_map_posi
 	return(Result);
 }
 
+inline b32
+tile_map_on_same_tile(tile_map_position *Pos1, tile_map_position *Pos2)
+{
+	b32 Result = ((Pos1->Tile.x == Pos2->Tile.x) &&
+				 (Pos1->Tile.y == Pos2->Tile.y));
+
+	return(Result);
+
+
+}
+
