@@ -61,6 +61,36 @@ f32_sqrt(f32 x)
 	return(Result);
 }
 
+inline u32 
+f32_ceil_to_u32(f32 x)
+{
+
+}
+
+struct bit_scan_result
+{
+	u32 index;
+	b32 found;
+};
+
+internal bit_scan_result
+find_first_bit_set_u32(u32 x)
+{
+	bit_scan_result Result = {};
+#if COMPILER_MSVC
+	Result.found = _BitScanForward((unsigned long *)&Result.index, x);
+#else
+	for (u32 scan_index = 0; scan_index < 32; scan_index++) {
+		if ((1 << scan_index) & x) {
+			Result.index = scan_index;
+			Result.found = true;
+			break;
+		}
+	}
+#endif
+	return(Result);
+}
+
 
 #define GAME_INTRINSICS_H
 #endif

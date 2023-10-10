@@ -1,6 +1,6 @@
 
 #pragma pack(push, 1)
-typedef struct
+struct bitmap_header
 {
 	u16 file_type;
 	u32 file_size;
@@ -22,14 +22,14 @@ typedef struct
 	u32 red_mask;
 	u32 green_mask;
 	u32 blue_mask;
-} bitmap_header;
+};
 
-typedef struct
+struct wave_header
 {
 	u32 chunk_id;
 	u32 chunk_size;
 	u32 wave_id;
-} wave_header;
+};
 
 #define RIFF_CODE(a, b, c, d) (((u32)(a) << 0) | ((u32)(b) << 8) | ((u32)(c) << 16) | ((u32)(d) << 24))
 
@@ -41,13 +41,13 @@ enum
 	 WAVE_CHUNK_ID_DATA = RIFF_CODE('d', 'a', 't', 'a')
 };
 
-typedef struct
+struct wave_chunk
 {
 	u32 id;
 	u32 size;
-} wave_chunk;
+};
 
-typedef struct
+struct wave_format_chunk
 {
 	u16 format;
 	u16 channel_count;
@@ -60,28 +60,12 @@ typedef struct
 	u32 channel_mask;
 	u8 sub_format[16];
 
-} wave_format_chunk;
+};
 #pragma pack(pop)
 
-typedef struct
-{
-	u32 index;
-	b32 found;
-} bit_scan_result;
 
-internal bit_scan_result
-find_first_bit_set_u32(u32 x)
-{
-	bit_scan_result Result = {0};
-	for (u32 scan_index = 0; scan_index < 32; scan_index++) {
-		if ((1 << scan_index) & x) {
-			Result.index = scan_index;
-			Result.found = TRUE;
-			break;
-		}
-	}
-	return(Result);
-}
+
+
 
 internal loaded_bitmap
 bitmap_file_read_entire(char *filename)
