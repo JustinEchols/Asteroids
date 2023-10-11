@@ -1,15 +1,26 @@
 /*
  * TODO:
- * - Threading
- *   Asset loading
- *   Warp animation
- * - Explosion animation
- * - Game of life?
- * - sfx
- * - score
- * - menu
- * - optimization pass
- * - vfx
+ *	- Threading
+ * 	- Asset loading
+ * 	- Animations
+ *		- Explosions
+ *		- Lasers
+ *		- Warp
+ * 	- Game of life?
+ * 	- SFX
+ * 	- Score
+ * 	- Menu
+ * 	- Optimization pass
+ * 	- Profiling
+ * 	- SIMD
+ * 	- Intrinsics
+ * 	- Vfx
+ * 	- Audio mixing
+ * 	- Minkoski based collision detection
+ * 	- Bitmap transformations (rotations, scaling, ...)
+ * 	- Normal mapping
+ * 	- Asteroid collision 
+ * 	- Angular momentum
 */
 
 #include "game.h"
