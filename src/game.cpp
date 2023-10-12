@@ -3,12 +3,16 @@
  *	- Threading
  * 	- Asset loading
  * 	- Animations
- *		- Explosions
- *		- Lasers
- *		- Warp
+ *		- Asteroid destruction
+ *		- Lasers/beams
+ *		- Warping
  *		- Shield
  *			- Appears on collision
  *			- Fades shortly thereafter
+ * 	- Particles
+ *		- Ship thrusters
+ *		- Energy beam
+ *		- Asteroids destruction
  * 	- Game of life?
  *		- Destorying an asteoid spawns alien
  *		- Alien behavior adheres to the rules of the game of life
@@ -24,6 +28,7 @@
  * 	- Audio mixing
  * 	- Minkoski based collision detection
  * 	- Bitmap transformations (rotations, scaling, ...)
+ * 	- UV coordinate mapping
  * 	- Normal mapping
  * 	- Asteroid collision 
  * 	- Angular momentum
@@ -396,11 +401,6 @@ rectangle_transparent_draw(back_buffer *BackBuffer, v2f Min, v2f Max, f32 r, f32
 	}
 }
 
-
-
-
-
-
 internal void
 bitmap_draw(back_buffer *BackBuffer, loaded_bitmap *Bitmap, f32 x, f32 y)
 {
@@ -476,6 +476,7 @@ internal b32
 test_wall(f32 max_corner_x, f32 rel_x, f32 rel_y, f32 *t_min,
 		  f32 player_delta_x, f32 player_delta_y, f32 min_corner_y, f32 max_corner_y)
 {
+	// NOTE(Justin): Using epsilons is not ideal..
 	b32 hit = false;
 	f32 epsilon = 0.001f;
 	f32 wall_x = max_corner_x;
@@ -573,7 +574,6 @@ player_move(tile_map *TileMap, player *Player, v2f ddPos, f32 dt_for_frame)
 	PlayerNewPos = tile_map_position_remap(TileMap, PlayerNewPos);
 
 	Player->TileMapPos = PlayerNewPos;
-	//Player->dPos += dt_for_frame * ddPos;
 
 	if (collided) {
 		if (!Player->is_shielded) {
@@ -607,6 +607,7 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 		GameState->WarpFrames[7] = bitmap_file_read_entire("vfx/warp_08.bmp");
 
 		GameState->AsteroidSprite = bitmap_file_read_entire("asteroids/01.bmp");
+
 
 
 
