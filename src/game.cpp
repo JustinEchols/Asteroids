@@ -6,7 +6,13 @@
  *		- Explosions
  *		- Lasers
  *		- Warp
+ *		- Shield
+ *			- Appears on collision
+ *			- Fades shortly thereafter
  * 	- Game of life?
+ *		- Destorying an asteoid spawns alien
+ *		- Alien behavior adheres to the rules of the game of life
+ *		- Include a weighting so that the alien movement is biased towards the player.
  * 	- SFX
  * 	- Score
  * 	- Menu
@@ -14,7 +20,7 @@
  * 	- Profiling
  * 	- SIMD
  * 	- Intrinsics
- * 	- Vfx
+ * 	- VfX
  * 	- Audio mixing
  * 	- Minkoski based collision detection
  * 	- Bitmap transformations (rotations, scaling, ...)
