@@ -254,58 +254,6 @@ bezier_curve_draw(back_buffer *BackBuffer, v2f P1, v2f P2, v2f P3, f32 t)
 	pixel_set(BackBuffer, C3, color);
 }
 
-
-
-#if 0
-internal void
-player_draw(game_state *GameState, back_buffer *BackBuffer, player *Player)
-{
-	// NOTE(Justin): x in [-w/10. w/10] and y in [-h/10, h/10].
-	// To draw the player to the screen we first need to map (x, y)
-	// into [0, w] x [0, h]. This is what point_map_to_screen does. 
-
-	v2f PlayerScreenLeft = tile_relative_pos_map_to_screen(GameState, BackBuffer, Player->TileMapPos, Player->Vertices[PLAYER_LEFT]);
-	v2f PlayerScreenRight = tile_relative_pos_map_to_screen(GameState, BackBuffer, Player->TileMapPos, Player->Vertices[PLAYER_RIGHT]);
-	v2f PlayerScreenTop = tile_relative_pos_map_to_screen(GameState, BackBuffer, Player->TileMapPos, Player->Vertices[PLAYER_TOP]);
-	v2f PlayerScreenBezierTop = tile_relative_pos_map_to_screen(GameState, BackBuffer, Player->TileMapPos, Player->Vertices[PLAYER_BEZIER_TOP]);
-
-	line_wu_draw(BackBuffer, PlayerScreenLeft, PlayerScreenTop, &Player->ColorWu);
-	line_wu_draw(BackBuffer, PlayerScreenRight, PlayerScreenTop, &Player->ColorWu);
-
-	// NOTE(Justin): The 100 is arbitrary and fudged to make sure the curve is filled with pixels.
-	// TODO(Justin): Antialising and precise drawing.
-	for (u32 i = 0; i < 100; i++) {
-		f32 t = (f32)i / 100;
-		bezier_curve_draw(BackBuffer, PlayerScreenLeft, PlayerScreenBezierTop, PlayerScreenRight, t);
-	}
-
-#if DEBUG_VERTICES
-	v2f OffsetInPixels = {10.0f, 10.0f};
-	v2f MinPos = tile_relative_pos_map_to_screen(GameState, BackBuffer, Player->TileMapPos, Player->TileMapPos.TileRelativePos);
-	v2f MaxPos = v2f_add(MinPos, OffsetInPixels);
-
-	v2f MinLeft = PlayerScreenLeft;
-	v2f MaxLeft = v2f_add(MinLeft, OffsetInPixels);
-
-	v2f MinRight = PlayerScreenRight;
-	v2f MaxRight = v2f_add(MinRight, OffsetInPixels);
-
-	v2f MinTop = PlayerScreenTop;
-	v2f MaxTop = v2f_add(MinTop, OffsetInPixels);
-
-	// Position - white
-	rectangle_draw(BackBuffer, MinPos, MaxPos, 1.0f, 1.0f, 1.0f);
-	// Left - red
-	rectangle_draw(BackBuffer, MinLeft, MaxLeft, 1.0f, 0.0f, 0.0f);
-	// Right - green
-	rectangle_draw(BackBuffer, MinRight, MaxRight, 0.0f, 1.0f, 0.0f);
-	// Top - blue
-	rectangle_draw(BackBuffer, MinTop, MaxTop, 0.0f, 0.0f, 1.0f);
-#endif
-
-}
-#endif
-
 internal u32
 string_length(char *str)
 {
@@ -343,39 +291,6 @@ strings_are_same(char *str1, char *str2)
 	}
 	return(Result);
 }
-
-#if 0
-internal void
-player_bounding_box_draw(game_state *GameState, back_buffer *BackBuffer, player *Player)
-{
-
-	v2f P0 = Player->BoundingBox.Min;
-	v2f OffsetP1 = v2f_scale(2.0f * Player->base_half_width, Player->Right);
-	v2f P1 = v2f_add(P0, OffsetP1);
-	v2f P2 = Player->BoundingBox.Max;
-	v2f OffsetP3 = v2f_scale(-1.0f, OffsetP1);
-	v2f P3 = v2f_add(P2, OffsetP3);
-
-	P0 = get_screen_pos(BackBuffer, P0);
-	P1 = get_screen_pos(BackBuffer, P1);
-	P2 = get_screen_pos(BackBuffer, P2);
-	P3 = get_screen_pos(BackBuffer, P3);
-
-	line_wu_draw(BackBuffer, P0, P1, &Player->ColorWu);
-	line_wu_draw(BackBuffer, P1, P2, &Player->ColorWu);
-	line_wu_draw(BackBuffer, P2, P3, &Player->ColorWu);
-	line_wu_draw(BackBuffer, P3, P0, &Player->ColorWu);
-
-	v2f OffsetInPixels = v2f_create(10.0f, 10.0f);
-	v2f Min = point_map_to_screen(GameState, BackBuffer, Player->BoundingBox.Min);
-	v2f Max = v2f_add(Min, OffsetInPixels);
-	rectangle_draw(BackBuffer, Min, Max, 1.0f, 1.0f, 0.0f);
-
-	Min = point_map_to_screen(GameState, BackBuffer, Player->BoundingBox.Max);
-	Max = v2f_add(Min, OffsetInPixels);
-	rectangle_draw(BackBuffer, Min, Max, 1.0f, 0.0f, 1.0f);
-}
-#endif
 
 internal void
 line_vertical_draw(back_buffer *BackBuffer, f32 x, f32 r, f32 g, f32 b)
