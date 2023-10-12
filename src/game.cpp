@@ -366,7 +366,6 @@ player_bounding_box_draw(game_state *GameState, back_buffer *BackBuffer, player 
 	line_wu_draw(BackBuffer, P2, P3, &Player->ColorWu);
 	line_wu_draw(BackBuffer, P3, P0, &Player->ColorWu);
 
-
 	v2f OffsetInPixels = v2f_create(10.0f, 10.0f);
 	v2f Min = point_map_to_screen(GameState, BackBuffer, Player->BoundingBox.Min);
 	v2f Max = v2f_add(Min, OffsetInPixels);
