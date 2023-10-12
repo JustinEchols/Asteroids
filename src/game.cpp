@@ -241,8 +241,6 @@ lerp_color(v3f ColorA, v3f ColorB, f32 t)
 	return(Result);
 }
 
-
-
 internal void
 bezier_curve_draw(back_buffer *BackBuffer, v2f P1, v2f P2, v2f P3, f32 t)
 {
@@ -255,7 +253,7 @@ bezier_curve_draw(back_buffer *BackBuffer, v2f P1, v2f P2, v2f P3, f32 t)
 }
 
 internal u32
-string_length(char *str)
+str_length(char *str)
 {
 	u32 Result = 0;
 	for (char *c = str; *c != '\0'; c++) {
@@ -265,7 +263,7 @@ string_length(char *str)
 }
 
 internal b32
-strings_are_same(char *str1, char *str2)
+str_are_same(char *str1, char *str2)
 {
 	// NOTE(Justin): Assume the strings are the same from the
 	// outset, if we find that the lengths are in fact different, then they
@@ -275,8 +273,8 @@ strings_are_same(char *str1, char *str2)
 
 	b32 Result = 1;
 
-	u32 str1_length = string_length(str1);
-	u32 str2_length = string_length(str2);
+	u32 str1_length = str_length(str1);
+	u32 str2_length = str_length(str2);
 	if (str1_length == str2_length) {
 		char *c1 = str1;
 		char *c2 = str2;
@@ -288,6 +286,17 @@ strings_are_same(char *str1, char *str2)
 		}
 	} else {
 		Result = 0;
+	}
+	return(Result);
+}
+
+internal string_u8
+str_u8(char *str)
+{
+	string_u8 Result;
+	Result.data = (u8 *)str;
+	for (char *c = str; *c != '\0'; c++) {
+		Result.length++;
 	}
 	return(Result);
 }
@@ -375,7 +384,7 @@ rectangle_transparent_draw(back_buffer *BackBuffer, v2f Min, v2f Max, f32 r, f32
 	u32 blue = f32_round_to_u32(255.0f * b);
 	u32 color = ((red << 16) | (green << 8) | (blue << 0));
 
-	u8 *pixel_row = (u8 *)BackBuffer->memory + BackBuffer->stride * y_min + BackBuffer->bytes_per_pixel * x_min ;
+	u8 *pixel_row = (u8 *)BackBuffer->memory + BackBuffer->stride * y_min + BackBuffer->bytes_per_pixel * x_min;
 	for (int row = y_min; row < y_max; row++) {
 
 		u32 *pixel = (u32 *)pixel_row;
@@ -388,16 +397,6 @@ rectangle_transparent_draw(back_buffer *BackBuffer, v2f Min, v2f Max, f32 r, f32
 }
 
 
-internal string_u8
-str_u8(char *str)
-{
-	string_u8 Result;
-	Result.data = (u8 *)str;
-	for (char *c = str; *c != '\0'; c++) {
-		Result.length++;
-	}
-	return(Result);
-}
 
 
 
