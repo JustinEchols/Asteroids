@@ -572,6 +572,101 @@ test_wall(f32 max_corner_x, f32 rel_x, f32 rel_y, f32 *t_min,
 	}
 	return(hit);
 }
+
+internal void
+player_move(tile_map *TileMap, player *Player, v2f ddPos, f32 dt_for_frame)
+{
+	f32 ddp_length_squared = v2f_length_squared(ddPos);
+	if (ddp_length_squared > 1.0f) {
+		ddPos *= HALF_ROOT_TWO;
+	}
+	ddPos *= Player->speed;
+
+	v2f dPos;
+	dPos = dt_for_frame * ddPos + Player->dPos;
+	Player->dPos = dPos;
+
+	v2f PlayerDelta = 0.5f * ddPos * SQUARE(dt_for_frame) + dt_for_frame * Player->dPos;
+
+	tile_map_position PlayerOldPos = Player->TileMapPos;
+
+	tile_map_position PlayerNewPos = Player->TileMapPos;
+	PlayerNewPos.TileOffset += PlayerDelta;
+	PlayerNewPos = tile_map_position_remap(TileMap, PlayerNewPos);
+
+	s32 tile_min_x = MIN(PlayerOldPos.Tile.x, PlayerNewPos.Tile.x);
+	s32 tile_min_y = MIN(PlayerOldPos.Tile.y, PlayerNewPos.Tile.y);
+	s32 tile_max_x_one_past = MAX(PlayerOldPos.Tile.x, PlayerNewPos.Tile.x) + 1;
+	s32 tile_max_y_one_past = MAX(PlayerOldPos.Tile.y, PlayerNewPos.Tile.y) + 1;
+
+	// TODO(Justin): Collision detection against asteroids not tiles.
+	// TODO(Justin): Player shield allows for collisions with 
+	f32 t_min = 1.0f;
+	v2f WallNormal = {};
+	b32 collided = false;
+	for (s32 tile_y = tile_min_y; tile_y != tile_max_y_one_past; tile_y++) {
+		for (s32 tile_x = tile_min_x; tile_x != tile_max_x_one_past; tile_x++) {
+			tile_map_position TestTilePos = tile_map_get_centered_position(tile_x, tile_y);
+			u32 tile_value = tile_map_get_tile_value_unchecked(TileMap, TestTilePos.Tile);
+			if (!tile_map_is_tile_value_empty(tile_value)) {
+				v2f MinCorner = -0.5f * v2f_create(TileMap->tile_side_in_meters, TileMap->tile_side_in_meters);
+				v2f MaxCorner = 0.5f * v2f_create(TileMap->tile_side_in_meters, TileMap->tile_side_in_meters);
+
+				tile_map_pos_delta TileRelDelta = tile_map_get_pos_delta(TileMap, &PlayerOldPos, &TestTilePos);
+				v2f Rel = TileRelDelta.dXY;
+
+				// Right wall
+				if (test_wall(MaxCorner.x, Rel.x, Rel.y, &t_min, PlayerDelta.x, PlayerDelta.y,
+							MinCorner.y, MaxCorner.y)) {
+					WallNormal = {1.0f, 0.0f};
+					collided = true;
+				}
+
+				// Left wall
+				if (test_wall(MinCorner.x, Rel.x, Rel.y, &t_min, PlayerDelta.x, PlayerDelta.y,
+							MinCorner.y, MaxCorner.y)) {
+
+					WallNormal= {-1.0f, 0.0f};
+					collided = true;
+				}
+
+				// Bottom wall
+				if (test_wall(MinCorner.y, Rel.y, Rel.x, &t_min, PlayerDelta.y, PlayerDelta.x,
+							MinCorner.x, MaxCorner.x)) {
+
+					WallNormal = {0.0f, 1.0f};
+					collided = true;
+				}
+
+				// Top wall
+				if (test_wall(MaxCorner.y, Rel.y, Rel.x, &t_min, PlayerDelta.y, PlayerDelta.x,
+							MinCorner.x, MaxCorner.x)) {
+
+					WallNormal = {0.0f, -1.0f};
+					collided = true;
+				}
+			}
+		}
+	}
+
+	PlayerNewPos = PlayerOldPos;
+	PlayerNewPos.TileOffset += t_min * PlayerDelta;
+	PlayerNewPos = tile_map_position_remap(TileMap, PlayerNewPos);
+
+	Player->TileMapPos = PlayerNewPos;
+	//Player->dPos += dt_for_frame * ddPos;
+
+	if (collided) {
+		if (!Player->is_shielded) {
+			Player->dPos = {};
+			Player->TileMapPos = {};
+			Player->TileMapPos.Tile = {TileMap->tile_count_x / 2, TileMap->tile_count_y / 2};
+		} else {
+			Player->dPos = Player->dPos - 2.0f * v2f_dot(Player->dPos, WallNormal) * WallNormal;
+		}
+	}
+}
+
 internal void
 update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer *SoundBuffer, game_input *GameInput)
 {
@@ -610,36 +705,12 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 		TileMap->meters_to_pixels = TileMap->tile_side_in_pixels / TileMap->tile_side_in_meters;
 		TileMap->tiles = push_array(&GameState->TileMapArena, TileMap->tile_count_x * TileMap->tile_count_y, u32);
 
-
-		v2i TileUpperLeft = v2i_create(0, 8);
-		v2i TileBottomLeft = v2i_create(0, 0);
-		v2i TileBottomRight = v2i_create(16, 0);
-		v2i TileUpperRight = v2i_create(16, 8);
-		v2i TileMiddle = v2i_create(8, 4);
-
-#if 0
-		u32 tile_value = 1;
-		tile_map_tile_set_value(TileMap, TileUpperLeft, tile_value);
-		tile_map_tile_set_value(TileMap, TileBottomLeft, tile_value);
-		tile_map_tile_set_value(TileMap, TileBottomRight, tile_value);
-		tile_map_tile_set_value(TileMap, TileUpperRight, tile_value);
-		tile_map_tile_set_value(TileMap, TileMiddle, tile_value);
-
-		for (s32 tile_x = 2; tile_x < TileMap->tile_count_x; tile_x++) {
-			if (tile_x % 2 == 0) {
-				v2i Tile = {tile_x, 0};
-				tile_map_tile_set_value(TileMap, Tile, tile_value);
-			}
-		}
-#endif
-
-
 		GameState->WorldHalfDim = v2f_create((f32)BackBuffer->width / (2.0f * GameState->pixels_per_meter),
 											 (f32)BackBuffer->height / (2.0f * GameState->pixels_per_meter));
 
 		player *Player = &GameState->Player;
 
-		Player->TileMapPos.Tile = v2i_create(2, 1);
+		Player->TileMapPos.Tile = v2i_create(TileMap->tile_count_x / 2, TileMap->tile_count_y / 2);
 		Player->TileMapPos.TileOffset = v2f_create(0.0f, 0.0f);
 
 		Player->height = 10.0f;
@@ -650,7 +721,9 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 
 		Player->dPos = v2f_create(0.0f, 0.0f);
 		Player->speed = 30.0f;
-		Player->is_shooting = FALSE;
+		Player->is_shooting = false;
+		Player->is_warping = false;
+		Player->is_shielded = true;
 
 		GameState->projectile_next = 0;
 		GameState->projectile_speed = 60.0f;
@@ -857,6 +930,7 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 				GameState->projectile_next = 0;
 			}
 			Projectile->TileMapPos = Player->TileMapPos;
+			Projectile->TileMapPos.TileOffset += 10.0f * Player->Direction;
 			Projectile->distance_remaining = 100.0f;
 			Projectile->Direction = Player->Direction;
 			Projectile->dPos = GameState->projectile_speed * Projectile->Direction;
@@ -950,133 +1024,13 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 	// NOTE(Justin): Move player.
 	//
 
+
 	v2f ddPos = {};
 	if (GameInput->Controller.Up.ended_down) {
 		ddPos = v2f_create(PlayerNewDirection.x, PlayerNewDirection.y);
 	}
-	f32 ddp_length_squared = v2f_length_squared(ddPos);
-	if (ddp_length_squared > 1.0f) {
-		ddPos *= HALF_ROOT_TWO;
-	}
-	ddPos *= Player->speed;
+	player_move(TileMap, Player, ddPos, dt_for_frame);
 
-	v2f dPos;
-	dPos = dt_for_frame * ddPos + Player->dPos;
-	Player->dPos = dPos;
-
-	v2f PlayerDelta = 0.5f * ddPos * SQUARE(dt_for_frame) + dt_for_frame * Player->dPos;
-
-	tile_map_position PlayerOldPos = Player->TileMapPos;
-
-	tile_map_position PlayerNewPos = Player->TileMapPos;
-	PlayerNewPos.TileOffset += PlayerDelta;
-	PlayerNewPos = tile_map_position_remap(TileMap, PlayerNewPos);
-
-#if 0
-	tile_map_position PlayerLeft = PlayerNewPos;
-	PlayerLeft.TileOffset.x -= 0.5f * TileMap->tile_side_in_meters;
-	PlayerLeft = tile_map_position_remap(TileMap, PlayerLeft);
-
-	tile_map_position PlayerRight = PlayerNewPos;
-	PlayerRight.TileOffset.x += 0.5f * TileMap->tile_side_in_meters;
-	PlayerRight = tile_map_position_remap(TileMap, PlayerRight);
-
-	b32 collided = false;
-	tile_map_position CollidedPos = {};
-	if (!tile_map_tile_is_empty(TileMap, PlayerNewPos.Tile)) {
-		CollidedPos = PlayerNewPos;
-		collided = true;
-	}
-	if (!tile_map_tile_is_empty(TileMap, PlayerLeft.Tile)) {
-		CollidedPos = PlayerLeft;
-		collided = true;
-	}
-	if (!tile_map_tile_is_empty(TileMap, PlayerRight.Tile)) {
-		CollidedPos = PlayerRight;
-		collided = true;
-	}
-
-	if (collided) {
-		v2f R = {};
-		if (CollidedPos.Tile.x < GameState->Player.TileMapPos.Tile.x) {
-			R = {1, 0};
-		}
-		if (CollidedPos.Tile.x > GameState->Player.TileMapPos.Tile.x) {
-			R = {-1, 0};
-		}
-		if (CollidedPos.Tile.y < GameState->Player.TileMapPos.Tile.y) {
-			R = {0, 1};
-		}
-		if (CollidedPos.Tile.y > GameState->Player.TileMapPos.Tile.y) {
-			R = {0, -1};
-		}
-		   GameState->Player.dPos = GameState->Player.dPos - 2.0f * v2f_dot(GameState->Player.dPos, R) * R;
-	} else {
-		Player->TileMapPos = PlayerNewPos;
-	}
-#else
-	s32 tile_min_x = MIN(PlayerOldPos.Tile.x, PlayerNewPos.Tile.x);
-	s32 tile_min_y = MIN(PlayerOldPos.Tile.y, PlayerNewPos.Tile.y);
-	s32 tile_max_x_one_past = MAX(PlayerOldPos.Tile.x, PlayerNewPos.Tile.x) + 1;
-	s32 tile_max_y_one_past = MAX(PlayerOldPos.Tile.y, PlayerNewPos.Tile.y) + 1;
-
-	u32 player_tile_width = (u32)(GameState->Ship.width / TileMap->tile_side_in_meters);
-	u32 player_tile_height = (u32)(GameState->Ship.height / TileMap->tile_side_in_meters);
-
-
-	tile_map_position TargetPos = GameState->Player.TileMapPos;
-	f32 target_distance_squared = v2f_length_squared(PlayerDelta);
-
-	f32 t_min = 1.0f;
-	v2f WallNormal = {};
-
-	for (s32 tile_y = tile_min_y; tile_y != tile_max_y_one_past; tile_y++) {
-		for (s32 tile_x = tile_min_x; tile_x != tile_max_x_one_past; tile_x++) {
-			tile_map_position TestTilePos = tile_map_get_centered_position(tile_x, tile_y);
-			u32 tile_value = tile_map_get_tile_value_unchecked(TileMap, TestTilePos.Tile);
-			if (!tile_map_is_tile_value_empty(tile_value)) {
-				v2f MinCorner = -0.5f * v2f_create(TileMap->tile_side_in_meters, TileMap->tile_side_in_meters);
-				v2f MaxCorner = 0.5f * v2f_create(TileMap->tile_side_in_meters, TileMap->tile_side_in_meters);
-
-				tile_map_pos_delta TileRelDelta = tile_map_get_pos_delta(TileMap, &PlayerOldPos, &TestTilePos);
-				v2f Rel = TileRelDelta.dXY;
-
-				// Right wall
-				if (test_wall(MaxCorner.x, Rel.x, Rel.y, &t_min, PlayerDelta.x, PlayerDelta.y,
-						MinCorner.y, MaxCorner.y)) {
-					WallNormal = {1.0f, 0.0f};
-				}
-
-				// Left wall
-				if (test_wall(MinCorner.x, Rel.x, Rel.y, &t_min, PlayerDelta.x, PlayerDelta.y,
-						MinCorner.y, MaxCorner.y)) {
-
-					WallNormal= {-1.0f, 0.0f};
-				}
-
-				// Bottom wall
-				if (test_wall(MinCorner.y, Rel.y, Rel.x, &t_min, PlayerDelta.y, PlayerDelta.x,
-						MinCorner.x, MaxCorner.x)) {
-
-					WallNormal = {0.0f, 1.0f};
-				}
-
-				// Top wall
-				if (test_wall(MaxCorner.y, Rel.y, Rel.x, &t_min, PlayerDelta.y, PlayerDelta.x,
-						MinCorner.x, MaxCorner.x)) {
-
-					WallNormal = {0.0f, -1.0f};
-				}
-			}
-		}
-	}
-	PlayerNewPos = PlayerOldPos;
-	PlayerNewPos.TileOffset += t_min * PlayerDelta;
-	PlayerNewPos = tile_map_position_remap(TileMap, PlayerNewPos);
-
-	Player->TileMapPos = PlayerNewPos;
-	Player->dPos = Player->dPos - 2.0f * v2f_dot(Player->dPos, WallNormal) * WallNormal;
-#endif
 
 	v2f PlayerScreenPos = tile_map_get_screen_coordinates(TileMap, &Player->TileMapPos, BottomLeft);
 #if 1
