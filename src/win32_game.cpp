@@ -352,53 +352,59 @@ win32_process_pending_messgaes(game_controller_input *KeyboardController)
 				if (key_was_down != key_is_down) {
 					switch(vk_code) {
 						case VK_LBUTTON:
-							{
-							} break;
+						{
+						} break;
 						case VK_RBUTTON:
-							{
-							} break;
+						{
+						} break;
 						case VK_LEFT:
-							{
-							} break;
+						{
+						} break;
 						case VK_UP:
-							{
-							} break;
+						{
+						} break;
 						case VK_DOWN:
-							{
-							} break;
+						{
+						} break;
 						case VK_RIGHT:
-							{
-							} break;
+						{
+						} break;
 						case VK_SPACE:
-							{
-								KeyboardController->Space.ended_down = key_is_down;
-								KeyboardController->Space.half_transition_count++;
-							} break;
+						{
+							KeyboardController->Space.ended_down = key_is_down;
+							KeyboardController->Space.half_transition_count++;
+						} break;
 						case 'W':
-							{
-								KeyboardController->Up.ended_down = key_is_down;
-								KeyboardController->Up.half_transition_count++;
-							} break;
+						{
+							KeyboardController->Up.ended_down = key_is_down;
+							KeyboardController->Up.half_transition_count++;
+						} break;
 						case 'A':
-							{
-								KeyboardController->Left.ended_down = key_is_down;
-								KeyboardController->Left.half_transition_count++;
-							} break;
+						{
+							KeyboardController->Left.ended_down = key_is_down;
+							KeyboardController->Left.half_transition_count++;
+						} break;
 						case 'S':
-							{
-								KeyboardController->Down.ended_down = key_is_down;
-								KeyboardController->Down.half_transition_count++;
-							} break;
+						{
+							KeyboardController->Down.ended_down = key_is_down;
+							KeyboardController->Down.half_transition_count++;
+						} break;
 						case 'D':
-							{
-								KeyboardController->Right.ended_down = key_is_down;
-								KeyboardController->Right.half_transition_count++;
-							} break;
+						{
+							KeyboardController->Right.ended_down = key_is_down;
+							KeyboardController->Right.half_transition_count++;
+						} break;
+						case VK_SHIFT:
+						{
+							KeyboardController->Shift.ended_down = key_is_down;
+							KeyboardController->Shift.half_transition_count++;
+						} break;
 						case VK_ESCAPE:
-							{
-								OutputDebugStringA("Escape");
-								Win32GlobalRunning = FALSE;
-							} break;
+						{
+							OutputDebugStringA("Escape");
+							Win32GlobalRunning = FALSE;
+						} break;
+
 					}
 					if (key_is_down) {
 						b32 alt_key_was_down = (Message.lParam & (1 << 29));
