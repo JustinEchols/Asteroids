@@ -105,6 +105,7 @@ typedef struct
 			game_button_state Left;
 			game_button_state Right;
 			game_button_state Space;
+			game_button_state Shift;
 			game_button_state ArrowUp;
 			game_button_state ArrowDown;
 		};
