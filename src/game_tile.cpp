@@ -7,21 +7,6 @@ tile_map_get_tile_value_unchecked(tile_map *TileMap, v2i Tile)
 
 }
 
-#if 0
-internal b32
-tile_map_tile_is_empty(tile_map *TileMap, tile_map_position TestPos)
-{
-	b32 Result = 0;
-	if ((TestPos.Tile.x >= 0) && (TestPos.Tile.x < TileMap->tile_count_x) &&
-		(TestPos.Tile.y >= 0) && (TestPos.Tile.y < TileMap->tile_count_y)) {
-
-		u32 tile_map_value = TileMap->tiles[TestPos.Tile.y * TileMap->tile_count_x + TestPos.Tile.x];
-		Result = (tile_map_value == 0);
-	}
-	return(Result);
-}
-#endif
-
 internal b32
 tile_map_tile_is_empty(tile_map *TileMap, v2i TestTile)
 {
@@ -94,10 +79,7 @@ tile_map_get_centered_position(s32 tile_x, s32 tile_y)
 	return(Result);
 }
 
-struct tile_map_pos_delta
-{
-	v2f dXY;
-};
+
 
 internal tile_map_pos_delta
 tile_map_get_pos_delta(tile_map *TileMap, tile_map_position *Pos1, tile_map_position *Pos2)
@@ -110,7 +92,7 @@ tile_map_get_pos_delta(tile_map *TileMap, tile_map_position *Pos1, tile_map_posi
 
 	v2f TileOffsetDelta = Pos1->TileOffset - Pos2->TileOffset;
 
-	Result.dXY= TileMap->tile_side_in_meters * TileDelta + TileOffsetDelta;
+	Result.dOffset = TileMap->tile_side_in_meters * TileDelta + TileOffsetDelta;
 
 	return(Result);
 }
