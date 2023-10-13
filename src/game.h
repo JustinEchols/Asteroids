@@ -5,20 +5,20 @@
 
 // WAV PCM is 16 bits per sample, either one or two channels, and samples are
 // interleaved (rlrlrlrl).
-typedef struct 
+struct string_u8
 {
 	u8 *data;
 	u64 length;
-} string_u8;
+};
 
 typedef size_t memory_index;
 
-typedef struct 
+struct memory_arena
 {
 	memory_index size;
 	u8 *base;
 	memory_index used;
-} memory_arena;
+};
 
 internal void
 memory_arena_initialize(memory_arena *MemoryArena, memory_index arena_size, u8 *base)
@@ -39,28 +39,31 @@ push_size_(memory_arena *MemoryArena, memory_index size)
 	return(Result);
 }
 
+
 #include "game_intrinsics.h"
 #include "game_math.h"
+#include "game_tile.h"
+
 #include "game_asset.h"
 
-typedef struct
+struct color
 {
 	char *name;
 	v3f Value;
-} color;
+};
 
-typedef struct 
+struct bounding_box
 {
 	v2f Min;
 	v2f Max;
-} bounding_box;
+};
 
-typedef struct
+struct circle
 {
 	v2f Center;
 	f32 radius;
 
-} circle;
+};
 
 
 
@@ -75,13 +78,9 @@ enum
 	PLAYER_VERTEX_COUNT
 };
 
-typedef struct
-{
-	v2i Tile;
-	v2f TileOffset;
-} tile_map_position;
 
-typedef struct
+
+struct player
 {
 	f32 height;
 	f32 base_half_width;
@@ -92,12 +91,13 @@ typedef struct
 	f32 speed;
 	b32 is_shooting;
 	b32 is_warping;
+	b32 is_shielded;
 
 	bounding_box BoundingBox;
 	circle Shield;
 
 	tile_map_position TileMapPos;
-} player;
+};
 
 typedef enum
 {
@@ -109,7 +109,7 @@ typedef enum
 
 } asteroid_size;
 
-typedef struct
+struct asteroid
 {
 	v2f Pos;
 	tile_map_position TileMapPos;
@@ -123,15 +123,15 @@ typedef struct
 	asteroid_size size;
 	b32 hit;
 	b32 is_active;
-} asteroid;
+};
 
-typedef struct
+struct projectile_trail
 {
 	tile_map_position TileMapPos;
 	f32 time_left;
-} projectile_trail;
+};
 
-typedef struct
+struct projectile
 {
 	tile_map_position TileMapPos;
 	v2f Direction;
@@ -144,32 +144,23 @@ typedef struct
 	projectile_trail Trails[4];
 	u32 trail_next;
 	f32 time_between_next_trail;
-} projectile;
+};
 
-
-typedef struct
+struct entity
 {
-	s32 tile_count_x;
-	s32 tile_count_y;
-	s32 tile_side_in_pixels;
-	f32 tile_side_in_meters;
-	f32 meters_to_pixels;
+	b32 exists;
+	tile_map_position TileMapPos;
+	v2f dPos;
+};
 
 
-	u32* tiles;
-} tile_map;
-
-typedef struct
-{
-	f32 tile_side_in_meters;
-} world;
-
-typedef struct
+struct game_state
 {
 	loaded_bitmap Background;
 	loaded_bitmap Ship;
 	loaded_bitmap WarpFrames[8];
 	loaded_bitmap AsteroidSprite;
+	loaded_bitmap LaserBlue;
 
 	u32 warp_frame_index;
 	f32 pixels_per_meter;
@@ -195,7 +186,7 @@ typedef struct
 	u32 test_sample_index;
 
 	b32 is_initialized;
-} game_state;
+};
 
 #define GAME_H
 #endif
