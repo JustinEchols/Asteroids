@@ -64,7 +64,6 @@ f32_sqrt(f32 x)
 inline u32 
 f32_ceil_to_u32(f32 x)
 {
-
 }
 
 struct bit_scan_result
@@ -73,7 +72,7 @@ struct bit_scan_result
 	b32 found;
 };
 
-internal bit_scan_result
+inline bit_scan_result
 find_first_bit_set_u32(u32 x)
 {
 	bit_scan_result Result = {};
