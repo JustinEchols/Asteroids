@@ -1,32 +1,43 @@
 /*
  * TODO:
- *	- Threading
+ *	- Collision Detection
+ *		- Minkoski based collision detection
+ *		- Asteroid collisions
+ *		- Projectile collisions
+ *
+ *	- Hash table tile map storage?
+ *		- Use has value to get tiles that are actually set
+ *		- No need to loop through entire tile map
+
  * 	- Asset loading
- * 	- Animations
- *		- Asteroid destruction
- *		- Lasers/beams
- *		- Warping
- *		- Shield
- *			- Appears on collision
- *			- Fades shortly thereafter
- * 	- Particles
- *		- Ship thrusters
- *		- Energy beam
- *		- Asteroids destruction
+ * 	- VfX
+ *		- Animations
+ *			- Asteroid destruction
+ *			- Lasers/beams
+ *			- Warping
+ *			- Shield
+ *				- Appears on collision
+ *				- Fades shortly thereafter
+ * 		- Particles
+ *			- Ship thrusters
+ *			- Energy beam
+ *			- Asteroids destruction
  * 	- Game of life?
  *		- Destorying an asteoid spawns alien
  *		- Alien behavior adheres to the rules of the game of life
  *		- Include a weighting so that the alien movement is biased towards the player.
  * 	- SFX
+ *		- Audio mixer
  * 	- Score
  * 	- Menu
  * 	- Optimization pass
- * 	- Profiling
- * 	- SIMD
- * 	- Intrinsics
- * 	- VfX
+ *		- Threading
+ *		- Profiling
+ *		- SIMD
+ *		- Intrinsics
+
  * 	- Audio mixing
- * 	- Minkoski based collision detection
+
  * 	- Bitmap transformations (rotations, scaling, ...)
  * 	- UV coordinate mapping
  * 	- Normal mapping
@@ -533,7 +544,7 @@ player_move(tile_map *TileMap, player *Player, v2f ddPos, f32 dt_for_frame)
 				v2f MaxCorner = 0.5f * v2f_create(TileMap->tile_side_in_meters, TileMap->tile_side_in_meters);
 
 				tile_map_pos_delta TileRelDelta = tile_map_get_pos_delta(TileMap, &PlayerOldPos, &TestTilePos);
-				v2f Rel = TileRelDelta.dXY;
+				v2f Rel = TileRelDelta.dOffset;
 
 				// Right wall
 				if (test_wall(MaxCorner.x, Rel.x, Rel.y, &t_min, PlayerDelta.x, PlayerDelta.y,
@@ -586,6 +597,7 @@ player_move(tile_map *TileMap, player *Player, v2f ddPos, f32 dt_for_frame)
 	}
 }
 
+
 internal void
 update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer *SoundBuffer, game_input *GameInput)
 {
@@ -607,6 +619,7 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 		GameState->WarpFrames[7] = bitmap_file_read_entire("vfx/warp_08.bmp");
 
 		GameState->AsteroidSprite = bitmap_file_read_entire("asteroids/01.bmp");
+		GameState->LaserBlue = bitmap_file_read_entire("lasers/laser_small_blue.bmp");
 
 
 
@@ -646,7 +659,7 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 		Player->is_shielded = true;
 
 		GameState->projectile_next = 0;
-		GameState->projectile_speed = 60.0f;
+		GameState->projectile_speed = 30.0f;
 		GameState->projectile_half_width = 1.0f;
 
 		f32 asteroid_scales[3] = {1.5f, 3.0f, 5.0f};
@@ -668,8 +681,6 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 			// Direction
 			f32 x_dir = ((f32)rand() / (f32)RAND_MAX) - 0.5f;
 			f32 y_dir = ((f32)rand() / (f32)RAND_MAX) - 0.5f;
-
-		
 
 			f32 speed_scale = ((f32)rand() / (f32)RAND_MAX);
 
@@ -779,16 +790,6 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 	bitmap_draw(BackBuffer, &GameState->Background, 0.0f, 0.0f);
 #endif
 
-
-
-	v2f *WorldHalfDim = &GameState->WorldHalfDim;
-	if (WorldHalfDim->x != ((f32)BackBuffer->width / (2.0f * GameState->pixels_per_meter))) {
-		WorldHalfDim->x = ((f32)BackBuffer->width / (2.0f * GameState->pixels_per_meter));
-	}
-	if (WorldHalfDim->y != ((f32)BackBuffer->height / (2.0f * GameState->pixels_per_meter))) {
-		WorldHalfDim->y = ((f32)BackBuffer->height / (2.0f * GameState->pixels_per_meter));
-	}
-
 	f32 dt_for_frame = GameInput->dt_for_frame;
 	player *Player = &GameState->Player;
 
@@ -850,7 +851,6 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 				GameState->projectile_next = 0;
 			}
 			Projectile->TileMapPos = Player->TileMapPos;
-			Projectile->TileMapPos.TileOffset += 10.0f * Player->Direction;
 			Projectile->distance_remaining = 100.0f;
 			Projectile->Direction = Player->Direction;
 			Projectile->dPos = GameState->projectile_speed * Projectile->Direction;
@@ -890,12 +890,11 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 			Projectile->distance_remaining -= v2f_length(DeltaPos);
 			if (Projectile->distance_remaining > 0.0f) {
 				v2f OffsetInPixels = v2f_create(5.0f, 5.0f);
-				v2f Min;
-				Min.x = BottomLeft.x + Projectile->TileMapPos.Tile.x * TileMap->tile_side_in_pixels + TileMap->meters_to_pixels * Projectile->TileMapPos.TileOffset.x;
-				Min.y = BottomLeft.y + Projectile->TileMapPos.Tile.y * TileMap->tile_side_in_pixels + TileMap->meters_to_pixels * Projectile->TileMapPos.TileOffset.y;
 
+				v2f Min = tile_map_get_screen_coordinates(TileMap, &Projectile->TileMapPos, BottomLeft);
 				v2f Max = Min + OffsetInPixels;
-				rectangle_draw(BackBuffer, Min, Max, 1.0f, 1.0f, 1.0f);
+
+				rectangle_draw(BackBuffer, Min, Max, 0.0f, 0.0f, 1.0f);
 			} else {
 				Projectile->is_active = FALSE;
 			}
@@ -929,12 +928,11 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 				Trail->time_left -= dt_for_frame;
 				if (Trail->time_left > 0.0f) {
 					v2f OffsetInPixels = v2f_create(5.0f, 5.0f);
-					v2f Min;
-					Min.x = BottomLeft.x + Trail->TileMapPos.Tile.x * TileMap->tile_side_in_pixels + TileMap->meters_to_pixels * Trail->TileMapPos.TileOffset.x;
-					Min.y = BottomLeft.y + Trail->TileMapPos.Tile.y * TileMap->tile_side_in_pixels + TileMap->meters_to_pixels * Trail->TileMapPos.TileOffset.y;
 
+					v2f Min = tile_map_get_screen_coordinates(TileMap, &Trail->TileMapPos, BottomLeft);
 					v2f Max = Min + OffsetInPixels;
-					rectangle_transparent_draw(BackBuffer, Min, Max, 1.0f, 1.0f, 1.0f, Trail->time_left);
+
+					rectangle_transparent_draw(BackBuffer, Min, Max, 0.0f, 0.0f, 1.0f, Trail->time_left);
 				}
 			}
 		}
@@ -944,7 +942,6 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 	// NOTE(Justin): Move player.
 	//
 
-
 	v2f ddPos = {};
 	if (GameInput->Controller.Up.ended_down) {
 		ddPos = v2f_create(PlayerNewDirection.x, PlayerNewDirection.y);
@@ -952,9 +949,17 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 	player_move(TileMap, Player, ddPos, dt_for_frame);
 
 
-	v2f PlayerScreenPos = tile_map_get_screen_coordinates(TileMap, &Player->TileMapPos, BottomLeft);
+
+
 #if 1
+	v2f PlayerScreenPos = tile_map_get_screen_coordinates(TileMap, &Player->TileMapPos, BottomLeft);
 	debug_vector_draw_at_point(BackBuffer, PlayerScreenPos, Player->Direction);
+
+	v2f OffsetInPixels = {10.0f, 10.0f};
+	Min = PlayerScreenPos;
+	Min += -0.5f * OffsetInPixels;
+	Max = Min + OffsetInPixels;
+	rectangle_draw(BackBuffer, Min, Max, 0.0f, 0.0f, 0.0f);
 #endif
 
 	// NOTE(Justin): To center the player bitmap within a tile we need to first
@@ -962,10 +967,12 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 	// half the width and height of the player sprite. The result is that the
 	// player sprite is centered with the tile.
 
+#if 0
 	v2f Alignment = {(f32)GameState->Ship.width / 2.0f, (f32)GameState->Ship.height / 2.0f};
 	PlayerScreenPos += -1.0f * Alignment;
 
 	bitmap_draw(BackBuffer, &GameState->Ship, PlayerScreenPos.x, PlayerScreenPos.y);
+#endif
 
 	// NOTE(Justin): Assume that the bounding box min and max are the left and
 	// right vertices of the player, respectively. Then check if it is true and
@@ -982,7 +989,7 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 	// vector of the asteroid by dt_for_frame and add the vector to the asteroids
 	// position. Note that this vector is dx = dt_for_frame * dPos. 
 
-#if 1
+	// TODO(Justin): Collision of asteroids,
 	for (u32 asteroid_index = 0; asteroid_index < ARRAY_COUNT(GameState->Asteroids); asteroid_index++) {
 		asteroid *Asteroid = GameState->Asteroids + asteroid_index;
 		v2f AsteroidDelta = dt_for_frame * Asteroid->dPos;
@@ -1053,10 +1060,6 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 
 
 	}
-#endif
-
-
-
 
 	//player_draw(GameState, BackBuffer, &GameState->Player);
 
