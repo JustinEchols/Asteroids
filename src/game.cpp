@@ -892,6 +892,7 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 				v2f OffsetInPixels = v2f_create(5.0f, 5.0f);
 
 				v2f Min = tile_map_get_screen_coordinates(TileMap, &Projectile->TileMapPos, BottomLeft);
+				Min += (f32)(GameState->Ship.width / 2.0f) * Projectile->Direction;
 				v2f Max = Min + OffsetInPixels;
 
 				rectangle_draw(BackBuffer, Min, Max, 0.0f, 0.0f, 1.0f);
@@ -930,6 +931,7 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 					v2f OffsetInPixels = v2f_create(5.0f, 5.0f);
 
 					v2f Min = tile_map_get_screen_coordinates(TileMap, &Trail->TileMapPos, BottomLeft);
+					Min += (f32)(GameState->Ship.width / 2.0f) * Projectile->Direction;
 					v2f Max = Min + OffsetInPixels;
 
 					rectangle_transparent_draw(BackBuffer, Min, Max, 0.0f, 0.0f, 1.0f, Trail->time_left);
@@ -955,11 +957,7 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 	v2f PlayerScreenPos = tile_map_get_screen_coordinates(TileMap, &Player->TileMapPos, BottomLeft);
 	debug_vector_draw_at_point(BackBuffer, PlayerScreenPos, Player->Direction);
 
-	v2f OffsetInPixels = {10.0f, 10.0f};
-	Min = PlayerScreenPos;
-	Min += -0.5f * OffsetInPixels;
-	Max = Min + OffsetInPixels;
-	rectangle_draw(BackBuffer, Min, Max, 0.0f, 0.0f, 0.0f);
+
 #endif
 
 	// NOTE(Justin): To center the player bitmap within a tile we need to first
@@ -967,11 +965,17 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 	// half the width and height of the player sprite. The result is that the
 	// player sprite is centered with the tile.
 
-#if 0
+#if 1
 	v2f Alignment = {(f32)GameState->Ship.width / 2.0f, (f32)GameState->Ship.height / 2.0f};
 	PlayerScreenPos += -1.0f * Alignment;
 
 	bitmap_draw(BackBuffer, &GameState->Ship, PlayerScreenPos.x, PlayerScreenPos.y);
+#else
+	v2f OffsetInPixels = {10.0f, 10.0f};
+	Min = PlayerScreenPos;
+	Min += -0.5f * OffsetInPixels;
+	Max = Min + OffsetInPixels;
+	rectangle_draw(BackBuffer, Min, Max, 0.0f, 0.0f, 0.0f);
 #endif
 
 	// NOTE(Justin): Assume that the bounding box min and max are the left and
