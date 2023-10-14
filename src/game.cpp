@@ -726,15 +726,14 @@ entity_get(game_state *GameState, u32 index)
 	return(Result);
 }
 
-
-
 internal u32 
-entity_add(game_state *GameState)
+entity_add(game_state *GameState, entity_type type)
 {
 	ASSERT(GameState->entity_count < ARRAY_COUNT(GameState->Entities));
 	u32 entity_index = GameState->entity_count++;
 
 	GameState->Entities[entity_index] = {};
+	GameState->Entities[entity_index].type = type;
 	return(entity_index);
 }
 
@@ -770,7 +769,7 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 	if (!GameMemory->is_initialized) {
 
 		// NOTE(Justin): Reserve slot 0 for null entity.
-		u32 entity_null_index = entity_add(GameState);
+		u32 entity_null_index = entity_add(GameState, ENTITY_NULL);
 
 		//GameState->TestSound = wav_file_read_entire("bloop_00.wav");
 		GameState->Background = bitmap_file_read_entire("space_background.bmp");
@@ -803,7 +802,7 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 		TileMap->tiles = push_array(&GameState->TileMapArena, TileMap->tile_count_x * TileMap->tile_count_y, u32);
 
 
-		GameState->player_entity_index = entity_add(GameState);
+		GameState->player_entity_index = entity_add(GameState, ENTITY_PLAYER);
 		entity *EntityPlayer = entity_get(GameState, GameState->player_entity_index);
 		player_initialize(GameState, EntityPlayer);
 
