@@ -1,4 +1,17 @@
 
+internal v2f
+tile_map_get_screen_coordinates(tile_map *TileMap, tile_map_position *TileMapPos, v2f BottomLeft)
+{
+	v2f Result = {};
+
+	Result.x = BottomLeft.x + TileMap->tile_side_in_pixels * TileMapPos->Tile.x + 
+		(TileMap->tile_side_in_pixels / 2) + TileMap->meters_to_pixels * TileMapPos->TileOffset.x;
+	Result.y = BottomLeft.y + TileMap->tile_side_in_pixels * TileMapPos->Tile.y +
+		(TileMap->tile_side_in_pixels / 2) + TileMap->meters_to_pixels * TileMapPos->TileOffset.y;
+
+	return(Result);
+}
+
 inline u32
 tile_map_get_tile_value_unchecked(tile_map *TileMap, v2i Tile)
 {

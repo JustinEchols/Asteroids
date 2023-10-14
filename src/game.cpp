@@ -590,18 +590,7 @@ debug_vector_draw_at_point(back_buffer * BackBuffer, v2f Point, v2f Direction)
 	line_dda_draw(BackBuffer, Point, Point + c * Direction, 1.0f, 1.0f, 1.0f);
 }
 
-internal v2f
-tile_map_get_screen_coordinates(tile_map *TileMap, tile_map_position *TileMapPos, v2f BottomLeft)
-{
-	v2f Result = {};
 
-	Result.x = BottomLeft.x + TileMap->tile_side_in_pixels * TileMapPos->Tile.x + 
-		(TileMap->tile_side_in_pixels / 2) + TileMap->meters_to_pixels * TileMapPos->TileOffset.x;
-	Result.y = BottomLeft.y + TileMap->tile_side_in_pixels * TileMapPos->Tile.y +
-		(TileMap->tile_side_in_pixels / 2) + TileMap->meters_to_pixels * TileMapPos->TileOffset.y;
-
-	return(Result);
-}
 
 internal b32
 test_wall(f32 max_corner_x, f32 rel_x, f32 rel_y, f32 *t_min,
@@ -741,8 +730,6 @@ entity_add(game_state *GameState, entity_type type)
 internal void
 player_initialize(game_state *GameState, entity *Entity)
 {
-	//Entity = {};
-
 	Entity->exists = true;
 	Entity->TileMapPos.Tile.x = GameState->TileMap->tile_count_x / 2;
 	Entity->TileMapPos.Tile.y = GameState->TileMap->tile_count_y / 2;
@@ -758,6 +745,11 @@ player_initialize(game_state *GameState, entity *Entity)
 	Entity->is_shielded = true;
 
 	Entity->type = ENTITY_PLAYER;
+}
+
+internal void
+asteroid_initialize(game_state *GameState, entity *Entity)
+{
 }
 
 
