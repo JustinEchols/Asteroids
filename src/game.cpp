@@ -420,19 +420,48 @@ bitmap_draw(back_buffer *BackBuffer, loaded_bitmap *Bitmap, f32 x, f32 y)
 	s32 x_max = f32_round_to_s32(x + (f32)Bitmap->width);
 	s32 y_max = f32_round_to_s32(y + (f32)Bitmap->height);
 
+	s32 region_1_x_min = 0;
+	s32 region_1_x_max = 0;
+	s32 region_2_x_min = 0;
+	s32 region_2_x_max = 0;
+
+	s32 region_1_y_min = 0;
+	s32 region_1_y_max = 0;
+	s32 region_2_y_min = 0;
+	s32 region_2_y_max = 0;
+
+	b32 bitmap_across_x_boundary = false;
+	b32 bitmap_across_y_boundary = false;
 	if (x_min < 0) {
-		x_min += BackBuffer->width;
+		region_1_x_min = x_min + BackBuffer->width;
+		region_1_x_max = BackBuffer->width;
+		region_2_x_min = 0;
+		region_2_x_max = x_max;
+		bitmap_across_x_boundary = true;
 	}
 	if (y_min < 0) {
-		y_min += BackBuffer->height;
+		region_1_y_min = y_min + BackBuffer->height;;
+		region_1_y_max = BackBuffer->height;
+		region_2_y_min = 0;
+		region_2_y_max = y_max;
+		bitmap_across_y_boundary = true;
 	}
 	if (x_max > BackBuffer->width) {
-		x_max -= BackBuffer->width;
+		region_1_x_min = x_min;
+		region_1_x_max = BackBuffer->width;
+		region_2_x_min = 0;
+		region_2_x_max = x_max - BackBuffer->width; 
+		bitmap_across_x_boundary = true;
 	}
 	if (y_max > BackBuffer->height) {
-		y_max -= BackBuffer->height;
+		region_1_y_min = y_min;
+		region_1_y_max = BackBuffer->height;
+		region_2_y_min = 0;
+		region_2_y_max = y_max - BackBuffer->height;
+		bitmap_across_y_boundary = true;
 	}
 
+	if (!(bitmap_across_x_boundary || bitmap_across_y_boundary)) {
 	u8 *dest_row = (u8 *)BackBuffer->memory + y_min * BackBuffer->stride + x_min * BackBuffer->bytes_per_pixel;
 	u8 *src_row = (u8 *)Bitmap->memory;
 	for (s32 y = y_min; y < y_max; y++) {
@@ -460,6 +489,99 @@ bitmap_draw(back_buffer *BackBuffer, loaded_bitmap *Bitmap, f32 x, f32 y)
 		}
 		dest_row += BackBuffer->stride;
 		src_row += Bitmap->stride;
+	}
+	} else {
+
+		if (!bitmap_across_y_boundary) {
+			region_1_y_min = y_min;
+			region_1_y_max = y_max;
+
+			region_2_y_min = region_1_y_min;
+			region_2_y_max = region_1_y_max;
+		} else if (!bitmap_across_x_boundary) {
+			region_1_x_min = x_min;
+			region_1_x_max = x_max;
+
+			region_2_x_min = region_1_x_min;
+			region_2_x_max = region_1_x_max;
+		}
+
+		u8 *dest_row = (u8 *)BackBuffer->memory + region_1_y_min * BackBuffer->stride + region_1_x_min * BackBuffer->bytes_per_pixel;
+		u8 *src_row = (u8 *)Bitmap->memory;
+		for (s32 y = region_1_y_min; y < region_1_y_max; y++) {
+			u32 *src = (u32 *)src_row;
+			u32 *dest = (u32 *)dest_row;
+			for (s32 x = region_1_x_min; x < region_1_x_max; x++) {
+
+				f32 alpha = (f32)((*src >> 24) & 0xFF) / 255.0f;
+				f32 src_r = (f32)((*src >> 16) & 0xFF);
+				f32 src_g = (f32)((*src >> 8) & 0xFF);
+				f32 src_b = (f32)((*src >> 0) & 0xFF);
+
+				f32 dest_r = (f32)((*dest >> 16) & 0xFF);
+				f32 dest_g = (f32)((*dest >> 8) & 0xFF);
+				f32 dest_b = (f32)((*dest >> 0) & 0xFF);
+
+				f32 r = (1.0f - alpha) * dest_r + alpha * src_r;
+				f32 g = (1.0f - alpha) * dest_g + alpha * src_g; 
+				f32 b = (1.0f - alpha) * dest_b + alpha * src_b;
+
+				*dest = (((u32)(r + 0.5f) << 16) | ((u32)(g + 0.5f) << 8) | ((u32)(b + 0.5f) << 0));
+
+				dest++;
+				src++;
+			}
+			dest_row += BackBuffer->stride;
+			src_row += Bitmap->stride;
+		}
+
+
+
+		s32 bitmap_start_x = 0; 
+		if (x_min < 0) {
+			bitmap_start_x = -1 * x_min;
+		}
+		if (x_max > BackBuffer->width) {
+			bitmap_start_x = BackBuffer->width - x_min;
+		}
+
+		s32 bitmap_start_y = 0;
+		if (y_min < 0) {
+			bitmap_start_y = -1 * y_min;
+		}
+		if (y_max > BackBuffer->height) {
+			bitmap_start_y = BackBuffer->height - y_min;
+		}
+
+		dest_row = (u8 *)BackBuffer->memory + region_2_y_min * BackBuffer->stride + region_2_x_min * BackBuffer->bytes_per_pixel;
+
+		src_row = (u8 *)Bitmap->memory + bitmap_start_y * Bitmap->stride + bitmap_start_x * Bitmap->bytes_per_pixel;
+		for (s32 y = region_2_y_min; y < region_2_y_max; y++) {
+			u32 *src = (u32 *)src_row;
+			u32 *dest = (u32 *)dest_row;
+			for (s32 x = region_2_x_min; x < region_2_x_max; x++) {
+
+				f32 alpha = (f32)((*src >> 24) & 0xFF) / 255.0f;
+				f32 src_r = (f32)((*src >> 16) & 0xFF);
+				f32 src_g = (f32)((*src >> 8) & 0xFF);
+				f32 src_b = (f32)((*src >> 0) & 0xFF);
+
+				f32 dest_r = (f32)((*dest >> 16) & 0xFF);
+				f32 dest_g = (f32)((*dest >> 8) & 0xFF);
+				f32 dest_b = (f32)((*dest >> 0) & 0xFF);
+
+				f32 r = (1.0f - alpha) * dest_r + alpha * src_r;
+				f32 g = (1.0f - alpha) * dest_g + alpha * src_g; 
+				f32 b = (1.0f - alpha) * dest_b + alpha * src_b;
+
+				*dest = (((u32)(r + 0.5f) << 16) | ((u32)(g + 0.5f) << 8) | ((u32)(b + 0.5f) << 0));
+
+				dest++;
+				src++;
+			}
+			dest_row += BackBuffer->stride;
+			src_row += Bitmap->stride;
+		}
 	}
 }
 
@@ -638,8 +760,6 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 		TileMap->meters_to_pixels = TileMap->tile_side_in_pixels / TileMap->tile_side_in_meters;
 		TileMap->tiles = push_array(&GameState->TileMapArena, TileMap->tile_count_x * TileMap->tile_count_y, u32);
 
-		GameState->WorldHalfDim = v2f_create((f32)BackBuffer->width / (2.0f * GameState->pixels_per_meter),
-											 (f32)BackBuffer->height / (2.0f * GameState->pixels_per_meter));
 
 		player *Player = &GameState->Player;
 
@@ -705,29 +825,6 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 			// Orientation
 			f32 angle = 2.0f * PI32 * ((f32)rand() / (f32)RAND_MAX);
 			m3x3 Rotation = m3x3_rotate_about_origin(angle);
-
-			// Bounding Box
-			v2f BoundingBoxMin = GameState->Asteroids[asteroid_index].LocalVertices[0];
-			v2f BoundingBoxMax = GameState->Asteroids[asteroid_index].LocalVertices[1];
-			for (u32 vertex_index = 0; vertex_index < ARRAY_COUNT(GameState->Asteroids[asteroid_index].LocalVertices); vertex_index++) {
-				v2f Vertex = GameState->Asteroids[asteroid_index].LocalVertices[vertex_index];
-				if (Vertex.x < BoundingBoxMin.x) {
-					BoundingBoxMin.x = Vertex.x;
-				}
-				if (Vertex.y < BoundingBoxMin.y) {
-					BoundingBoxMin.y = Vertex.y;
-				}
-				if (Vertex.x > BoundingBoxMax.x) {
-					BoundingBoxMax.x = Vertex.x;
-				}
-				if (Vertex.y > BoundingBoxMax.y) {
-					BoundingBoxMax.y = Vertex.y;
-				}
-			}
-			BoundingBoxMin = 1.10f * BoundingBoxMin;
-			BoundingBoxMax = 0.9f * BoundingBoxMax;
-			GameState->Asteroids[asteroid_index].BoundingBox.Min += GameState->Asteroids[asteroid_index].Pos; 
-			GameState->Asteroids[asteroid_index].BoundingBox.Max += GameState->Asteroids[asteroid_index].Pos; 
 
 			GameState->Asteroids[asteroid_index].is_active = true;
 
@@ -956,14 +1053,12 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 #if 1
 	v2f PlayerScreenPos = tile_map_get_screen_coordinates(TileMap, &Player->TileMapPos, BottomLeft);
 	debug_vector_draw_at_point(BackBuffer, PlayerScreenPos, Player->Direction);
-
-
 #endif
 
 	// NOTE(Justin): To center the player bitmap within a tile we need to first
 	// get the players screen position (above) and then offset this position by
 	// half the width and height of the player sprite. The result is that the
-	// player sprite is centered with the tile.
+	// player sprite is centered within the tile.
 
 #if 1
 	v2f Alignment = {(f32)GameState->Ship.width / 2.0f, (f32)GameState->Ship.height / 2.0f};
@@ -978,33 +1073,105 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 	rectangle_draw(BackBuffer, Min, Max, 0.0f, 0.0f, 0.0f);
 #endif
 
-	// NOTE(Justin): Assume that the bounding box min and max are the left and
-	// right vertices of the player, respectively. Then check if it is true and
-	// update the bounding box min/max if not true.
-
-	
-	// TODO(Justin): Experiment with two bounding boxes for the player. A large
-	// and small bounding box. Or continue with ne bounding box and if the
-	// players, or an asteroids, bounding box intersects with another bounding
-	// bo then do more robust collision detection.
-
 	// NOTE(Justin): Asteroids have constant velocity and therefore no
 	// acceleration. To move the asteroid for each frame, scale the velocity
 	// vector of the asteroid by dt_for_frame and add the vector to the asteroids
 	// position. Note that this vector is dx = dt_for_frame * dPos. 
 
 	// TODO(Justin): Collision of asteroids,
+
 	for (u32 asteroid_index = 0; asteroid_index < ARRAY_COUNT(GameState->Asteroids); asteroid_index++) {
 		asteroid *Asteroid = GameState->Asteroids + asteroid_index;
+
+
 		v2f AsteroidDelta = dt_for_frame * Asteroid->dPos;
+
+		// NOTE(Jusitn): Advance the asteroids position by the entire amount
+		// that the asteroid could move this frame. In the collision dectection
+		// we then search for a collision at an earilier time t_min.
+		tile_map_position AsteroidOldPos = Asteroid->TileMapPos;
 		tile_map_position AsteroidNewPos = Asteroid->TileMapPos;
 		AsteroidNewPos.TileOffset += AsteroidDelta;
 		AsteroidNewPos = tile_map_position_remap(TileMap, AsteroidNewPos);
 
-		if (!tile_map_on_same_tile(&Asteroid->TileMapPos, &AsteroidNewPos)) {
-			tile_map_tile_set_value(TileMap, Asteroid->TileMapPos.Tile, 0);
-			tile_map_tile_set_value(TileMap, AsteroidNewPos.Tile, 1);
+
+		s32 tile_min_x = MIN(AsteroidOldPos.Tile.x, AsteroidNewPos.Tile.x);
+		s32 tile_min_y = MIN(AsteroidOldPos.Tile.y, AsteroidNewPos.Tile.y);
+		s32 tile_max_x_one_past = MAX(AsteroidOldPos.Tile.x, AsteroidNewPos.Tile.x) + 1;
+		s32 tile_max_y_one_past = MAX(AsteroidOldPos.Tile.y, AsteroidNewPos.Tile.y) + 1;
+
+		f32 t_min = 1.0f;
+		v2f WallNormal = {};
+		b32 collided = false;
+		for (s32 tile_y = tile_min_y; tile_y != tile_max_y_one_past; tile_y++) {
+			for (s32 tile_x = tile_min_x; tile_x != tile_max_x_one_past; tile_x++) {
+				tile_map_position TestTilePos = tile_map_get_centered_position(tile_x, tile_y);
+				u32 tile_value = tile_map_get_tile_value_unchecked(TileMap, TestTilePos.Tile);
+				if (!tile_map_is_tile_value_empty(tile_value)) {
+					v2f MinCorner = -0.5f * v2f_create(TileMap->tile_side_in_meters, TileMap->tile_side_in_meters);
+					v2f MaxCorner = 0.5f * v2f_create(TileMap->tile_side_in_meters, TileMap->tile_side_in_meters);
+
+					tile_map_pos_delta TileOffsetDelta = tile_map_get_pos_delta(TileMap, &AsteroidOldPos, &AsteroidNewPos);
+					v2f dOffset = TileOffsetDelta.dOffset;
+
+					// Right wall
+					if (test_wall(MaxCorner.x, dOffset.x, dOffset.y, &t_min, AsteroidDelta.x, AsteroidDelta.y,
+								MinCorner.y, MaxCorner.y)) {
+						WallNormal = {1.0f, 0.0f};
+						collided = true;
+					}
+
+					// Left wall
+					if (test_wall(MinCorner.x, dOffset.x, dOffset.y, &t_min, AsteroidDelta.x, AsteroidDelta.y,
+								MinCorner.y, MaxCorner.y)) {
+
+						WallNormal= {-1.0f, 0.0f};
+						collided = true;
+					}
+
+					// Bottom wall
+					if (test_wall(MinCorner.y, dOffset.y, dOffset.x, &t_min, AsteroidDelta.y, AsteroidDelta.x,
+								MinCorner.x, MaxCorner.x)) {
+
+						WallNormal = {0.0f, 1.0f};
+						collided = true;
+					}
+
+					// Top wall
+					if (test_wall(MaxCorner.y, dOffset.y, dOffset.x, &t_min, AsteroidDelta.y, AsteroidDelta.x,
+								MinCorner.x, MaxCorner.x)) {
+
+						WallNormal = {0.0f, -1.0f};
+						collided = true;
+					}
+				}
+			}
 		}
+
+		AsteroidNewPos = Asteroid->TileMapPos;
+		AsteroidNewPos.TileOffset += t_min * AsteroidDelta;
+		AsteroidNewPos = tile_map_position_remap(TileMap, AsteroidNewPos);
+
+		if (!tile_map_on_same_tile(&AsteroidOldPos, &AsteroidNewPos)) {
+			tile_map_tile_set_value(TileMap, AsteroidOldPos.Tile, TILE_EMPTY);
+			tile_map_tile_set_value(TileMap, AsteroidNewPos.Tile, TILE_OCCUPIED);
+		}
+
+		Asteroid->TileMapPos = AsteroidNewPos;
+
+		if (collided) {
+			Asteroid->dPos = Asteroid->dPos - 2.0f * v2f_dot(Asteroid->dPos, WallNormal) * WallNormal;
+		}
+
+		v2f AsteroidScreenPos = tile_map_get_screen_coordinates(TileMap, &Asteroid->TileMapPos, BottomLeft);
+
+		v2f AsteroidAlignment = {(f32)GameState->AsteroidSprite.width / 2.0f, (f32)GameState->AsteroidSprite.height / 2.0f};
+		AsteroidScreenPos += -1.0f * AsteroidAlignment;
+
+		bitmap_draw(BackBuffer, &GameState->AsteroidSprite, AsteroidScreenPos.x, AsteroidScreenPos.y);
+	}
+
+
 
 		// TODO(Justin): Collision Detection after calculating offset and bounding box.
 
@@ -1053,17 +1220,11 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 		}
 		Asteroid->BoundingBox = AsteroidNewBoundingBox;
 #endif
-		Asteroid->TileMapPos = AsteroidNewPos;
-
-		v2f AsteroidScreenPos = tile_map_get_screen_coordinates(TileMap, &Asteroid->TileMapPos, BottomLeft);
-
-		v2f AsteroidAlignment = {(f32)GameState->AsteroidSprite.width / 2.0f, (f32)GameState->AsteroidSprite.height / 2.0f};
-		AsteroidScreenPos += -1.0f * AsteroidAlignment;
-
-		bitmap_draw(BackBuffer, &GameState->AsteroidSprite, AsteroidScreenPos.x, AsteroidScreenPos.y);
+		//Asteroid->TileMapPos = AsteroidNewPos;
 
 
-	}
+
+
 
 	//player_draw(GameState, BackBuffer, &GameState->Player);
 
