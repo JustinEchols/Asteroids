@@ -1,5 +1,12 @@
 #if !defined(GAME_INTRINSICS_H)
 
+inline f32
+absolute_value(f32 x)
+{
+	f32 Result = fabs(x);
+	return(Result);
+}
+
 inline s16
 f32_round_to_s16(f32 x)
 {
