@@ -807,25 +807,6 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 		entity *EntityPlayer = entity_get(GameState, GameState->player_entity_index);
 		player_initialize(GameState, EntityPlayer);
 
-#if 0
-		player *Player = &GameState->Player;
-
-		Player->TileMapPos.Tile = v2i_create(TileMap->tile_count_x / 2, TileMap->tile_count_y / 2);
-		Player->TileMapPos.TileOffset = v2f_create(0.0f, 0.0f);
-
-		Player->height = 10.0f;
-		Player->base_half_width = 4.0f;
-
-		Player->Right = v2f_create(1.0f, 0.0f);
-		Player->Direction = v2f_create(0.0f, 1.0f);
-
-		Player->dPos = v2f_create(0.0f, 0.0f);
-		Player->speed = 30.0f;
-		Player->is_shooting = false;
-		Player->is_warping = false;
-		Player->is_shielded = true;
-#endif
-
 		GameState->projectile_next = 0;
 		GameState->projectile_speed = 30.0f;
 		GameState->projectile_half_width = 1.0f;
