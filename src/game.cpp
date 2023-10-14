@@ -535,8 +535,6 @@ bitmap_draw(back_buffer *BackBuffer, loaded_bitmap *Bitmap, f32 x, f32 y)
 			src_row += Bitmap->stride;
 		}
 
-
-
 		s32 bitmap_start_x = 0; 
 		if (x_min < 0) {
 			bitmap_start_x = -1 * x_min;
@@ -627,23 +625,22 @@ test_wall(f32 max_corner_x, f32 rel_x, f32 rel_y, f32 *t_min,
 }
 
 internal void
-player_move(tile_map *TileMap, player *Player, v2f ddPos, f32 dt_for_frame)
+player_move(tile_map *TileMap, entity *Entity, v2f ddPos, f32 dt_for_frame)
 {
 	f32 ddp_length_squared = v2f_length_squared(ddPos);
 	if (ddp_length_squared > 1.0f) {
 		ddPos *= HALF_ROOT_TWO;
 	}
-	ddPos *= Player->speed;
+	ddPos *= Entity->speed;
 
 	v2f dPos;
-	dPos = dt_for_frame * ddPos + Player->dPos;
-	Player->dPos = dPos;
+	dPos = dt_for_frame * ddPos + Entity->dPos;
+	Entity->dPos = dPos;
 
-	v2f PlayerDelta = 0.5f * ddPos * SQUARE(dt_for_frame) + dt_for_frame * Player->dPos;
+	v2f PlayerDelta = 0.5f * ddPos * SQUARE(dt_for_frame) + dt_for_frame * Entity->dPos;
 
-	tile_map_position PlayerOldPos = Player->TileMapPos;
-
-	tile_map_position PlayerNewPos = Player->TileMapPos;
+	tile_map_position PlayerOldPos = Entity->TileMapPos;
+	tile_map_position PlayerNewPos = Entity->TileMapPos;
 	PlayerNewPos.TileOffset += PlayerDelta;
 	PlayerNewPos = tile_map_position_remap(TileMap, PlayerNewPos);
 
@@ -706,17 +703,62 @@ player_move(tile_map *TileMap, player *Player, v2f ddPos, f32 dt_for_frame)
 	PlayerNewPos.TileOffset += t_min * PlayerDelta;
 	PlayerNewPos = tile_map_position_remap(TileMap, PlayerNewPos);
 
-	Player->TileMapPos = PlayerNewPos;
+	Entity->TileMapPos = PlayerNewPos;
 
 	if (collided) {
-		if (!Player->is_shielded) {
-			Player->dPos = {};
-			Player->TileMapPos = {};
-			Player->TileMapPos.Tile = {TileMap->tile_count_x / 2, TileMap->tile_count_y / 2};
+		if (!Entity->is_shielded) {
+			Entity->dPos = {};
+			Entity->TileMapPos = {};
+			Entity->TileMapPos.Tile = {TileMap->tile_count_x / 2, TileMap->tile_count_y / 2};
 		} else {
-			Player->dPos = Player->dPos - 2.0f * v2f_dot(Player->dPos, WallNormal) * WallNormal;
+			Entity->dPos = Entity->dPos - 2.0f * v2f_dot(Entity->dPos, WallNormal) * WallNormal;
 		}
 	}
+}
+
+inline entity *
+entity_get(game_state *GameState, u32 index)
+{
+	entity *Result = 0;
+	if ((index > 0) && (index < ARRAY_COUNT(GameState->Entities))) {
+		Result = GameState->Entities + index;
+	}
+	return(Result);
+}
+
+
+
+internal u32 
+entity_add(game_state *GameState)
+{
+	ASSERT(GameState->entity_count < ARRAY_COUNT(GameState->Entities));
+	u32 entity_index = GameState->entity_count++;
+
+	GameState->Entities[entity_index] = {};
+	return(entity_index);
+}
+
+
+internal void
+player_initialize(game_state *GameState, entity *Entity)
+{
+	//Entity = {};
+
+	Entity->exists = true;
+	Entity->TileMapPos.Tile.x = GameState->TileMap->tile_count_x / 2;
+	Entity->TileMapPos.Tile.y = GameState->TileMap->tile_count_y / 2;
+	Entity->TileMapPos.TileOffset.x = 0.0f;
+	Entity->TileMapPos.TileOffset.y = 0.0f;
+	Entity->height = 10.0f;
+	Entity->base_half_width = 4.0f;
+	Entity->Right = {1.0f, 0.0f};
+	Entity->Direction = {0.0f, 1.0f};
+	Entity->speed = 30.0f;
+	Entity->is_shooting = false;
+	Entity->is_warping = false;
+	Entity->is_shielded = true;
+
+	Entity->type = ENTITY_PLAYER;
 }
 
 
@@ -726,6 +768,9 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 	ASSERT(sizeof(game_state) <= GameMemory->total_size);
 	game_state *GameState = (game_state *)GameMemory->permanent_storage;
 	if (!GameMemory->is_initialized) {
+
+		// NOTE(Justin): Reserve slot 0 for null entity.
+		u32 entity_null_index = entity_add(GameState);
 
 		//GameState->TestSound = wav_file_read_entire("bloop_00.wav");
 		GameState->Background = bitmap_file_read_entire("space_background.bmp");
@@ -743,9 +788,6 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 		GameState->AsteroidSprite = bitmap_file_read_entire("asteroids/01.bmp");
 		GameState->LaserBlue = bitmap_file_read_entire("lasers/laser_small_blue.bmp");
 
-
-
-
 		memory_arena_initialize(&GameState->TileMapArena, GameMemory->total_size - sizeof(game_state),
 								(u8 *)GameMemory->permanent_storage + sizeof(game_state));
 
@@ -761,6 +803,11 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 		TileMap->tiles = push_array(&GameState->TileMapArena, TileMap->tile_count_x * TileMap->tile_count_y, u32);
 
 
+		GameState->player_entity_index = entity_add(GameState);
+		entity *EntityPlayer = entity_get(GameState, GameState->player_entity_index);
+		player_initialize(GameState, EntityPlayer);
+
+#if 0
 		player *Player = &GameState->Player;
 
 		Player->TileMapPos.Tile = v2i_create(TileMap->tile_count_x / 2, TileMap->tile_count_y / 2);
@@ -777,12 +824,15 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 		Player->is_shooting = false;
 		Player->is_warping = false;
 		Player->is_shielded = true;
+#endif
 
 		GameState->projectile_next = 0;
 		GameState->projectile_speed = 30.0f;
 		GameState->projectile_half_width = 1.0f;
 
 		f32 asteroid_scales[3] = {1.5f, 3.0f, 5.0f};
+
+#if 0
 		srand(2023);
 		for (u32 asteroid_index = 0; asteroid_index < ARRAY_COUNT(GameState->Asteroids); asteroid_index++) {
 
@@ -828,23 +878,52 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 
 			GameState->Asteroids[asteroid_index].is_active = true;
 
+#endif
+		for (u32 asteroid_index = 0; asteroid_index < 2; asteroid_index++) {
+
+			// Tile offset
+			f32 x_offset = 0.0f;
+			f32 y_offset = 0.0f;
+
+			// Tile
+
+			s32 tile_x = 0;
+			s32 tile_y = 0;
+			f32 x_dir = 0.0f;
+			f32 y_dir = 0.0f;
+			if (asteroid_index == 1) {
+				tile_x = 3;
+				tile_y = 0;
+				x_dir = -1.0f;
+				y_dir = 0.0f;
+			} else {
+				tile_x =  0;
+				tile_y =  0;
+				x_dir = 1.0f;
+				y_dir = 0.0f;
+			}
+
+			GameState->Asteroids[asteroid_index].TileMapPos.TileOffset = {x_offset, y_offset};
+			GameState->Asteroids[asteroid_index].TileMapPos.Tile = {tile_x, tile_y};
+
+			f32 speed_scale = 1.0f;
+
+			GameState->Asteroids[asteroid_index].Direction = v2f_create(x_dir, y_dir);
+			GameState->Asteroids[asteroid_index].speed = 9.0f;
+
+			f32 asteroid_speed = speed_scale * GameState->Asteroids[asteroid_index].speed;
+			GameState->Asteroids[asteroid_index].dPos = asteroid_speed * GameState->Asteroids[asteroid_index].Direction;
+
+			GameState->Asteroids[asteroid_index].is_active = true;
 		}
 
-		for (u32 asteroid_index = 0; asteroid_index < ARRAY_COUNT(GameState->Asteroids); asteroid_index++) {
+		for (u32 asteroid_index = 0; asteroid_index < 2; asteroid_index++) {
 			asteroid *Asteroid = GameState->Asteroids + asteroid_index;
 			tile_map_tile_set_value(TileMap, Asteroid->TileMapPos.Tile, 1);
 		}
 
 		GameMemory->is_initialized = TRUE;
 	}
-
-
-
-#if 1
-	v2f Min = {};
-	v2f Max = v2f_create((f32)BackBuffer->width, (f32)BackBuffer->height);
-	rectangle_draw(BackBuffer, Min, Max, 0.0f, 0.0f, 0.0f);
-#endif
 
 	// NOTE(Justin): Since the backbuffer is bottom up, the first row of the
 	// tilemap is the row that gets drawn first and gets drawn at the very
@@ -856,6 +935,11 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 	tile_map *TileMap = GameState->TileMap;
 	v2f BottomLeft = v2f_create(5.0f, 5.0f);
 #if DEBUG_TILE_MAP
+
+	v2f MinScreenXY = {};
+	v2f MaxScreenXY = v2f_create((f32)BackBuffer->width, (f32)BackBuffer->height);
+	rectangle_draw(BackBuffer, MinScreenXY, MaxScreenXY, 0.0f, 0.0f, 0.0f);
+
 	for (s32 row = 0; row < TileMap->tile_count_y; row++) {
 		for (s32 col = 0; col < TileMap->tile_count_x ; col++) {
 			u32 tile_value = TileMap->tiles[row * TileMap->tile_count_x + col];
@@ -863,10 +947,6 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 			if (tile_value == 1) {
 				gray = 1.0f;
 			} 
-			if ((row == GameState->Player.TileMapPos.Tile.y) && 
-				(col == GameState->Player.TileMapPos.Tile.x)) {
-				gray = 0.0f;
-			}
 			v2f Min, Max;
 
 			Min.x = BottomLeft.x + (f32)col * TileMap->tile_side_in_pixels;
@@ -877,21 +957,21 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 		}
 	}
 
-	Min.x = BottomLeft.x + GameState->Player.TileMapPos.Tile.x * TileMap->tile_side_in_pixels;
-	Min.y = BottomLeft.y + (f32)GameState->Player.TileMapPos.Tile.y * TileMap->tile_side_in_pixels;
-	Max.x = Min.x + TileMap->tile_side_in_pixels;
-	Max.y = Min.y + TileMap->tile_side_in_pixels;
-	rectangle_draw(BackBuffer, Min, Max, 1.0f, 1.0f, 0.0f);
+	entity *EntityPlayer = entity_get(GameState, GameState->player_entity_index);
+	MinScreenXY.x = BottomLeft.x + (f32)EntityPlayer->TileMapPos.Tile.x * TileMap->tile_side_in_pixels;
+	MinScreenXY.y = BottomLeft.y + (f32)EntityPlayer->TileMapPos.Tile.y * TileMap->tile_side_in_pixels;
+	MaxScreenXY.x = MinScreenXY.x + TileMap->tile_side_in_pixels;
+	MaxScreenXY.y = MinScreenXY.y + TileMap->tile_side_in_pixels;
+	rectangle_draw(BackBuffer, MinScreenXY, MaxScreenXY, 1.0f, 1.0f, 0.0f);
 
 #else
 	bitmap_draw(BackBuffer, &GameState->Background, 0.0f, 0.0f);
 #endif
 
 	f32 dt_for_frame = GameInput->dt_for_frame;
-	player *Player = &GameState->Player;
 
-	v2f PlayerNewRight = Player->Right;
-	v2f PlayerNewDirection = Player->Direction;
+	v2f PlayerNewRight = EntityPlayer->Right;
+	v2f PlayerNewDirection = EntityPlayer->Direction;
 	if (GameInput->Controller.Left.ended_down) {
 
 		// NOTE(Justin): The player has a coordinate frame of two basis vectors
@@ -919,8 +999,8 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 		PlayerNewRight = m3x3_transform_v2f(Rotation, PlayerNewRight);
 		PlayerNewDirection = m3x3_transform_v2f(Rotation, PlayerNewDirection);
 	}
-	Player->Right = PlayerNewRight;
-	Player->Direction = PlayerNewDirection;
+	EntityPlayer->Right = PlayerNewRight;
+	EntityPlayer->Direction = PlayerNewDirection;
 
 
 	//
@@ -942,19 +1022,19 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 
 	
 	if (GameInput->Controller.Space.ended_down) {
-		if (!Player->is_shooting) {
+		if (!EntityPlayer->is_shooting) {
 			projectile *Projectile = GameState->Projectiles + GameState->projectile_next++;
 			if (GameState->projectile_next >= ARRAY_COUNT(GameState->Projectiles)) {
 				GameState->projectile_next = 0;
 			}
-			Projectile->TileMapPos = Player->TileMapPos;
+			Projectile->TileMapPos = EntityPlayer->TileMapPos;
 			Projectile->distance_remaining = 100.0f;
-			Projectile->Direction = Player->Direction;
+			Projectile->Direction = EntityPlayer->Direction;
 			Projectile->dPos = GameState->projectile_speed * Projectile->Direction;
 			Projectile->is_active = TRUE;
 			Projectile->time_between_next_trail = 0.1f;
-			Player->is_shooting = TRUE;
-		} else if (Player->is_shooting) {
+			EntityPlayer->is_shooting = TRUE;
+		} else if (EntityPlayer->is_shooting) {
 			// NOTE(Justin): If the player is already shooting, wait some time
 			// before shooting a new projectile. Otherwise MACHINE GUN.
 			GameState->time_between_new_projectiles += dt_for_frame;
@@ -963,18 +1043,18 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 				if (GameState->projectile_next >= ARRAY_COUNT(GameState->Projectiles)) {
 					GameState->projectile_next = 0;
 				}
-				Projectile->TileMapPos = Player->TileMapPos;
+				Projectile->TileMapPos = EntityPlayer->TileMapPos;
 				Projectile->distance_remaining = 100.0f;
-				Projectile->Direction = Player->Direction;
+				Projectile->Direction = EntityPlayer->Direction;
 				Projectile->dPos = GameState->projectile_speed * Projectile->Direction;
 				Projectile->is_active = TRUE;
 				Projectile->time_between_next_trail = 0.1f;
-				Player->is_shooting = TRUE;
+				EntityPlayer->is_shooting = TRUE;
 				GameState->time_between_new_projectiles = 0.0f;
 			}
 		}
 	} else {
-		Player->is_shooting = FALSE;
+		EntityPlayer->is_shooting = FALSE;
 	}
 
 	for (u32 projectile_index = 0; projectile_index < ARRAY_COUNT(GameState->Projectiles); projectile_index++) {
@@ -1045,33 +1125,9 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 	if (GameInput->Controller.Up.ended_down) {
 		ddPos = v2f_create(PlayerNewDirection.x, PlayerNewDirection.y);
 	}
-	player_move(TileMap, Player, ddPos, dt_for_frame);
+	player_move(TileMap, EntityPlayer, ddPos, dt_for_frame);
 
 
-
-
-#if 1
-	v2f PlayerScreenPos = tile_map_get_screen_coordinates(TileMap, &Player->TileMapPos, BottomLeft);
-	debug_vector_draw_at_point(BackBuffer, PlayerScreenPos, Player->Direction);
-#endif
-
-	// NOTE(Justin): To center the player bitmap within a tile we need to first
-	// get the players screen position (above) and then offset this position by
-	// half the width and height of the player sprite. The result is that the
-	// player sprite is centered within the tile.
-
-#if 1
-	v2f Alignment = {(f32)GameState->Ship.width / 2.0f, (f32)GameState->Ship.height / 2.0f};
-	PlayerScreenPos += -1.0f * Alignment;
-
-	bitmap_draw(BackBuffer, &GameState->Ship, PlayerScreenPos.x, PlayerScreenPos.y);
-#else
-	v2f OffsetInPixels = {10.0f, 10.0f};
-	Min = PlayerScreenPos;
-	Min += -0.5f * OffsetInPixels;
-	Max = Min + OffsetInPixels;
-	rectangle_draw(BackBuffer, Min, Max, 0.0f, 0.0f, 0.0f);
-#endif
 
 	// NOTE(Justin): Asteroids have constant velocity and therefore no
 	// acceleration. To move the asteroid for each frame, scale the velocity
@@ -1080,15 +1136,15 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 
 	// TODO(Justin): Collision of asteroids,
 
-	for (u32 asteroid_index = 0; asteroid_index < ARRAY_COUNT(GameState->Asteroids); asteroid_index++) {
+	for (u32 asteroid_index = 0; asteroid_index < /*ARRAY_COUNT(GameState->Asteroids)*/2; asteroid_index++) {
 		asteroid *Asteroid = GameState->Asteroids + asteroid_index;
-
 
 		v2f AsteroidDelta = dt_for_frame * Asteroid->dPos;
 
 		// NOTE(Jusitn): Advance the asteroids position by the entire amount
 		// that the asteroid could move this frame. In the collision dectection
 		// we then search for a collision at an earilier time t_min.
+
 		tile_map_position AsteroidOldPos = Asteroid->TileMapPos;
 		tile_map_position AsteroidNewPos = Asteroid->TileMapPos;
 		AsteroidNewPos.TileOffset += AsteroidDelta;
@@ -1171,63 +1227,45 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 		bitmap_draw(BackBuffer, &GameState->AsteroidSprite, AsteroidScreenPos.x, AsteroidScreenPos.y);
 	}
 
+	// 
+	// NOTE(Justin): Render
+	//
 
+	entity *Entity = GameState->Entities;
+	for (u32 entity_index = 0; entity_index < GameState->entity_count; entity_index++, Entity++) {
+		if (Entity) {
+			switch(Entity->type) {
+				case ENTITY_PLAYER:
+				{
+					v2f PlayerScreenPos = tile_map_get_screen_coordinates(TileMap, &Entity->TileMapPos, BottomLeft);
+					debug_vector_draw_at_point(BackBuffer, PlayerScreenPos, Entity->Direction);
 
-		// TODO(Justin): Collision Detection after calculating offset and bounding box.
+					// NOTE(Justin): To center the player bitmap within a tile we need to first
+					// get the players screen position (above) and then offset this position by
+					// half the width and height of the player sprite. The result is that the
+					// player sprite is centered within the tile.
 
-#if 0
-		bounding_box AsteroidNewBoundingBox = Asteroid->BoundingBox;
-		AsteroidNewBoundingBox.Min = v2f_add(PosOffset, AsteroidNewBoundingBox.Min);
-		AsteroidNewBoundingBox.Max = v2f_add(PosOffset, AsteroidNewBoundingBox.Max);
-		AsteroidNewBoundingBox.Min = point_clip_to_world(WorldHalfDim, AsteroidNewBoundingBox.Min);
-		AsteroidNewBoundingBox.Max = point_clip_to_world(WorldHalfDim, AsteroidNewBoundingBox.Max);
+#if 1
+					v2f Alignment = {(f32)GameState->Ship.width / 2.0f, (f32)GameState->Ship.height / 2.0f};
+					PlayerScreenPos += -1.0f * Alignment;
 
+					bitmap_draw(BackBuffer, &GameState->Ship, PlayerScreenPos.x, PlayerScreenPos.y);
+#else
+					v2f OffsetInPixels = {10.0f, 10.0f};
+					Min = PlayerScreenPos;
+					Min += -0.5f * OffsetInPixels;
+					Max = Min + OffsetInPixels;
+					rectangle_draw(BackBuffer, Min, Max, 0.0f, 0.0f, 0.0f);
+#endif
+				} break;
+				case ENTITY_ASTEROID:
+				{
 
-		if ((PlayerNewBoundingBox.Min.x >= AsteroidNewBoundingBox.Min.x) &&
-				(PlayerNewBoundingBox.Min.x <= AsteroidNewBoundingBox.Max.x)) {
-
-			if ((PlayerNewBoundingBox.Min.y >= AsteroidNewBoundingBox.Min.y) &&
-					(PlayerNewBoundingBox.Min.y <= AsteroidNewBoundingBox.Max.y)) {
-				PlayerNewPos = v2f_create(0.0f, 0.0f);
-				PlayerNewRight = v2f_create(1.0f, 0.0f);
-				PlayerNewDirection = v2f_create(0.0f, 1.0f);
-				dPos = v2f_create(0.0f, 0.0f);
-			}
-			else if ((PlayerNewBoundingBox.Max.y <= AsteroidNewBoundingBox.Max.y) && 
-					(PlayerNewBoundingBox.Max.y >= AsteroidNewBoundingBox.Min.y)) {
-				PlayerNewPos = v2f_create(0.0f, 0.0f);
-				PlayerNewRight = v2f_create(1.0f, 0.0f);
-				PlayerNewDirection = v2f_create(0.0f, 1.0f);
-				dPos = v2f_create(0.0f, 0.0f);
-			}
-		} else if ((PlayerNewBoundingBox.Max.x >= AsteroidNewBoundingBox.Min.x) &&
-				(PlayerNewBoundingBox.Max.x <= AsteroidNewBoundingBox.Max.x)) {
-
-			if ((PlayerNewBoundingBox.Min.y >= AsteroidNewBoundingBox.Min.y) &&
-					(PlayerNewBoundingBox.Min.y <= AsteroidNewBoundingBox.Max.y)) {
-				PlayerNewPos = v2f_create(0.0f, 0.0f);
-				PlayerNewRight = v2f_create(1.0f, 0.0f);
-				PlayerNewDirection = v2f_create(0.0f, 1.0f);
-				dPos = v2f_create(0.0f, 0.0f);
-			}
-			else if ((PlayerNewBoundingBox.Max.y <= AsteroidNewBoundingBox.Max.y) && 
-					(PlayerNewBoundingBox.Max.y >= AsteroidNewBoundingBox.Min.y)) {
-				PlayerNewPos = v2f_create(0.0f, 0.0f);
-				PlayerNewRight = v2f_create(1.0f, 0.0f);
-				PlayerNewDirection = v2f_create(0.0f, 1.0f);
-				dPos = v2f_create(0.0f, 0.0f);
+				} break;
 			}
 		}
-		Asteroid->BoundingBox = AsteroidNewBoundingBox;
-#endif
-		//Asteroid->TileMapPos = AsteroidNewPos;
-
-
-
-
-
-	//player_draw(GameState, BackBuffer, &GameState->Player);
+	}
 
 	//sound_buffer_fill(GameState, SoundBuffer);
 
-}
+	}

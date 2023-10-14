@@ -84,7 +84,6 @@ struct player
 {
 	f32 height;
 	f32 base_half_width;
-	v2f Vertices[4];
 	v2f Right;
 	v2f Direction;
 	v2f dPos;
@@ -93,13 +92,11 @@ struct player
 	b32 is_warping;
 	b32 is_shielded;
 
-	bounding_box BoundingBox;
-	circle Shield;
 
 	tile_map_position TileMapPos;
 };
 
-typedef enum
+enum asteroid_size
 {
 	ASTEROID_SMALL,
 	ASTEROID_MEDIUM,
@@ -107,17 +104,14 @@ typedef enum
  
 	ASTEROID_SIZE_COUNT
 
-} asteroid_size;
+};
 
 struct asteroid
 {
-	v2f Pos;
 	tile_map_position TileMapPos;
 	v2f Direction;
 	f32 speed;
 	v2f dPos;
-	v2f LocalVertices[6];
-	bounding_box BoundingBox;
 
 	f32 mass;
 	asteroid_size size;
@@ -146,11 +140,31 @@ struct projectile
 	f32 time_between_next_trail;
 };
 
+enum entity_type
+{
+	ENTITY_NULL,
+	ENTITY_PLAYER,
+	ENTITY_ASTEROID
+};
+
 struct entity
 {
 	b32 exists;
-	tile_map_position TileMapPos;
+
+
+	f32 height;
+	f32 base_half_width;
+	v2f Right;
+	v2f Direction;
 	v2f dPos;
+	f32 speed;
+	b32 is_shooting;
+	b32 is_warping;
+	b32 is_shielded;
+
+	tile_map_position TileMapPos;
+
+	entity_type type;
 };
 
 
@@ -163,14 +177,17 @@ struct game_state
 	loaded_bitmap LaserBlue;
 
 	u32 warp_frame_index;
-	f32 pixels_per_meter;
-	v2f WorldHalfDim;
 
 	memory_arena TileMapArena;
+	memory_arena AsteroidsArena;
+
 	tile_map *TileMap;
 
 
+
+
 	player Player;
+
 
 	projectile Projectiles[64];
 	u32 projectile_next;
@@ -181,6 +198,11 @@ struct game_state
 
 	u32 asteroid_count;
 	asteroid Asteroids[16];
+
+	u32 entity_count;
+	entity Entities[256];
+
+	u32 player_entity_index;
 
 	loaded_sound TestSound;
 	u32 test_sample_index;
