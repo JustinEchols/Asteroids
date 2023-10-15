@@ -95,13 +95,13 @@ rectangle_draw(back_buffer *BackBuffer, v2f Min, v2f Max, f32 r, f32 g, f32 b)
 	if (x_min < 0) {
 		x_min += BackBuffer->width;
 	}
-	if (x_max >= BackBuffer->width) {
+	if (x_max > BackBuffer->width) {
 		x_max -= BackBuffer->width;
 	}
 	if (y_min < 0) {
 		y_min += BackBuffer->height;
 	}
-	if (y_max >= BackBuffer->height) {
+	if (y_max > BackBuffer->height) {
 		y_max -= BackBuffer->height;
 	}
 
@@ -590,8 +590,6 @@ debug_vector_draw_at_point(back_buffer * BackBuffer, v2f Point, v2f Direction)
 	line_dda_draw(BackBuffer, Point, Point + c * Direction, 1.0f, 1.0f, 1.0f);
 }
 
-
-
 internal b32
 test_wall(f32 max_corner_x, f32 rel_x, f32 rel_y, f32 *t_min,
 		  f32 player_delta_x, f32 player_delta_y, f32 min_corner_y, f32 max_corner_y)
@@ -715,15 +713,28 @@ entity_get(game_state *GameState, u32 index)
 	return(Result);
 }
 
-internal u32 
+struct entity_add_result
+{
+	u32 index;
+	entity *Entity;
+};
+
+internal u32
 entity_add(game_state *GameState, entity_type type)
 {
 	ASSERT(GameState->entity_count < ARRAY_COUNT(GameState->Entities));
 	u32 entity_index = GameState->entity_count++;
 
-	GameState->Entities[entity_index] = {};
-	GameState->Entities[entity_index].type = type;
-	return(entity_index);
+	entity_add_result EntityAddResult;
+
+	entity *Entity = GameState->Entities + entity_index;
+	*Entity = {};
+	Entity->type = type;
+
+	EntityAddResult.index = entity_index;
+	EntityAddResult.Entity = Entity;
+
+	return(EntityAddResult.index);
 }
 
 
@@ -744,13 +755,153 @@ player_initialize(game_state *GameState, entity *Entity)
 	Entity->is_warping = false;
 	Entity->is_shielded = true;
 
+	// MOTE(Justin): The enitty type is set when we add the entity, no need to
+	// do this here?
+
 	Entity->type = ENTITY_PLAYER;
 }
 
 internal void
 asteroid_initialize(game_state *GameState, entity *Entity)
 {
+	tile_map *TileMap = GameState->TileMap;
+	// Tile offset
+	f32 x_offset = (12.0f * ((f32)rand() / (f32)RAND_MAX) - 6);
+	f32 y_offset = (12.0f * ((f32)rand() / (f32)RAND_MAX) - 6);
+
+	// Tile
+	s32 tile_x =  (s32)((TileMap->tile_count_x - 1) * ((f32)rand() / (f32)(RAND_MAX)));
+	s32 tile_y =  (s32)((TileMap->tile_count_y - 1) * ((f32)rand() / (f32)(RAND_MAX)));
+
+	Entity->TileMapPos.TileOffset = {x_offset, y_offset};
+	Entity->TileMapPos.Tile = {tile_x, tile_y};
+
+
+	// Direction
+	f32 x_dir = ((f32)rand() / (f32)RAND_MAX) - 0.5f;
+	f32 y_dir = ((f32)rand() / (f32)RAND_MAX) - 0.5f;
+
+	f32 speed_scale = ((f32)rand() / (f32)RAND_MAX);
+
+	Entity->Direction = {x_dir, y_dir};
+	Entity->speed = 9.0f;
+
+	f32 asteroid_speed = speed_scale * Entity->speed;
+	Entity->dPos = asteroid_speed * Entity->Direction;
+
+	tile_map_tile_set_value(TileMap, Entity->TileMapPos.Tile, TILE_OCCUPIED);
+
+	// Size scale
+#if 0
+	u32 scale_index = rand() % 3;
+	f32 size_scale = asteroid_scales[scale_index];
+	if (size_scale == asteroid_scales[ASTEROID_SMALL]) {
+		GameState->Asteroids[asteroid_index].size = ASTEROID_SMALL;
+	} else if (size_scale == asteroid_scales[ASTEROID_MEDIUM]) {
+		GameState->Asteroids[asteroid_index].size = ASTEROID_MEDIUM;
+	} else {
+		GameState->Asteroids[asteroid_index].size = ASTEROID_LARGE;
+	}
+	GameState->Asteroids[asteroid_index].mass = size_scale;
+
+	// Orientation
+	f32 angle = 2.0f * PI32 * ((f32)rand() / (f32)RAND_MAX);
+	m3x3 Rotation = m3x3_rotate_about_origin(angle);
+
+	GameState->Asteroids[asteroid_index].is_active = true;
+#endif
 }
+
+internal void
+asteroids_move(game_state *GameState, f32 dt_for_frame)
+{
+	tile_map *TileMap = GameState->TileMap;
+	entity *Entity = GameState->Entities;
+	for (u32 entity_index = 0; entity_index < GameState->entity_count; entity_index++, Entity++) {
+		if (Entity->type == ENTITY_ASTEROID) {
+
+			v2f AsteroidDelta = dt_for_frame * Entity->dPos;
+
+			tile_map_position AsteroidOldPos = Entity->TileMapPos;
+			tile_map_position AsteroidNewPos = Entity->TileMapPos;
+			AsteroidNewPos.TileOffset += AsteroidDelta;
+			AsteroidNewPos = tile_map_position_remap(TileMap, AsteroidNewPos);
+
+
+			s32 tile_min_x = MIN(AsteroidOldPos.Tile.x, AsteroidNewPos.Tile.x);
+			s32 tile_min_y = MIN(AsteroidOldPos.Tile.y, AsteroidNewPos.Tile.y);
+			s32 tile_max_x_one_past = MAX(AsteroidOldPos.Tile.x, AsteroidNewPos.Tile.x) + 1;
+			s32 tile_max_y_one_past = MAX(AsteroidOldPos.Tile.y, AsteroidNewPos.Tile.y) + 1;
+
+			f32 t_min = 1.0f;
+			v2f WallNormal = {};
+			b32 collided = false;
+			for (s32 tile_y = tile_min_y; tile_y != tile_max_y_one_past; tile_y++) {
+				for (s32 tile_x = tile_min_x; tile_x != tile_max_x_one_past; tile_x++) {
+					tile_map_position TestTilePos = tile_map_get_centered_position(tile_x, tile_y);
+					u32 tile_value = tile_map_get_tile_value_unchecked(TileMap, TestTilePos.Tile);
+					if (!tile_map_is_tile_value_empty(tile_value)) {
+						v2f MinCorner = -0.5f * v2f_create(TileMap->tile_side_in_meters, TileMap->tile_side_in_meters);
+						v2f MaxCorner = 0.5f * v2f_create(TileMap->tile_side_in_meters, TileMap->tile_side_in_meters);
+
+						tile_map_pos_delta TileOffsetDelta = tile_map_get_pos_delta(TileMap, &AsteroidOldPos, &AsteroidNewPos);
+						v2f dOffset = TileOffsetDelta.dOffset;
+
+						// Right wall
+						if (test_wall(MaxCorner.x, dOffset.x, dOffset.y, &t_min, AsteroidDelta.x, AsteroidDelta.y,
+									MinCorner.y, MaxCorner.y)) {
+							WallNormal = {1.0f, 0.0f};
+							collided = true;
+						}
+
+						// Left wall
+						if (test_wall(MinCorner.x, dOffset.x, dOffset.y, &t_min, AsteroidDelta.x, AsteroidDelta.y,
+									MinCorner.y, MaxCorner.y)) {
+
+							WallNormal= {-1.0f, 0.0f};
+							collided = true;
+						}
+
+						// Bottom wall
+						if (test_wall(MinCorner.y, dOffset.y, dOffset.x, &t_min, AsteroidDelta.y, AsteroidDelta.x,
+									MinCorner.x, MaxCorner.x)) {
+
+							WallNormal = {0.0f, 1.0f};
+							collided = true;
+						}
+
+						// Top wall
+						if (test_wall(MaxCorner.y, dOffset.y, dOffset.x, &t_min, AsteroidDelta.y, AsteroidDelta.x,
+									MinCorner.x, MaxCorner.x)) {
+
+							WallNormal = {0.0f, -1.0f};
+							collided = true;
+						}
+					}
+				}
+			}
+
+			AsteroidNewPos = Entity->TileMapPos;
+			AsteroidNewPos.TileOffset += t_min * AsteroidDelta;
+			AsteroidNewPos = tile_map_position_remap(TileMap, AsteroidNewPos);
+
+			if (!tile_map_on_same_tile(&AsteroidOldPos, &AsteroidNewPos)) {
+				tile_map_tile_set_value(TileMap, AsteroidOldPos.Tile, TILE_EMPTY);
+				tile_map_tile_set_value(TileMap, AsteroidNewPos.Tile, TILE_OCCUPIED);
+			}
+
+			Entity->TileMapPos = AsteroidNewPos;
+
+			if (collided) {
+				Entity->dPos = Entity->dPos - 2.0f * v2f_dot(Entity->dPos, WallNormal) * WallNormal;
+			}
+		}
+
+	}
+}
+
+
+
 
 
 internal void
@@ -761,6 +912,7 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 	if (!GameMemory->is_initialized) {
 
 		// NOTE(Justin): Reserve slot 0 for null entity.
+
 		u32 entity_null_index = entity_add(GameState, ENTITY_NULL);
 
 		//GameState->TestSound = wav_file_read_entire("bloop_00.wav");
@@ -780,7 +932,7 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 		GameState->LaserBlue = bitmap_file_read_entire("lasers/laser_small_blue.bmp");
 
 		memory_arena_initialize(&GameState->TileMapArena, GameMemory->total_size - sizeof(game_state),
-								(u8 *)GameMemory->permanent_storage + sizeof(game_state));
+				(u8 *)GameMemory->permanent_storage + sizeof(game_state));
 
 
 		GameState->TileMap = push_array(&GameState->TileMapArena, 1, tile_map);
@@ -804,97 +956,66 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 
 		f32 asteroid_scales[3] = {1.5f, 3.0f, 5.0f};
 
-#if 0
+#if 1
 		srand(2023);
 		for (u32 asteroid_index = 0; asteroid_index < ARRAY_COUNT(GameState->Asteroids); asteroid_index++) {
-
-			// Tile offset
-			f32 x_offset = (12.0f * ((f32)rand() / (f32)RAND_MAX) - 6);
-			f32 y_offset = (12.0f * ((f32)rand() / (f32)RAND_MAX) - 6);
-
-			// Tile
-			s32 tile_x =  (s32)((TileMap->tile_count_x - 1) * ((f32)rand() / (f32)(RAND_MAX)));
-			s32 tile_y =  (s32)((TileMap->tile_count_y - 1) * ((f32)rand() / (f32)(RAND_MAX)));
-
-			GameState->Asteroids[asteroid_index].TileMapPos.TileOffset = {x_offset, y_offset};
-			GameState->Asteroids[asteroid_index].TileMapPos.Tile = {tile_x, tile_y};
+			u32 asteroid_entity_index = entity_add(GameState, ENTITY_ASTEROID);
+			entity *EntityAsteroid = entity_get(GameState, asteroid_entity_index);
+			asteroid_initialize(GameState, EntityAsteroid);
 
 
-			// Direction
-			f32 x_dir = ((f32)rand() / (f32)RAND_MAX) - 0.5f;
-			f32 y_dir = ((f32)rand() / (f32)RAND_MAX) - 0.5f;
 
-			f32 speed_scale = ((f32)rand() / (f32)RAND_MAX);
 
-			GameState->Asteroids[asteroid_index].Direction = v2f_create(x_dir, y_dir);
-			GameState->Asteroids[asteroid_index].speed = 9.0f;
 
-			f32 asteroid_speed = speed_scale * GameState->Asteroids[asteroid_index].speed;
-			GameState->Asteroids[asteroid_index].dPos = asteroid_speed * GameState->Asteroids[asteroid_index].Direction;
+#else
+			for (u32 asteroid_index = 0; asteroid_index < 2; asteroid_index++) {
 
-			// Size scale
-			u32 scale_index = rand() % 3;
-			f32 size_scale = asteroid_scales[scale_index];
-			if (size_scale == asteroid_scales[ASTEROID_SMALL]) {
-				GameState->Asteroids[asteroid_index].size = ASTEROID_SMALL;
-			} else if (size_scale == asteroid_scales[ASTEROID_MEDIUM]) {
-				GameState->Asteroids[asteroid_index].size = ASTEROID_MEDIUM;
-			} else {
-				GameState->Asteroids[asteroid_index].size = ASTEROID_LARGE;
+				// Tile offset
+				f32 x_offset = 0.0f;
+				f32 y_offset = 0.0f;
+
+				// Tile
+
+				s32 tile_x = 0;
+				s32 tile_y = 0;
+				f32 x_dir = 0.0f;
+				f32 y_dir = 0.0f;
+				if (asteroid_index == 1) {
+					tile_x = 3;
+					tile_y = 0;
+					x_dir = -1.0f;
+					y_dir = 0.0f;
+				} else {
+					tile_x =  0;
+					tile_y =  0;
+					x_dir = 1.0f;
+					y_dir = 0.0f;
+				}
+				u32 entity_asteroid_index = entity_add(GameState, ENTITY_ASTEROID);
+				entity *EntityAsteroid = entity_get(GameState, entity_asteroid_index);
+				player_initialize(GameState, EntityPlayer);
+
+				GameState->Asteroids[asteroid_index].TileMapPos.TileOffset = {x_offset, y_offset};
+				GameState->Asteroids[asteroid_index].TileMapPos.Tile = {tile_x, tile_y};
+
+				f32 speed_scale = 1.0f;
+
+				GameState->Asteroids[asteroid_index].Direction = v2f_create(x_dir, y_dir);
+				GameState->Asteroids[asteroid_index].speed = 9.0f;
+
+				f32 asteroid_speed = speed_scale * GameState->Asteroids[asteroid_index].speed;
+				GameState->Asteroids[asteroid_index].dPos = asteroid_speed * GameState->Asteroids[asteroid_index].Direction;
+
+				GameState->Asteroids[asteroid_index].is_active = true;
 			}
-			GameState->Asteroids[asteroid_index].mass = size_scale;
-		
-			// Orientation
-			f32 angle = 2.0f * PI32 * ((f32)rand() / (f32)RAND_MAX);
-			m3x3 Rotation = m3x3_rotate_about_origin(angle);
 
-			GameState->Asteroids[asteroid_index].is_active = true;
-
+			for (u32 asteroid_index = 0; asteroid_index < 2; asteroid_index++) {
+				asteroid *Asteroid = GameState->Asteroids + asteroid_index;
+				tile_map_tile_set_value(TileMap, Asteroid->TileMapPos.Tile, 1);
+			}
 #endif
-		for (u32 asteroid_index = 0; asteroid_index < 2; asteroid_index++) {
-
-			// Tile offset
-			f32 x_offset = 0.0f;
-			f32 y_offset = 0.0f;
-
-			// Tile
-
-			s32 tile_x = 0;
-			s32 tile_y = 0;
-			f32 x_dir = 0.0f;
-			f32 y_dir = 0.0f;
-			if (asteroid_index == 1) {
-				tile_x = 3;
-				tile_y = 0;
-				x_dir = -1.0f;
-				y_dir = 0.0f;
-			} else {
-				tile_x =  0;
-				tile_y =  0;
-				x_dir = 1.0f;
-				y_dir = 0.0f;
-			}
-
-			GameState->Asteroids[asteroid_index].TileMapPos.TileOffset = {x_offset, y_offset};
-			GameState->Asteroids[asteroid_index].TileMapPos.Tile = {tile_x, tile_y};
-
-			f32 speed_scale = 1.0f;
-
-			GameState->Asteroids[asteroid_index].Direction = v2f_create(x_dir, y_dir);
-			GameState->Asteroids[asteroid_index].speed = 9.0f;
-
-			f32 asteroid_speed = speed_scale * GameState->Asteroids[asteroid_index].speed;
-			GameState->Asteroids[asteroid_index].dPos = asteroid_speed * GameState->Asteroids[asteroid_index].Direction;
-
-			GameState->Asteroids[asteroid_index].is_active = true;
+			GameMemory->is_initialized = TRUE;
 		}
-
-		for (u32 asteroid_index = 0; asteroid_index < 2; asteroid_index++) {
-			asteroid *Asteroid = GameState->Asteroids + asteroid_index;
-			tile_map_tile_set_value(TileMap, Asteroid->TileMapPos.Tile, 1);
-		}
-
-		GameMemory->is_initialized = TRUE;
 	}
 
 	// NOTE(Justin): Since the backbuffer is bottom up, the first row of the
@@ -1108,96 +1229,8 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 
 	// TODO(Justin): Collision of asteroids,
 
-	for (u32 asteroid_index = 0; asteroid_index < /*ARRAY_COUNT(GameState->Asteroids)*/2; asteroid_index++) {
-		asteroid *Asteroid = GameState->Asteroids + asteroid_index;
+	asteroids_move(GameState, dt_for_frame);
 
-		v2f AsteroidDelta = dt_for_frame * Asteroid->dPos;
-
-		// NOTE(Jusitn): Advance the asteroids position by the entire amount
-		// that the asteroid could move this frame. In the collision dectection
-		// we then search for a collision at an earilier time t_min.
-
-		tile_map_position AsteroidOldPos = Asteroid->TileMapPos;
-		tile_map_position AsteroidNewPos = Asteroid->TileMapPos;
-		AsteroidNewPos.TileOffset += AsteroidDelta;
-		AsteroidNewPos = tile_map_position_remap(TileMap, AsteroidNewPos);
-
-
-		s32 tile_min_x = MIN(AsteroidOldPos.Tile.x, AsteroidNewPos.Tile.x);
-		s32 tile_min_y = MIN(AsteroidOldPos.Tile.y, AsteroidNewPos.Tile.y);
-		s32 tile_max_x_one_past = MAX(AsteroidOldPos.Tile.x, AsteroidNewPos.Tile.x) + 1;
-		s32 tile_max_y_one_past = MAX(AsteroidOldPos.Tile.y, AsteroidNewPos.Tile.y) + 1;
-
-		f32 t_min = 1.0f;
-		v2f WallNormal = {};
-		b32 collided = false;
-		for (s32 tile_y = tile_min_y; tile_y != tile_max_y_one_past; tile_y++) {
-			for (s32 tile_x = tile_min_x; tile_x != tile_max_x_one_past; tile_x++) {
-				tile_map_position TestTilePos = tile_map_get_centered_position(tile_x, tile_y);
-				u32 tile_value = tile_map_get_tile_value_unchecked(TileMap, TestTilePos.Tile);
-				if (!tile_map_is_tile_value_empty(tile_value)) {
-					v2f MinCorner = -0.5f * v2f_create(TileMap->tile_side_in_meters, TileMap->tile_side_in_meters);
-					v2f MaxCorner = 0.5f * v2f_create(TileMap->tile_side_in_meters, TileMap->tile_side_in_meters);
-
-					tile_map_pos_delta TileOffsetDelta = tile_map_get_pos_delta(TileMap, &AsteroidOldPos, &AsteroidNewPos);
-					v2f dOffset = TileOffsetDelta.dOffset;
-
-					// Right wall
-					if (test_wall(MaxCorner.x, dOffset.x, dOffset.y, &t_min, AsteroidDelta.x, AsteroidDelta.y,
-								MinCorner.y, MaxCorner.y)) {
-						WallNormal = {1.0f, 0.0f};
-						collided = true;
-					}
-
-					// Left wall
-					if (test_wall(MinCorner.x, dOffset.x, dOffset.y, &t_min, AsteroidDelta.x, AsteroidDelta.y,
-								MinCorner.y, MaxCorner.y)) {
-
-						WallNormal= {-1.0f, 0.0f};
-						collided = true;
-					}
-
-					// Bottom wall
-					if (test_wall(MinCorner.y, dOffset.y, dOffset.x, &t_min, AsteroidDelta.y, AsteroidDelta.x,
-								MinCorner.x, MaxCorner.x)) {
-
-						WallNormal = {0.0f, 1.0f};
-						collided = true;
-					}
-
-					// Top wall
-					if (test_wall(MaxCorner.y, dOffset.y, dOffset.x, &t_min, AsteroidDelta.y, AsteroidDelta.x,
-								MinCorner.x, MaxCorner.x)) {
-
-						WallNormal = {0.0f, -1.0f};
-						collided = true;
-					}
-				}
-			}
-		}
-
-		AsteroidNewPos = Asteroid->TileMapPos;
-		AsteroidNewPos.TileOffset += t_min * AsteroidDelta;
-		AsteroidNewPos = tile_map_position_remap(TileMap, AsteroidNewPos);
-
-		if (!tile_map_on_same_tile(&AsteroidOldPos, &AsteroidNewPos)) {
-			tile_map_tile_set_value(TileMap, AsteroidOldPos.Tile, TILE_EMPTY);
-			tile_map_tile_set_value(TileMap, AsteroidNewPos.Tile, TILE_OCCUPIED);
-		}
-
-		Asteroid->TileMapPos = AsteroidNewPos;
-
-		if (collided) {
-			Asteroid->dPos = Asteroid->dPos - 2.0f * v2f_dot(Asteroid->dPos, WallNormal) * WallNormal;
-		}
-
-		v2f AsteroidScreenPos = tile_map_get_screen_coordinates(TileMap, &Asteroid->TileMapPos, BottomLeft);
-
-		v2f AsteroidAlignment = {(f32)GameState->AsteroidSprite.width / 2.0f, (f32)GameState->AsteroidSprite.height / 2.0f};
-		AsteroidScreenPos += -1.0f * AsteroidAlignment;
-
-		bitmap_draw(BackBuffer, &GameState->AsteroidSprite, AsteroidScreenPos.x, AsteroidScreenPos.y);
-	}
 
 	// 
 	// NOTE(Justin): Render
@@ -1232,6 +1265,12 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 				} break;
 				case ENTITY_ASTEROID:
 				{
+					v2f AsteroidScreenPos = tile_map_get_screen_coordinates(TileMap, &Entity->TileMapPos, BottomLeft);
+
+					v2f AsteroidAlignment = {(f32)GameState->AsteroidSprite.width / 2.0f, (f32)GameState->AsteroidSprite.height / 2.0f};
+					AsteroidScreenPos += -1.0f * AsteroidAlignment;
+
+					bitmap_draw(BackBuffer, &GameState->AsteroidSprite, AsteroidScreenPos.x, AsteroidScreenPos.y);
 
 				} break;
 			}
