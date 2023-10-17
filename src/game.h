@@ -65,21 +65,6 @@ struct circle
 
 };
 
-
-
-enum 
-{
-	PLAYER_LEFT,
-
-	PLAYER_RIGHT,
-	PLAYER_TOP,
-	PLAYER_BEZIER_TOP,
-
-	PLAYER_VERTEX_COUNT
-};
-
-
-
 struct player
 {
 	f32 height;
@@ -144,13 +129,17 @@ enum entity_type
 {
 	ENTITY_NULL,
 	ENTITY_PLAYER,
-	ENTITY_ASTEROID
+	ENTITY_ASTEROID,
+	ENTITY_PROJECTILE,
+	ENTITY_FAMILIAR
 };
 
 struct entity
 {
-	b32 exists;
+	u32 index;
 
+	b32 exists;
+	b32 collides;
 
 	f32 height;
 	f32 base_half_width;
@@ -162,14 +151,31 @@ struct entity
 	b32 is_warping;
 	b32 is_shielded;
 
+
 	tile_map_position TileMapPos;
 
 	entity_type type;
 };
 
+struct entity_visible_piece
+{
+	loaded_bitmap *Bitmap;
+	v2f Offset;
+	f32 alpha;
+};
+
+struct entity_visible_piece_group
+{
+	u32 piece_count;
+	entity_visible_piece Pieces[8];
+};
+
+
+
 
 struct game_state
 {
+	// TODO(Justin): Should we break up some bitmaps for VFX purposes?
 	loaded_bitmap Background;
 	loaded_bitmap Ship;
 	loaded_bitmap WarpFrames[8];
@@ -183,12 +189,6 @@ struct game_state
 
 	tile_map *TileMap;
 
-
-
-
-	player Player;
-
-
 	projectile Projectiles[64];
 	u32 projectile_next;
 
@@ -197,8 +197,6 @@ struct game_state
 	f32 time_between_new_projectiles;
 
 	u32 asteroid_count;
-	asteroid Asteroids[16];
-
 	u32 entity_count;
 	entity Entities[256];
 

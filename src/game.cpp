@@ -595,7 +595,7 @@ debug_vector_draw_at_point(back_buffer * BackBuffer, v2f Point, v2f Direction)
 }
 
 internal b32
-test_wall(f32 max_corner_x, f32 rel_x, f32 rel_y, f32 *t_min,
+test_tile_side(f32 max_corner_x, f32 rel_x, f32 rel_y, f32 *t_min,
 		  f32 player_delta_x, f32 player_delta_y, f32 min_corner_y, f32 max_corner_y)
 {
 	// NOTE(Justin): Using epsilons is not ideal..
@@ -660,14 +660,14 @@ entity_move(game_state *GameState, entity *Entity, v2f ddPos, f32 dt_for_frame)
 					v2f Rel = TileRelDelta.dOffset;
 
 					// Right wall
-					if (test_wall(MaxCorner.x, Rel.x, Rel.y, &t_min, EntityDelta.x, EntityDelta.y,
+					if (test_tile_side(MaxCorner.x, Rel.x, Rel.y, &t_min, EntityDelta.x, EntityDelta.y,
 								MinCorner.y, MaxCorner.y)) {
 						TileNormal = {1.0f, 0.0f};
 						collided = true;
 					}
 
 					// Left wall
-					if (test_wall(MinCorner.x, Rel.x, Rel.y, &t_min, EntityDelta.x, EntityDelta.y,
+					if (test_tile_side(MinCorner.x, Rel.x, Rel.y, &t_min, EntityDelta.x, EntityDelta.y,
 								MinCorner.y, MaxCorner.y)) {
 
 						TileNormal= {-1.0f, 0.0f};
@@ -675,7 +675,7 @@ entity_move(game_state *GameState, entity *Entity, v2f ddPos, f32 dt_for_frame)
 					}
 
 					// Bottom wall
-					if (test_wall(MinCorner.y, Rel.y, Rel.x, &t_min, EntityDelta.y, EntityDelta.x,
+					if (test_tile_side(MinCorner.y, Rel.y, Rel.x, &t_min, EntityDelta.y, EntityDelta.x,
 								MinCorner.x, MaxCorner.x)) {
 
 						TileNormal = {0.0f, 1.0f};
@@ -683,7 +683,7 @@ entity_move(game_state *GameState, entity *Entity, v2f ddPos, f32 dt_for_frame)
 					}
 
 					// Top wall
-					if (test_wall(MaxCorner.y, Rel.y, Rel.x, &t_min, EntityDelta.y, EntityDelta.x,
+					if (test_tile_side(MaxCorner.y, Rel.y, Rel.x, &t_min, EntityDelta.y, EntityDelta.x,
 								MinCorner.x, MaxCorner.x)) {
 
 						TileNormal = {0.0f, -1.0f};
@@ -828,8 +828,23 @@ familiar_add(game_state *GameState)
 	Entity->collides = true;
 
 	return(Entity);
-
 }
+
+inline void
+push_piece(entity_visible_piece_group *PieceGroup, loaded_bitmap *Bitmap, v2f Offset, v2f Align, f32 alpha = 1.0f)
+{
+	ASSERT(PieceGroup->piece_count < ARRAY_COUNT(PieceGroup->Pieces));
+	entity_visible_piece *Piece = PieceGroup->Pieces + PieceGroup->piece_count++;
+	Piece->Bitmap = Bitmap;
+	Piece->Offset = Offset - Align;
+	Piece->alpha = alpha;
+}
+
+inline void
+familiar_update(game_state *GameState, entity *Entity, f32 dt_for_frame)
+{
+}
+
 
 internal void
 update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer *SoundBuffer, game_input *GameInput)
@@ -1094,7 +1109,7 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 
 	
 	v2f AsteroidAccel = {};
-	for (u32 entity_index = 0; entity_index < GameState->entity_count; entity_index++) {
+	for (u32 entity_index = 1; entity_index < GameState->entity_count; entity_index++) {
 		entity *Entity = GameState->Entities + entity_index;
 		if (Entity->type == ENTITY_ASTEROID) {
 			entity_move(GameState, Entity, AsteroidAccel, dt_for_frame);
@@ -1105,62 +1120,57 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 	// NOTE(Justin): Render
 	//
 
-	entity *Entity = GameState->Entities;
-	for (u32 entity_index = 0; entity_index < GameState->entity_count; entity_index++, Entity++) {
-		if (Entity) {
-			switch(Entity->type) {
-				case ENTITY_NULL:
-				{
-				} break;
-				case ENTITY_PLAYER:
-				{
-					v2f PlayerScreenPos = tile_map_get_screen_coordinates(TileMap, &Entity->TileMapPos,
-																									BottomLeft);
-					debug_vector_draw_at_point(BackBuffer, PlayerScreenPos, Entity->Direction);
+	entity_visible_piece_group PieceGroup;
+	for (u32 entity_index = 1; entity_index < GameState->entity_count; entity_index++) {
 
-					// NOTE(Justin): To center the player bitmap within a tile we need to first
-					// get the players screen position (above) and then offset this position by
-					// half the width and height of the player sprite. The result is that the
-					// player sprite is centered within the tile.
+		PieceGroup.piece_count = 0;
+		entity *Entity = GameState->Entities + entity_index;
+		switch(Entity->type) {
+			case ENTITY_PLAYER:
+			{
+				v2f PlayerScreenPos = tile_map_get_screen_coordinates(TileMap, &Entity->TileMapPos,
+						BottomLeft);
 
-					// TODO(Justin): The bitmap structure should contain the
-					// alignment vector, if not then as the game scales figuring
-					// out the alignment vector becomes untenable. (could
-					// calculate it and save it during startup, better to do it
-					// when we load the bitmap).
+				debug_vector_draw_at_point(BackBuffer, PlayerScreenPos, Entity->Direction);
 
-					v2f Alignment = {(f32)GameState->Ship.width / 2.0f, (f32)GameState->Ship.height / 2.0f};
-					PlayerScreenPos += -1.0f * Alignment;
+				v2f Alignment = {(f32)GameState->Ship.width / 2.0f, (f32)GameState->Ship.height / 2.0f};
+				push_piece(&PieceGroup, &GameState->Ship, PlayerScreenPos, Alignment);
 
-					bitmap_draw(BackBuffer, &GameState->Ship, PlayerScreenPos.x, PlayerScreenPos.y);
-					
 #if DEBUG_DRAW_PLAYER_POS
-					v2f OffsetInPixels = {10.0f, 10.0f};
-					Min = PlayerScreenPos;
-					Min += -0.5f * OffsetInPixels;
-					Max = Min + OffsetInPixels;
-					rectangle_draw(BackBuffer, Min, Max, 0.0f, 0.0f, 0.0f);
+				v2f OffsetInPixels = {10.0f, 10.0f};
+				Min = PlayerScreenPos;
+				Min += -0.5f * OffsetInPixels;
+				Max = Min + OffsetInPixels;
+				rectangle_draw(BackBuffer, Min, Max, 0.0f, 0.0f, 0.0f);
 #endif
-				} break;
-				case ENTITY_ASTEROID:
-				{
-					v2f AsteroidScreenPos = tile_map_get_screen_coordinates(TileMap, &Entity->TileMapPos,
-																									BottomLeft);
-					v2f AsteroidAlignment = {(f32)GameState->AsteroidSprite.width / 2.0f,
-											 (f32)GameState->AsteroidSprite.height / 2.0f};
-					AsteroidScreenPos += -1.0f * AsteroidAlignment;
+			} break;
+			case ENTITY_ASTEROID:
+			{
+				v2f AsteroidScreenPos = tile_map_get_screen_coordinates(TileMap, &Entity->TileMapPos,
+						BottomLeft);
+				v2f Alignment = {(f32)GameState->AsteroidSprite.width / 2.0f,
+					(f32)GameState->AsteroidSprite.height / 2.0f};
 
-					bitmap_draw(BackBuffer, &GameState->AsteroidSprite, AsteroidScreenPos.x, AsteroidScreenPos.y,
-																										1.0f);
+				push_piece(&PieceGroup, &GameState->AsteroidSprite, AsteroidScreenPos, Alignment);
 
-				} break;
-				default:
-				{
-					INVALID_CODE_PATH;
-				} break;
-			}
+			} break;
+			case ENTITY_FAMILIAR:
+			{
+				//familiar_update(GameState, Entity, dt_for_frame);
+			} break;
+			default:
+			{
+				INVALID_CODE_PATH;
+			} break;
+		}
+
+		for (u32 piece_index = 0; piece_index < PieceGroup.piece_count; piece_index++) {
+			entity_visible_piece *Piece = &PieceGroup.Pieces[piece_index];
+
+			bitmap_draw(BackBuffer, Piece->Bitmap, Piece->Offset.x, Piece->Offset.y, Piece->alpha);
 		}
 	}
+
 
 	//sound_buffer_fill(GameState, SoundBuffer);
 
