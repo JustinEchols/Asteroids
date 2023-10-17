@@ -413,7 +413,7 @@ rectangle_transparent_draw(back_buffer *BackBuffer, v2f Min, v2f Max, f32 r, f32
 }
 
 internal void
-bitmap_draw(back_buffer *BackBuffer, loaded_bitmap *Bitmap, f32 x, f32 y)
+bitmap_draw(back_buffer *BackBuffer, loaded_bitmap *Bitmap, f32 x, f32 y, f32 c_alpha = 1.0f)
 {
 	s32 x_min = f32_round_to_s32(x);
 	s32 y_min = f32_round_to_s32(y);
@@ -470,6 +470,8 @@ bitmap_draw(back_buffer *BackBuffer, loaded_bitmap *Bitmap, f32 x, f32 y)
 		for (s32 x = x_min; x < x_max; x++) {
 
 			f32 alpha = (f32)((*src >> 24) & 0xFF) / 255.0f;
+			alpha *= c_alpha;
+
 			f32 src_r = (f32)((*src >> 16) & 0xFF);
 			f32 src_g = (f32)((*src >> 8) & 0xFF);
 			f32 src_b = (f32)((*src >> 0) & 0xFF);
@@ -514,6 +516,7 @@ bitmap_draw(back_buffer *BackBuffer, loaded_bitmap *Bitmap, f32 x, f32 y)
 			for (s32 x = region_1_x_min; x < region_1_x_max; x++) {
 
 				f32 alpha = (f32)((*src >> 24) & 0xFF) / 255.0f;
+				alpha *= c_alpha;
 				f32 src_r = (f32)((*src >> 16) & 0xFF);
 				f32 src_g = (f32)((*src >> 8) & 0xFF);
 				f32 src_b = (f32)((*src >> 0) & 0xFF);
@@ -559,6 +562,8 @@ bitmap_draw(back_buffer *BackBuffer, loaded_bitmap *Bitmap, f32 x, f32 y)
 			for (s32 x = region_2_x_min; x < region_2_x_max; x++) {
 
 				f32 alpha = (f32)((*src >> 24) & 0xFF) / 255.0f;
+				alpha *= c_alpha;
+
 				f32 src_r = (f32)((*src >> 16) & 0xFF);
 				f32 src_g = (f32)((*src >> 8) & 0xFF);
 				f32 src_b = (f32)((*src >> 0) & 0xFF);
@@ -640,7 +645,7 @@ entity_move(game_state *GameState, entity *Entity, v2f ddPos, f32 dt_for_frame)
 	// TODO(Justin): Collision detection against asteroids not tiles.
 	// TODO(Justin): Entity shield allows for collisions with 
 	f32 t_min = 1.0f;
-	v2f WallNormal = {};
+	v2f TileNormal = {};
 	b32 collided = false;
 	for (s32 tile_y = tile_min_y; tile_y != tile_max_y_one_past; tile_y++) {
 		for (s32 tile_x = tile_min_x; tile_x != tile_max_x_one_past; tile_x++) {
@@ -657,7 +662,7 @@ entity_move(game_state *GameState, entity *Entity, v2f ddPos, f32 dt_for_frame)
 					// Right wall
 					if (test_wall(MaxCorner.x, Rel.x, Rel.y, &t_min, EntityDelta.x, EntityDelta.y,
 								MinCorner.y, MaxCorner.y)) {
-						WallNormal = {1.0f, 0.0f};
+						TileNormal = {1.0f, 0.0f};
 						collided = true;
 					}
 
@@ -665,7 +670,7 @@ entity_move(game_state *GameState, entity *Entity, v2f ddPos, f32 dt_for_frame)
 					if (test_wall(MinCorner.x, Rel.x, Rel.y, &t_min, EntityDelta.x, EntityDelta.y,
 								MinCorner.y, MaxCorner.y)) {
 
-						WallNormal= {-1.0f, 0.0f};
+						TileNormal= {-1.0f, 0.0f};
 						collided = true;
 					}
 
@@ -673,7 +678,7 @@ entity_move(game_state *GameState, entity *Entity, v2f ddPos, f32 dt_for_frame)
 					if (test_wall(MinCorner.y, Rel.y, Rel.x, &t_min, EntityDelta.y, EntityDelta.x,
 								MinCorner.x, MaxCorner.x)) {
 
-						WallNormal = {0.0f, 1.0f};
+						TileNormal = {0.0f, 1.0f};
 						collided = true;
 					}
 
@@ -681,7 +686,7 @@ entity_move(game_state *GameState, entity *Entity, v2f ddPos, f32 dt_for_frame)
 					if (test_wall(MaxCorner.y, Rel.y, Rel.x, &t_min, EntityDelta.y, EntityDelta.x,
 								MinCorner.x, MaxCorner.x)) {
 
-						WallNormal = {0.0f, -1.0f};
+						TileNormal = {0.0f, -1.0f};
 						collided = true;
 					}
 				}
@@ -710,10 +715,10 @@ entity_move(game_state *GameState, entity *Entity, v2f ddPos, f32 dt_for_frame)
 					Entity->TileMapPos = {};
 					Entity->TileMapPos.Tile = {TileMap->tile_count_x / 2, TileMap->tile_count_y / 2};
 				} else {
-					Entity->dPos = Entity->dPos - 2.0f * v2f_dot(Entity->dPos, WallNormal) * WallNormal;
+					Entity->dPos = Entity->dPos - 2.0f * v2f_dot(Entity->dPos, TileNormal) * TileNormal;
 				}
 			} else if (Entity->type == ENTITY_ASTEROID) {
-				Entity->dPos = Entity->dPos - 2.0f * v2f_dot(Entity->dPos, WallNormal) * WallNormal;
+				Entity->dPos = Entity->dPos - 2.0f * v2f_dot(Entity->dPos, TileNormal) * TileNormal;
 			}
 		}
 	}
@@ -743,7 +748,6 @@ entity_add(game_state *GameState, entity_type type)
 
 	return(Entity);
 }
-
 
 internal entity *
 player_add(game_state *GameState)
@@ -815,103 +819,17 @@ asteroid_add(game_state *GameState)
 	return(Entity);
 }
 
-// TODO(Justin): EntityMove
-
-internal void
-asteroids_move(game_state *GameState, f32 dt_for_frame)
+internal entity *
+familiar_add(game_state *GameState)
 {
+	entity *Entity = entity_add(GameState, ENTITY_FAMILIAR);
 
-	// NOTE(Justin): Asteroids have constant velocity and therefore no
-	// acceleration. To move the asteroid for each frame, scale the velocity
-	// vector of the asteroid by dt_for_frame and add the vector to the asteroids
-	// position. Note that this vector is dx = dt_for_frame * dPos. 
+	Entity->exists = true;
+	Entity->collides = true;
 
-	// TODO(Justin): Debug collision of asteroids.
+	return(Entity);
 
-	tile_map *TileMap = GameState->TileMap;
-	entity *Entity = GameState->Entities;
-	for (u32 entity_index = 0; entity_index < GameState->entity_count; entity_index++, Entity++) {
-		if (Entity->type == ENTITY_ASTEROID) {
-
-			v2f AsteroidDelta = dt_for_frame * Entity->dPos;
-
-			tile_map_position AsteroidOldPos = Entity->TileMapPos;
-			tile_map_position AsteroidNewPos = Entity->TileMapPos;
-			AsteroidNewPos.TileOffset += AsteroidDelta;
-			AsteroidNewPos = tile_map_position_remap(TileMap, AsteroidNewPos);
-
-
-			s32 tile_min_x = MIN(AsteroidOldPos.Tile.x, AsteroidNewPos.Tile.x);
-			s32 tile_min_y = MIN(AsteroidOldPos.Tile.y, AsteroidNewPos.Tile.y);
-			s32 tile_max_x_one_past = MAX(AsteroidOldPos.Tile.x, AsteroidNewPos.Tile.x) + 1;
-			s32 tile_max_y_one_past = MAX(AsteroidOldPos.Tile.y, AsteroidNewPos.Tile.y) + 1;
-
-			f32 t_min = 1.0f;
-			v2f WallNormal = {};
-			b32 collided = false;
-			for (s32 tile_y = tile_min_y; tile_y != tile_max_y_one_past; tile_y++) {
-				for (s32 tile_x = tile_min_x; tile_x != tile_max_x_one_past; tile_x++) {
-					tile_map_position TestTilePos = tile_map_get_centered_position(tile_x, tile_y);
-					u32 tile_value = tile_map_get_tile_value_unchecked(TileMap, TestTilePos.Tile);
-					if (!tile_map_is_tile_value_empty(tile_value)) {
-						v2f MinCorner = -0.5f * v2f_create(TileMap->tile_side_in_meters, TileMap->tile_side_in_meters);
-						v2f MaxCorner = 0.5f * v2f_create(TileMap->tile_side_in_meters, TileMap->tile_side_in_meters);
-
-						tile_map_pos_delta TileOffsetDelta = tile_map_get_pos_delta(TileMap, &AsteroidOldPos, &AsteroidNewPos);
-						v2f dOffset = TileOffsetDelta.dOffset;
-
-						// Right wall
-						if (test_wall(MaxCorner.x, dOffset.x, dOffset.y, &t_min, AsteroidDelta.x, AsteroidDelta.y,
-									MinCorner.y, MaxCorner.y)) {
-							WallNormal = {1.0f, 0.0f};
-							collided = true;
-						}
-
-						// Left wall
-						if (test_wall(MinCorner.x, dOffset.x, dOffset.y, &t_min, AsteroidDelta.x, AsteroidDelta.y,
-									MinCorner.y, MaxCorner.y)) {
-
-							WallNormal= {-1.0f, 0.0f};
-							collided = true;
-						}
-
-						// Bottom wall
-						if (test_wall(MinCorner.y, dOffset.y, dOffset.x, &t_min, AsteroidDelta.y, AsteroidDelta.x,
-									MinCorner.x, MaxCorner.x)) {
-
-							WallNormal = {0.0f, 1.0f};
-							collided = true;
-						}
-
-						// Top wall
-						if (test_wall(MaxCorner.y, dOffset.y, dOffset.x, &t_min, AsteroidDelta.y, AsteroidDelta.x,
-									MinCorner.x, MaxCorner.x)) {
-
-							WallNormal = {0.0f, -1.0f};
-							collided = true;
-						}
-					}
-				}
-			}
-
-			AsteroidNewPos = Entity->TileMapPos;
-			AsteroidNewPos.TileOffset += t_min * AsteroidDelta;
-			AsteroidNewPos = tile_map_position_remap(TileMap, AsteroidNewPos);
-
-			if (!tile_map_is_same_tile(&AsteroidOldPos, &AsteroidNewPos)) {
-				tile_map_tile_set_value(TileMap, AsteroidOldPos.Tile, TILE_EMPTY);
-				tile_map_tile_set_value(TileMap, AsteroidNewPos.Tile, TILE_OCCUPIED);
-			}
-
-			Entity->TileMapPos = AsteroidNewPos;
-
-			if (collided) {
-				Entity->dPos = Entity->dPos - 2.0f * v2f_dot(Entity->dPos, WallNormal) * WallNormal;
-			}
-		}
-	}
 }
-
 
 internal void
 update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer *SoundBuffer, game_input *GameInput)
@@ -964,65 +882,12 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 
 		f32 asteroid_scales[3] = {1.5f, 3.0f, 5.0f};
 
-#if 1
 		srand(2023);
-		for (u32 asteroid_index = 0; asteroid_index < ARRAY_COUNT(GameState->Asteroids); asteroid_index++) {
+		for (u32 asteroid_index = 0; asteroid_index < 16; asteroid_index++) {
 			asteroid_add(GameState);
 
-
-
-
-
-
-#else
-			for (u32 asteroid_index = 0; asteroid_index < 2; asteroid_index++) {
-
-				// Tile offset
-				f32 x_offset = 0.0f;
-				f32 y_offset = 0.0f;
-
-				// Tile
-
-				s32 tile_x = 0;
-				s32 tile_y = 0;
-				f32 x_dir = 0.0f;
-				f32 y_dir = 0.0f;
-				if (asteroid_index == 1) {
-					tile_x = 3;
-					tile_y = 0;
-					x_dir = -1.0f;
-					y_dir = 0.0f;
-				} else {
-					tile_x =  0;
-					tile_y =  0;
-					x_dir = 1.0f;
-					y_dir = 0.0f;
-				}
-				u32 entity_asteroid_index = entity_add(GameState, ENTITY_ASTEROID);
-				entity *EntityAsteroid = entity_get(GameState, entity_asteroid_index);
-				player_initialize(GameState, EntityPlayer);
-
-				GameState->Asteroids[asteroid_index].TileMapPos.TileOffset = {x_offset, y_offset};
-				GameState->Asteroids[asteroid_index].TileMapPos.Tile = {tile_x, tile_y};
-
-				f32 speed_scale = 1.0f;
-
-				GameState->Asteroids[asteroid_index].Direction = v2f_create(x_dir, y_dir);
-				GameState->Asteroids[asteroid_index].speed = 9.0f;
-
-				f32 asteroid_speed = speed_scale * GameState->Asteroids[asteroid_index].speed;
-				GameState->Asteroids[asteroid_index].dPos = asteroid_speed * GameState->Asteroids[asteroid_index].Direction;
-
-				GameState->Asteroids[asteroid_index].is_active = true;
-			}
-
-			for (u32 asteroid_index = 0; asteroid_index < 2; asteroid_index++) {
-				asteroid *Asteroid = GameState->Asteroids + asteroid_index;
-				tile_map_tile_set_value(TileMap, Asteroid->TileMapPos.Tile, 1);
-			}
-#endif
-			GameMemory->is_initialized = TRUE;
 		}
+		GameMemory->is_initialized = true;
 	}
 
 	// NOTE(Justin): Since the backbuffer is bottom up, the first row of the
@@ -1033,7 +898,9 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 	// increase, objects move further up the screen.
 
 	tile_map *TileMap = GameState->TileMap;
-	v2f BottomLeft = v2f_create(5.0f, 5.0f);
+	v2f BottomLeft = {5.0f, 5.0f};
+
+	entity *EntityPlayer = entity_get(GameState, GameState->player_entity_index);
 #if DEBUG_TILE_MAP
 
 	v2f MinScreenXY = {};
@@ -1057,7 +924,6 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 		}
 	}
 
-	entity *EntityPlayer = entity_get(GameState, GameState->player_entity_index);
 	MinScreenXY.x = BottomLeft.x + (f32)EntityPlayer->TileMapPos.Tile.x * TileMap->tile_side_in_pixels;
 	MinScreenXY.y = BottomLeft.y + (f32)EntityPlayer->TileMapPos.Tile.y * TileMap->tile_side_in_pixels;
 	MaxScreenXY.x = MinScreenXY.x + TileMap->tile_side_in_pixels;
@@ -1067,8 +933,8 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 #else
 	bitmap_draw(BackBuffer, &GameState->Background, 0.0f, 0.0f);
 #endif
-
 	f32 dt_for_frame = GameInput->dt_for_frame;
+
 
 	v2f PlayerNewRight = EntityPlayer->Right;
 	v2f PlayerNewDirection = EntityPlayer->Direction;
@@ -1107,8 +973,7 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 	// NOTE(Justin): Player projectiles
 	//
 
-
-	// NOTE(Justin): The projectiles are implemented with a circular buffer.
+	// NOTE(Justin): The projectiles are implemented with a "circular buffer".
 	// When the player starts shooting we intialize a new projectile and
 	// increment an index into this buffer, the index is incremented to be able
 	// to pick the next projectile. When the index id at least the size of
@@ -1131,9 +996,9 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 			Projectile->distance_remaining = 100.0f;
 			Projectile->Direction = EntityPlayer->Direction;
 			Projectile->dPos = GameState->projectile_speed * Projectile->Direction;
-			Projectile->is_active = TRUE;
+			Projectile->is_active = true;
 			Projectile->time_between_next_trail = 0.1f;
-			EntityPlayer->is_shooting = TRUE;
+			EntityPlayer->is_shooting = true;
 		} else if (EntityPlayer->is_shooting) {
 			// NOTE(Justin): If the player is already shooting, wait some time
 			// before shooting a new projectile. Otherwise MACHINE GUN.
@@ -1147,14 +1012,14 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 				Projectile->distance_remaining = 100.0f;
 				Projectile->Direction = EntityPlayer->Direction;
 				Projectile->dPos = GameState->projectile_speed * Projectile->Direction;
-				Projectile->is_active = TRUE;
+				Projectile->is_active = true;
 				Projectile->time_between_next_trail = 0.1f;
-				EntityPlayer->is_shooting = TRUE;
+				EntityPlayer->is_shooting = true;
 				GameState->time_between_new_projectiles = 0.0f;
 			}
 		}
 	} else {
-		EntityPlayer->is_shooting = FALSE;
+		EntityPlayer->is_shooting = false;
 	}
 
 	for (u32 projectile_index = 0; projectile_index < ARRAY_COUNT(GameState->Projectiles); projectile_index++) {
@@ -1174,7 +1039,7 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 
 				rectangle_draw(BackBuffer, Min, Max, 0.0f, 0.0f, 1.0f);
 			} else {
-				Projectile->is_active = FALSE;
+				Projectile->is_active = false;
 			}
 
 			// TODO(Justin): Do this only if the projectile has distance
@@ -1218,15 +1083,16 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 	}
 
 	//
-	// NOTE(Justin): Move player.
+	// NOTE(Justin): Move entities.
 	//
 
-	v2f ddPos = {};
+	v2f PlayerAccel = {};
 	if (GameInput->Controller.Up.ended_down) {
-		ddPos = {PlayerNewDirection.x, PlayerNewDirection.y};
+		PlayerAccel = {PlayerNewDirection.x, PlayerNewDirection.y};
 	}
+	entity_move(GameState, EntityPlayer, PlayerAccel, dt_for_frame);
 
-	entity_move(GameState, EntityPlayer, ddPos, dt_for_frame);
+	
 	v2f AsteroidAccel = {};
 	for (u32 entity_index = 0; entity_index < GameState->entity_count; entity_index++) {
 		entity *Entity = GameState->Entities + entity_index;
@@ -1234,13 +1100,6 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 			entity_move(GameState, Entity, AsteroidAccel, dt_for_frame);
 		}
 	}
-
-
-
-
-
-	//asteroids_move(GameState, dt_for_frame);
-
 
 	// 
 	// NOTE(Justin): Render
@@ -1291,7 +1150,8 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 											 (f32)GameState->AsteroidSprite.height / 2.0f};
 					AsteroidScreenPos += -1.0f * AsteroidAlignment;
 
-					bitmap_draw(BackBuffer, &GameState->AsteroidSprite, AsteroidScreenPos.x, AsteroidScreenPos.y);
+					bitmap_draw(BackBuffer, &GameState->AsteroidSprite, AsteroidScreenPos.x, AsteroidScreenPos.y,
+																										1.0f);
 
 				} break;
 				default:
@@ -1304,4 +1164,4 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 
 	//sound_buffer_fill(GameState, SoundBuffer);
 
-	}
+}
