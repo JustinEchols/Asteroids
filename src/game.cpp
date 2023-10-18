@@ -698,7 +698,9 @@ entity_move(game_state *GameState, entity *Entity, v2f ddPos, f32 dt_for_frame)
 	EntityNewPos.TileOffset += t_min * EntityDelta;
 	EntityNewPos = tile_map_position_remap(TileMap, EntityNewPos);
 
-	if ((Entity->type == ENTITY_PLAYER) || (Entity->type == ENTITY_ASTEROID)) {
+	if ((Entity->type == ENTITY_PLAYER) ||
+		(Entity->type == ENTITY_ASTEROID) || 
+		(Entity->type == ENTITY_FAMILIAR)) {
 		if (!tile_map_is_same_tile(&EntityOldPos, &EntityNewPos)) {
 			tile_map_tile_set_value(TileMap, EntityOldPos.Tile, TILE_EMPTY);
 			tile_map_tile_set_value(TileMap, EntityNewPos.Tile, TILE_OCCUPIED);
@@ -827,6 +829,11 @@ familiar_add(game_state *GameState)
 	Entity->exists = true;
 	Entity->collides = true;
 
+	Entity->speed = 2.0f;
+
+	
+	tile_map_tile_set_value(GameState->TileMap, Entity->TileMapPos.Tile, TILE_OCCUPIED);
+
 	return(Entity);
 }
 
@@ -843,6 +850,34 @@ push_piece(entity_visible_piece_group *PieceGroup, loaded_bitmap *Bitmap, v2f Of
 inline void
 familiar_update(game_state *GameState, entity *Entity, f32 dt_for_frame)
 {
+	tile_map *TileMap = GameState->TileMap;
+	// TODO(Justin): Spatial partition search
+	
+	// NOTE(Justin): 10 meter maximum search
+	entity Player = {};
+	f32 distance_sq_max = SQUARE(100.0f);
+	f32 closest_dist = 0.0f;
+
+	v2f PlayerAbsPos = {};
+	v2f EntityAbsPos = {};
+	for (u32 entity_index = 1; entity_index < GameState->entity_count; entity_index++) {
+		entity *TestEntity = entity_get(GameState, entity_index);
+		if (TestEntity->type == ENTITY_PLAYER) {
+			PlayerAbsPos = tile_map_get_absolute_pos(TileMap, TestEntity->TileMapPos);
+			EntityAbsPos = tile_map_get_absolute_pos(TileMap, Entity->TileMapPos);
+			f32 test_distance_sq = v2f_length_squared(EntityAbsPos - PlayerAbsPos);
+			if (test_distance_sq < distance_sq_max) {
+				Player = *TestEntity;
+				closest_dist = test_distance_sq;
+			}
+		}
+	}
+	if (closest_dist > 0.0f) {
+		f32 acceleration = 2.0f;
+		f32 one_over_length = acceleration / square_root(closest_dist);
+		v2f ddPos = one_over_length * (PlayerAbsPos - EntityAbsPos);
+		entity_move(GameState, Entity, ddPos, dt_for_frame);
+	}
 }
 
 
@@ -898,12 +933,13 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 		f32 asteroid_scales[3] = {1.5f, 3.0f, 5.0f};
 
 		srand(2023);
-		for (u32 asteroid_index = 0; asteroid_index < 16; asteroid_index++) {
-			asteroid_add(GameState);
+		asteroid_add(GameState);
+		familiar_add(GameState);
 
-		}
 		GameMemory->is_initialized = true;
 	}
+
+
 
 	// NOTE(Justin): Since the backbuffer is bottom up, the first row of the
 	// tilemap is the row that gets drawn first and gets drawn at the very
@@ -916,6 +952,8 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 	v2f BottomLeft = {5.0f, 5.0f};
 
 	entity *EntityPlayer = entity_get(GameState, GameState->player_entity_index);
+	v2f temp = tile_map_get_absolute_pos(TileMap, EntityPlayer->TileMapPos);
+
 #if DEBUG_TILE_MAP
 
 	v2f MinScreenXY = {};
@@ -1156,7 +1194,16 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 			} break;
 			case ENTITY_FAMILIAR:
 			{
-				//familiar_update(GameState, Entity, dt_for_frame);
+
+				familiar_update(GameState, Entity, dt_for_frame);
+
+				v2f AsteroidScreenPos = tile_map_get_screen_coordinates(TileMap, &Entity->TileMapPos,
+						BottomLeft);
+				v2f Alignment = {(f32)GameState->AsteroidSprite.width / 2.0f,
+					(f32)GameState->AsteroidSprite.height / 2.0f};
+
+				push_piece(&PieceGroup, &GameState->AsteroidSprite, AsteroidScreenPos, Alignment);
+
 			} break;
 			default:
 			{
