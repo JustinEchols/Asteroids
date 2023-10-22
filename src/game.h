@@ -65,22 +65,6 @@ struct circle
 
 };
 
-struct player
-{
-	f32 height;
-	f32 base_half_width;
-	v2f Right;
-	v2f Direction;
-	v2f dPos;
-	f32 speed;
-	b32 is_shooting;
-	b32 is_warping;
-	b32 is_shielded;
-
-
-	tile_map_position TileMapPos;
-};
-
 enum asteroid_size
 {
 	ASTEROID_SMALL,
@@ -88,7 +72,6 @@ enum asteroid_size
 	ASTEROID_LARGE,
  
 	ASTEROID_SIZE_COUNT
-
 };
 
 struct asteroid
@@ -134,13 +117,11 @@ enum entity_type
 	ENTITY_FAMILIAR
 };
 
-#if 0
-struct shield_hit_point
+struct hit_point
 {
 	u8 flags;
-	u8 filled_amount;
+	u8 count;
 };
-#endif
 
 struct entity
 {
@@ -159,8 +140,8 @@ struct entity
 	b32 is_warping;
 	b32 is_shielded;
 
-	u32 shield_hit_point_max;
-	u32 shield_hit_points;
+	u8 hit_point_max;
+	hit_point HitPoints;
 
 	tile_map_position TileMapPos;
 

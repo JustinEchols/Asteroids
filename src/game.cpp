@@ -719,13 +719,13 @@ entity_move(game_state *GameState, entity *Entity, v2f ddPos, f32 dt_for_frame)
 					Entity->dPos = {};
 					Entity->TileMapPos = {};
 					Entity->TileMapPos.Tile = {TileMap->tile_count_x / 2, TileMap->tile_count_y / 2};
-					Entity->shield_hit_points = Entity->shield_hit_point_max;
+					Entity->HitPoints.count = Entity->hit_point_max;
 					Entity->is_shielded = true;
 
 					tile_map_tile_set_value(TileMap, Entity->TileMapPos.Tile, TILE_OCCUPIED);
 				} else {
-					Entity->shield_hit_points--;
-					if(Entity->shield_hit_points == 0)
+					Entity->HitPoints.count--;
+					if(Entity->HitPoints.count == 0)
 					{
 						Entity->is_shielded = false;
 					}
@@ -786,8 +786,8 @@ player_add(game_state *GameState)
 	Entity->is_warping = false;
 	Entity->is_shielded = true;
 
-	Entity->shield_hit_point_max = 3;
-	Entity->shield_hit_points = Entity->shield_hit_point_max;
+	Entity->hit_point_max = 3;
+	Entity->HitPoints.count = Entity->hit_point_max;
 
 	tile_map_tile_set_value(TileMap, Entity->TileMapPos.Tile, TILE_OCCUPIED);
 	// MOTE(Justin): The enitty type is set when we add the entity, no need to
