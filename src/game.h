@@ -134,6 +134,14 @@ enum entity_type
 	ENTITY_FAMILIAR
 };
 
+#if 0
+struct shield_hit_point
+{
+	u8 flags;
+	u8 filled_amount;
+};
+#endif
+
 struct entity
 {
 	u32 index;
@@ -151,6 +159,8 @@ struct entity
 	b32 is_warping;
 	b32 is_shielded;
 
+	u32 shield_hit_point_max;
+	u32 shield_hit_points;
 
 	tile_map_position TileMapPos;
 
@@ -161,7 +171,7 @@ struct entity_visible_piece
 {
 	loaded_bitmap *Bitmap;
 	v2f Offset;
-	f32 alpha;
+	f32 r, g, b, alpha;
 };
 
 struct entity_visible_piece_group
@@ -169,9 +179,6 @@ struct entity_visible_piece_group
 	u32 piece_count;
 	entity_visible_piece Pieces[8];
 };
-
-
-
 
 struct game_state
 {

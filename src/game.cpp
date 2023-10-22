@@ -713,10 +713,22 @@ entity_move(game_state *GameState, entity *Entity, v2f ddPos, f32 dt_for_frame)
 		if (collided) {
 			if (Entity->type == ENTITY_PLAYER) {
 				if (!Entity->is_shielded) {
+
+					tile_map_tile_set_value(TileMap, Entity->TileMapPos.Tile, TILE_EMPTY);
+
 					Entity->dPos = {};
 					Entity->TileMapPos = {};
 					Entity->TileMapPos.Tile = {TileMap->tile_count_x / 2, TileMap->tile_count_y / 2};
+					Entity->shield_hit_points = Entity->shield_hit_point_max;
+					Entity->is_shielded = true;
+
+					tile_map_tile_set_value(TileMap, Entity->TileMapPos.Tile, TILE_OCCUPIED);
 				} else {
+					Entity->shield_hit_points--;
+					if(Entity->shield_hit_points == 0)
+					{
+						Entity->is_shielded = false;
+					}
 					Entity->dPos = Entity->dPos - 2.0f * v2f_dot(Entity->dPos, TileNormal) * TileNormal;
 				}
 			} else if (Entity->type == ENTITY_ASTEROID) {
@@ -774,6 +786,9 @@ player_add(game_state *GameState)
 	Entity->is_warping = false;
 	Entity->is_shielded = true;
 
+	Entity->shield_hit_point_max = 3;
+	Entity->shield_hit_points = Entity->shield_hit_point_max;
+
 	tile_map_tile_set_value(TileMap, Entity->TileMapPos.Tile, TILE_OCCUPIED);
 	// MOTE(Justin): The enitty type is set when we add the entity, no need to
 	// do this here?
@@ -829,7 +844,7 @@ familiar_add(game_state *GameState)
 	Entity->exists = true;
 	Entity->collides = true;
 
-	Entity->speed = 2.0f;
+	Entity->speed = 1.0f;
 
 	
 	tile_map_tile_set_value(GameState->TileMap, Entity->TileMapPos.Tile, TILE_OCCUPIED);
@@ -855,16 +870,16 @@ familiar_update(game_state *GameState, entity *Entity, f32 dt_for_frame)
 	
 	// NOTE(Justin): 10 meter maximum search
 	entity Player = {};
-	f32 distance_sq_max = SQUARE(100.0f);
+	f32 distance_sq_max = SQUARE(50.0f);
 	f32 closest_dist = 0.0f;
 
 	v2f PlayerAbsPos = {};
-	v2f EntityAbsPos = {};
+	v2f EntityAbsPos = tile_map_get_absolute_pos(TileMap, Entity->TileMapPos);
 	for (u32 entity_index = 1; entity_index < GameState->entity_count; entity_index++) {
 		entity *TestEntity = entity_get(GameState, entity_index);
 		if (TestEntity->type == ENTITY_PLAYER) {
 			PlayerAbsPos = tile_map_get_absolute_pos(TileMap, TestEntity->TileMapPos);
-			EntityAbsPos = tile_map_get_absolute_pos(TileMap, Entity->TileMapPos);
+			//EntityAbsPos = tile_map_get_absolute_pos(TileMap, Entity->TileMapPos);
 			f32 test_distance_sq = v2f_length_squared(EntityAbsPos - PlayerAbsPos);
 			if (test_distance_sq < distance_sq_max) {
 				Player = *TestEntity;
@@ -872,12 +887,14 @@ familiar_update(game_state *GameState, entity *Entity, f32 dt_for_frame)
 			}
 		}
 	}
+	v2f ddPos = {};
 	if (closest_dist > 0.0f) {
-		f32 acceleration = 2.0f;
-		f32 one_over_length = acceleration / square_root(closest_dist);
-		v2f ddPos = one_over_length * (PlayerAbsPos - EntityAbsPos);
-		entity_move(GameState, Entity, ddPos, dt_for_frame);
+		f32 acceleration = 5.5f;
+		f32 one_over_length = acceleration / f32_sqrt(distance_sq_max);
+		ddPos = one_over_length * (PlayerAbsPos - EntityAbsPos);
+		Entity->Direction = ddPos;
 	}
+	entity_move(GameState, Entity, ddPos, dt_for_frame);
 }
 
 
@@ -1199,6 +1216,7 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 
 				v2f AsteroidScreenPos = tile_map_get_screen_coordinates(TileMap, &Entity->TileMapPos,
 						BottomLeft);
+				debug_vector_draw_at_point(BackBuffer, AsteroidScreenPos, Entity->Direction);
 				v2f Alignment = {(f32)GameState->AsteroidSprite.width / 2.0f,
 					(f32)GameState->AsteroidSprite.height / 2.0f};
 
@@ -1214,7 +1232,13 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 		for (u32 piece_index = 0; piece_index < PieceGroup.piece_count; piece_index++) {
 			entity_visible_piece *Piece = &PieceGroup.Pieces[piece_index];
 
-			bitmap_draw(BackBuffer, Piece->Bitmap, Piece->Offset.x, Piece->Offset.y, Piece->alpha);
+			f32 x = Piece->Offset.x;
+			f32 y = Piece->Offset.y;
+
+			if (Piece->Bitmap) {
+				bitmap_draw(BackBuffer, Piece->Bitmap, x, y, Piece->alpha);
+			} else {
+			}
 		}
 	}
 
