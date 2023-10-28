@@ -608,12 +608,12 @@ triangle_circle_collision(triangle *Triangle, circle *Circle)
 		circle_min_projected = f32_infinity();
 		circle_max_projected = f32_neg_infinity();
 
-		v2f CircleMin = circle_support_point(BackBuffer, Circle, -1.0f * ProjectedAxis);
+		v2f CircleMin = circle_support_point(Circle, -1.0f * ProjectedAxis);
 		f32 c = v2f_dot(CircleMin, ProjectedAxis);
 
 		circle_min_projected = MIN(c, circle_min_projected);
 
-		v2f CircleMax = circle_support_point(BackBuffer, Circle, ProjectedAxis);
+		v2f CircleMax = circle_support_point(Circle, ProjectedAxis);
 		c = v2f_dot(CircleMax, ProjectedAxis);
 		circle_max_projected = MAX(c, circle_max_projected);
 
@@ -658,11 +658,11 @@ triangle_circle_collision(triangle *Triangle, circle *Circle)
 	f32 circle_min_projected = f32_infinity();
 	f32 circle_max_projected = f32_neg_infinity();
 
-	v2f CircleMin = circle_support_point(BackBuffer, Circle, -1.0f * ProjectedAxis);
+	v2f CircleMin = circle_support_point(Circle, -1.0f * ProjectedAxis);
 	f32 c = v2f_dot(CircleMin, ProjectedAxis);
 	circle_min_projected = MIN(c, circle_min_projected);
 
-	v2f CircleMax = circle_support_point(BackBuffer, Circle, ProjectedAxis);
+	v2f CircleMax = circle_support_point(Circle, ProjectedAxis);
 	c = v2f_dot(CircleMax, ProjectedAxis);
 	circle_max_projected = MAX(c, circle_max_projected);
 
@@ -1393,7 +1393,7 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 	for (u32 i = 0; i < 3; i++) {
 		Test.Vertices[i] = M * Test.Vertices[i];
 	}
-	if (triangle_circle_collision(BackBuffer, &Test, &Circle)) {
+	if (triangle_circle_collision(&Test, &Circle)) {
 		triangle_draw(BackBuffer, T, 1.0f, 0.0f, 0.0f);
 	} else
 	{
