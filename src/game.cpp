@@ -185,7 +185,7 @@ circle_bounding_box_find(circle Circle)
 }
 
 internal v2f
-circle_support_point(back_buffer *BackBuffer, circle *Circle, v2f Dir)
+circle_support_point(circle *Circle, v2f Dir)
 {
 	v2f Result = {};
 	Result = Circle->Center + Circle->radius * Dir;
@@ -577,15 +577,14 @@ test_tile_side(f32 max_corner_x, f32 rel_x, f32 rel_y, f32 *t_min,
 	return(hit);
 }
 
-
 internal b32
-triangle_circle_collision(back_buffer *BackBuffer, triangle *Triangle, circle *Circle)
+triangle_circle_collision(triangle *Triangle, circle *Circle)
 {
 	b32 GapExists = false;
 	for (u32 vertex_i = 0; vertex_i < ARRAY_COUNT(Triangle->Vertices); vertex_i++) {
 
 		// Define edges s.t. a normal to the edge, the projection axis,
-		// can be used for the intersection test.
+		// can be used as the interval for the intersection test.
 
 		v2f P0 = Triangle->Vertices[vertex_i];
 		v2f P1 = Triangle->Vertices[(vertex_i + 1) % ARRAY_COUNT(Triangle->Vertices)];
