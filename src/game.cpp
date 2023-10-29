@@ -577,6 +577,55 @@ test_tile_side(f32 max_corner_x, f32 rel_x, f32 rel_y, f32 *t_min,
 	return(hit);
 }
 
+struct projected_interval
+{
+	f32 min;
+	f32 max;
+};
+
+internal projected_interval 
+triangle_project_onto_axis(triangle *Triangle, v2f ProjectedAxis)
+{
+	projected_interval Result = {};
+
+	f32 min = f32_infinity();
+	f32 max = f32_neg_infinity();
+	for (u32 vertex_i = 0; vertex_i < ARRAY_COUNT(Triangle->Vertices); vertex_i++) {
+		v2f Vertex = Triangle->Vertices[vertex_i];
+
+		f32 c = v2f_dot(Vertex, ProjectedAxis);
+		min = MIN(c, min);
+		max = MAX(c, max);
+	}
+	Result.min = min;
+	Result.max = max;
+
+	return(Result);
+}
+
+internal projected_interval
+circle_project_onto_axis(circle *Circle, v2f ProjectedAxis)
+{
+	projected_interval Result = {};
+
+	f32 min = f32_infinity();
+	f32 max = f32_neg_infinity();
+
+	v2f CircleMin = circle_support_point(Circle, -1.0f * ProjectedAxis);
+	v2f CircleMax = circle_support_point(Circle, ProjectedAxis);
+
+	f32 a = v2f_dot(CircleMin, ProjectedAxis);
+	f32 b = v2f_dot(CircleMax, ProjectedAxis);
+
+	min = MIN(a, min);
+	max = MAX(b, max);
+
+	Result.min = min;
+	Result.max = max;
+
+	return(Result);
+}
+
 internal b32
 triangle_circle_collision(triangle *Triangle, circle *Circle)
 {
@@ -592,39 +641,17 @@ triangle_circle_collision(triangle *Triangle, circle *Circle)
 		v2f ProjectedAxis = V2F(D.y, -D.x);
 		ProjectedAxis = v2f_normalize(ProjectedAxis);
 
-		f32 triangle_min_projected, triangle_max_projected;
-		triangle_min_projected = f32_infinity();
-		triangle_max_projected = f32_neg_infinity();
-		for (u32 vertex_j = 0; vertex_j < ARRAY_COUNT(Triangle->Vertices); vertex_j++) {
-			v2f Vertex = Triangle->Vertices[vertex_j];
+		projected_interval TriangleInterval = triangle_project_onto_axis(Triangle, ProjectedAxis);
+		projected_interval CircleInterval = circle_project_onto_axis(Circle, ProjectedAxis);
 
-			f32 c = v2f_dot(Vertex, ProjectedAxis);
-			triangle_min_projected = MIN(c, triangle_min_projected);
-			triangle_max_projected = MAX(c, triangle_max_projected);
+		if (CircleInterval.min > CircleInterval.max) {
+			f32 temp = CircleInterval.min;
+			CircleInterval.min = CircleInterval.max;
+			CircleInterval.max = temp;
 		}
 
-		f32 circle_min_projected, circle_max_projected;
-
-		circle_min_projected = f32_infinity();
-		circle_max_projected = f32_neg_infinity();
-
-		v2f CircleMin = circle_support_point(Circle, -1.0f * ProjectedAxis);
-		f32 c = v2f_dot(CircleMin, ProjectedAxis);
-
-		circle_min_projected = MIN(c, circle_min_projected);
-
-		v2f CircleMax = circle_support_point(Circle, ProjectedAxis);
-		c = v2f_dot(CircleMax, ProjectedAxis);
-		circle_max_projected = MAX(c, circle_max_projected);
-
-		if (circle_min_projected > circle_max_projected) {
-			f32 temp = circle_min_projected;
-			circle_min_projected = circle_max_projected;
-			circle_max_projected = temp;
-		}
-
-		if (!((circle_max_projected >= triangle_min_projected) &&
-					(triangle_max_projected >= circle_min_projected))) {
+		if (!((CircleInterval.max >= TriangleInterval.min) &&
+			(TriangleInterval.max >= CircleInterval.min))) {
 
 			return(GapExists);
 		}
@@ -645,29 +672,11 @@ triangle_circle_collision(triangle *Triangle, circle *Circle)
 	}
 	v2f ProjectedAxis = v2f_normalize(ClosestPoint - Circle->Center);
 
-	f32 triangle_min_projected = f32_infinity();
-	f32 triangle_max_projected = f32_neg_infinity();
-	for (u32 vertex_j = 0; vertex_j < ARRAY_COUNT(Triangle->Vertices); vertex_j++) {
-		v2f Vertex = Triangle->Vertices[vertex_j];
+	projected_interval TriangleInterval = triangle_project_onto_axis(Triangle, ProjectedAxis);
+	projected_interval CircleInterval = circle_project_onto_axis(Circle, ProjectedAxis);
 
-		f32 c = v2f_dot(Vertex, ProjectedAxis);
-		triangle_min_projected = MIN(c, triangle_min_projected);
-		triangle_max_projected = MAX(c, triangle_max_projected);
-	}
-
-	f32 circle_min_projected = f32_infinity();
-	f32 circle_max_projected = f32_neg_infinity();
-
-	v2f CircleMin = circle_support_point(Circle, -1.0f * ProjectedAxis);
-	f32 c = v2f_dot(CircleMin, ProjectedAxis);
-	circle_min_projected = MIN(c, circle_min_projected);
-
-	v2f CircleMax = circle_support_point(Circle, ProjectedAxis);
-	c = v2f_dot(CircleMax, ProjectedAxis);
-	circle_max_projected = MAX(c, circle_max_projected);
-
-	if (!((circle_max_projected >= triangle_min_projected) &&
-				(triangle_max_projected >= circle_min_projected))) {
+	if (!((CircleInterval.max >= TriangleInterval.min) &&
+		(TriangleInterval.max >= CircleInterval.min))) {
 
 		return(GapExists);
 	}
@@ -944,6 +953,8 @@ triangle_draw(back_buffer *BackBuffer, triangle *Triangle, f32 r, f32 g, f32 b)
 internal triangle
 triangle_init(v2f *Vertices, u32 vertex_count)
 {
+	// NOTE(Justin): Vertices are sorted into CCW order.
+
 	ASSERT(vertex_count == 3);
 
 	triangle Result = {};
@@ -1072,11 +1083,15 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 		GameInput->Mouse.x = BackBuffer->width / 2;
 		GameInput->Mouse.y = BackBuffer->height / 2;
 
+		GameState->Circle.Center = V2F((f32)BackBuffer->width / 2.0f + 150.0f, (f32)BackBuffer->height / 2.0f + 150.0f);
+		GameState->Circle.radius = 20.0f;
+
 		v2f vertices[3] = {};
-		vertices[0] = V2F((f32)BackBuffer->width / 2.0f, (f32)BackBuffer->height / 2.0f);
+		vertices[0] = V2F((f32)BackBuffer->width / 2.0f + 150.0f, (f32)BackBuffer->height / 2.0f - 150.0f);
 		vertices[1] = vertices[0] + V2F(-20.0f, 20.0f);
-		vertices[2] = vertices[1] + V2F(-20.0f, -20.0f);
+		vertices[2] = vertices[0] + V2F(-40.0f, 0.0f);
 		GameState->Triangle = triangle_init(vertices, 3);
+
 
 		GameMemory->is_initialized = true;
 
@@ -1380,29 +1395,37 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 		Delta += V2F(0.0f, -1.0f);
 	}
 
-	// NOTE(Justin): The arguement to the function is a v2f but the matrix
+	// NOTE(Justin): The argument to the function is a v2f but the matrix
 	// returned has a final column of (0,0,1)^T 
 	m3x3 M = m3x3_translation_create(Delta);
-	triangle *T = &GameState->Triangle;
+	//circle *ControllingCircle = &GameState->Circle;
+	//ControllingCircle->Center = M * ControllingCircle->Center;
+	//circle_draw(BackBuffer, ControllingCircle, 0.0f, 1.0f, 0.0f);
 
+	triangle *T = &GameState->Triangle;
 
 	circle Circle = circle_init(V2F((f32)BackBuffer->width / 2.0f + 50.0f, (f32)BackBuffer->height / 2.0f + 50.0f), 25.0f);
 
 
 	triangle Test = *T;
-	for (u32 i = 0; i < 3; i++) {
+	for (u32 i = 0 ; i < 3; i++) {
 		Test.Vertices[i] = M * Test.Vertices[i];
 	}
 	if (triangle_circle_collision(&Test, &Circle)) {
 		triangle_draw(BackBuffer, T, 1.0f, 0.0f, 0.0f);
-	} else
-	{
+	} else {
 		*T = Test;
 		triangle_draw(BackBuffer, T, 1.0f, 1.0f, 1.0f);
+
+
 	}
 
-	circle_draw(BackBuffer, &Circle, 1.0f, 1.0f, 1.0f);
-	line_dda_draw(BackBuffer, Circle.Center, Circle.Center + V2F(Circle.radius, 0.0f), 1.0f, 0.0f, 0.0f);
+	circle_draw(BackBuffer, &Circle, 0.0f, 0.0f, 1.0f);
+
+
+
+
+
 
 
 	//sound_buffer_fill(GameState, SoundBuffer);
