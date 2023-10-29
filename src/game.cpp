@@ -683,6 +683,36 @@ triangle_circle_collision(triangle *Triangle, circle *Circle)
 	return(!GapExists);
 }
 
+internal b32
+circles_collision(circle *CircleA, circle *CircleB)
+{
+	b32 GapExists = false;
+
+	v2f CenterAToCenterB = CircleB->Center - CircleA->Center;
+	v2f ProjectedAxis = v2f_normalize(CenterAToCenterB);
+
+	projected_interval CircleAInterval = circle_project_onto_axis(CircleA, ProjectedAxis);
+	projected_interval CircleBInterval = circle_project_onto_axis(CircleB, ProjectedAxis);
+
+	if (!((CircleAInterval.max >= CircleBInterval.min) &&
+		(CircleBInterval.max >= CircleAInterval.min))) {
+		return(GapExists);
+	}
+
+	v2f CenterBToCenterA = CircleA->Center - CircleB->Center;
+	ProjectedAxis = v2f_normalize(CenterBToCenterA);
+
+	CircleAInterval = circle_project_onto_axis(CircleA, ProjectedAxis);
+	CircleBInterval = circle_project_onto_axis(CircleB, ProjectedAxis);
+
+	if (!((CircleAInterval.max >= CircleBInterval.min) &&
+		(CircleBInterval.max >= CircleAInterval.min))) {
+		return(GapExists);
+	}
+
+	return(!GapExists);
+}
+
 
 internal void
 entity_move(game_state *GameState, entity *Entity, v2f ddPos, f32 dt_for_frame)
@@ -1402,25 +1432,23 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 	//ControllingCircle->Center = M * ControllingCircle->Center;
 	//circle_draw(BackBuffer, ControllingCircle, 0.0f, 1.0f, 0.0f);
 
-	triangle *T = &GameState->Triangle;
 
+	circle *C = &GameState->Circle;
 	circle Circle = circle_init(V2F((f32)BackBuffer->width / 2.0f + 50.0f, (f32)BackBuffer->height / 2.0f + 50.0f), 25.0f);
 
 
-	triangle Test = *T;
-	for (u32 i = 0 ; i < 3; i++) {
-		Test.Vertices[i] = M * Test.Vertices[i];
-	}
-	if (triangle_circle_collision(&Test, &Circle)) {
-		triangle_draw(BackBuffer, T, 1.0f, 0.0f, 0.0f);
+	circle Test = *C;
+	Test.Center = M * Test.Center;
+	if (circles_collision(&Test, &Circle)) {
+		circle_draw(BackBuffer, C, 1.0f, 0.0f, 0.0f);
 	} else {
-		*T = Test;
-		triangle_draw(BackBuffer, T, 1.0f, 1.0f, 1.0f);
-
-
+		C->Center = Test.Center;
+		circle_draw(BackBuffer, C, 1.0f, 1.0f, 1.0f);
 	}
+	circle_draw(BackBuffer, &Circle, 0.0f, 1.0f, 0.0f);
 
-	circle_draw(BackBuffer, &Circle, 0.0f, 0.0f, 1.0f);
+
+
 
 
 
