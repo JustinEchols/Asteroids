@@ -5,11 +5,7 @@
 
 // WAV PCM is 16 bits per sample, either one or two channels, and samples are
 // interleaved (rlrlrlrl).
-struct string_u8
-{
-	u8 *data;
-	u64 length;
-};
+
 
 typedef size_t memory_index;
 
@@ -40,6 +36,7 @@ push_size_(memory_arena *MemoryArena, memory_index size)
 }
 
 
+#include "game_string.h"
 #include "game_intrinsics.h"
 #include "game_math.h"
 #include "game_tile.h"
@@ -62,7 +59,12 @@ struct circle
 {
 	v2f Center;
 	f32 radius;
+};
 
+struct triangle
+{
+	v2f Vertices[3];
+	v2f Centroid;
 };
 
 enum asteroid_size
@@ -113,8 +115,9 @@ enum entity_type
 	ENTITY_NULL,
 	ENTITY_PLAYER,
 	ENTITY_ASTEROID,
+	ENTITY_FAMILIAR,
 	ENTITY_PROJECTILE,
-	ENTITY_FAMILIAR
+	ENTITY_NOT_USED
 };
 
 struct hit_point
@@ -123,12 +126,22 @@ struct hit_point
 	u8 count;
 };
 
+enum shape_type
+{
+	SHAPE_TRIANGLE,
+	SHAPE_CIRCLE
+};
+
+
 struct entity
 {
 	u32 index;
 
 	b32 exists;
 	b32 collides;
+	b32 is_shooting;
+	b32 is_warping;
+	b32 is_shielded;
 
 	f32 height;
 	f32 base_half_width;
@@ -136,9 +149,8 @@ struct entity
 	v2f Direction;
 	v2f dPos;
 	f32 speed;
-	b32 is_shooting;
-	b32 is_warping;
-	b32 is_shielded;
+	f32 distance_remaining;
+
 
 	u8 hit_point_max;
 	hit_point HitPoints;
@@ -146,24 +158,18 @@ struct entity
 	tile_map_position TileMapPos;
 
 	entity_type type;
+	shape_type shape;
+
+	circle CircleHitBox;
+	triangle TriangleHitBox;
 };
 
-struct entity_visible_piece
-{
-	loaded_bitmap *Bitmap;
-	v2f Offset;
-	f32 r, g, b, alpha;
-};
 
-struct entity_visible_piece_group
-{
-	u32 piece_count;
-	entity_visible_piece Pieces[8];
-};
 
 struct game_state
 {
 	// TODO(Justin): Should we break up some bitmaps for VFX purposes?
+
 	loaded_bitmap Background;
 	loaded_bitmap Ship;
 	loaded_bitmap WarpFrames[8];
@@ -177,11 +183,6 @@ struct game_state
 
 	tile_map *TileMap;
 
-	projectile Projectiles[64];
-	u32 projectile_next;
-
-	f32 projectile_speed;
-	f32 projectile_half_width;
 	f32 time_between_new_projectiles;
 
 	u32 asteroid_count;
@@ -192,6 +193,9 @@ struct game_state
 
 	loaded_sound TestSound;
 	u32 test_sample_index;
+
+	triangle Triangle;
+	circle Circle;
 
 	b32 is_initialized;
 };

@@ -332,7 +332,7 @@ WndProc(HWND WindowHandle, UINT Message, WPARAM wParam, LPARAM lParam)
 }
 
 internal void
-win32_process_pending_messgaes(game_controller_input *KeyboardController)
+win32_process_pending_messgaes(game_controller_input *KeyboardController, game_mouse_input *Mouse)
 {
 	MSG Message; 
 	while (PeekMessageA(&Message, 0, 0, 0, PM_REMOVE)) {
@@ -359,15 +359,23 @@ win32_process_pending_messgaes(game_controller_input *KeyboardController)
 						} break;
 						case VK_LEFT:
 						{
+							KeyboardController->ArrowLeft.ended_down = key_is_down;
+							KeyboardController->ArrowLeft.half_transition_count++;
 						} break;
 						case VK_UP:
 						{
+							KeyboardController->ArrowUp.ended_down = key_is_down;
+							KeyboardController->ArrowUp.half_transition_count++;
 						} break;
 						case VK_DOWN:
 						{
+							KeyboardController->ArrowDown.ended_down = key_is_down;
+							KeyboardController->ArrowDown.half_transition_count++;
 						} break;
 						case VK_RIGHT:
 						{
+							KeyboardController->ArrowRight.ended_down = key_is_down;
+							KeyboardController->ArrowRight.half_transition_count++;
 						} break;
 						case VK_SPACE:
 						{
@@ -416,6 +424,11 @@ win32_process_pending_messgaes(game_controller_input *KeyboardController)
 					}
 				}
 			}
+			case WM_MOUSEMOVE:
+			{
+				Mouse->x = (Message.lParam & 0xFFFF);
+				Mouse->y = Win32GlobalBackBuffer.height - ((Message.lParam & (0xFFFF << 16)) >> 16);
+			} break;
 			default:
 			{
 				TranslateMessage(&Message);
@@ -552,7 +565,7 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR CmdLine, int nCmdSho
 
 
 			game_memory GameMemory = {0};
-			GameMemory.total_size = KILOBYTES(16);
+			GameMemory.total_size = MEGABYTES(32);
 			GameMemory.permanent_storage = VirtualAlloc((LPVOID)0, GameMemory.total_size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
 
 
@@ -586,8 +599,15 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR CmdLine, int nCmdSho
 					game_controller_input *NewKeyboardController = &NewInput->Controller;
 					game_controller_input *OldKeyboardController = &OldInput->Controller;
 					game_controller_input ZeroController = {0}; 
-
 					*NewKeyboardController = ZeroController;
+
+					game_mouse_input *NewMouse = &NewInput->Mouse;
+					game_mouse_input *OldMouse = &OldInput->Mouse;
+					game_mouse_input ZeroMouse = {};
+					*NewMouse = ZeroMouse;
+					NewMouse->x = OldMouse->x;
+					NewMouse->y = OldMouse->y;
+
 					for (u32 button_index = 0;
 							button_index < ARRAY_COUNT(NewKeyboardController->Buttons);
 								button_index++) {
@@ -595,7 +615,14 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR CmdLine, int nCmdSho
 							OldKeyboardController->Buttons[button_index].ended_down;
 					}
 
-					win32_process_pending_messgaes(NewKeyboardController);
+					for (u32 button_index = 0;
+							button_index < ARRAY_COUNT(NewMouse->Buttons);
+								button_index++) {
+						NewMouse->Buttons[button_index].ended_down =
+							OldMouse->Buttons[button_index].ended_down;
+					}
+
+					win32_process_pending_messgaes(NewKeyboardController, NewMouse);
 
 
 					DWORD play_cursor;

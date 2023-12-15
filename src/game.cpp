@@ -46,9 +46,13 @@
 */
 
 #include "game.h"
+#include "game_render_group.h"
+#include "game_render_group.cpp"
 #include "game_string.cpp"
 #include "game_tile.cpp"
 #include "game_asset.cpp"
+
+#define White V3F(1.0f, 1.0f, 1.0f)
 
 internal void
 debug_sound_buffer_fill(sound_buffer *SoundBuffer)
@@ -84,6 +88,44 @@ sound_buffer_fill(game_state *GameState, sound_buffer *SoundBuffer)
 	}
 	GameState->test_sample_index += SoundBuffer->sample_count;
 }
+
+
+internal void 
+rectangle_draw(back_buffer *BackBuffer, v2f Min, v2f Max, v3f Color)
+{
+	s32 x_min = f32_round_to_s32(Min.x);
+	s32 y_min = f32_round_to_s32(Min.y);
+	s32 x_max = f32_round_to_s32(Max.x);
+	s32 y_max = f32_round_to_s32(Max.y);
+
+	if (x_min < 0) {
+		x_min += BackBuffer->width;
+	}
+	if (x_max > BackBuffer->width) {
+		x_max -= BackBuffer->width;
+	}
+	if (y_min < 0) {
+		y_min += BackBuffer->height;
+	}
+	if (y_max > BackBuffer->height) {
+		y_max -= BackBuffer->height;
+	}
+
+	u32 red = f32_round_to_u32(255.0f * Color.r);
+	u32 green = f32_round_to_u32(255.0f * Color.g);
+	u32 blue = f32_round_to_u32(255.0f * Color.b);
+	u32 color = ((red << 16) | (green << 8) | (blue << 0));
+
+	u8 *pixel_row = (u8 *)BackBuffer->memory + BackBuffer->stride * y_min + BackBuffer->bytes_per_pixel * x_min ;
+	for (int row = y_min; row < y_max; row++) {
+		u32 *pixel = (u32 *)pixel_row;
+		for (int col = x_min; col < x_max; col++)  {
+			*pixel++ = color;
+		}
+		pixel_row += BackBuffer->stride;
+	}
+}
+
 
 internal void 
 rectangle_draw(back_buffer *BackBuffer, v2f Min, v2f Max, f32 r, f32 g, f32 b)
@@ -748,19 +790,20 @@ entity_move(game_state *GameState, entity *Entity, v2f ddPos, f32 dt_for_frame)
 	if (ddp_length_squared > 1.0f) {
 		ddPos *= (1.0f / f32_sqrt(ddp_length_squared));
 	}
-
 	ddPos *= Entity->speed;
-	
-	v2f dPos;
-	dPos = dt_for_frame * ddPos + Entity->dPos;
-	Entity->dPos = dPos;
 
-	v2f EntityDelta = 0.5f * ddPos * SQUARE(dt_for_frame) + dt_for_frame * Entity->dPos;
+	v2f EntityDelta = (0.5f * ddPos * SQUARE(dt_for_frame) + dt_for_frame * Entity->dPos);
 
 	tile_map_position EntityOldPos = Entity->TileMapPos;
 	tile_map_position EntityNewPos = Entity->TileMapPos;
-	EntityNewPos.TileOffset += EntityDelta;
+
+	EntityNewPos.TileOffset = EntityNewPos.TileOffset + EntityDelta;
 	EntityNewPos = tile_map_position_remap(TileMap, EntityNewPos);
+
+	v2f NewVel = dt_for_frame * ddPos + Entity->dPos;
+	v2f OldVel = Entity->dPos;
+
+	Entity->dPos = NewVel;
 
 	s32 tile_min_x = MIN(EntityOldPos.Tile.x, EntityNewPos.Tile.x);
 	s32 tile_min_y = MIN(EntityOldPos.Tile.y, EntityNewPos.Tile.y);
@@ -973,8 +1016,6 @@ player_add(game_state *GameState)
 
 	//v2f Vertices[3] = {};
 
-
-
 	tile_map_tile_set_value(TileMap, Entity->TileMapPos.Tile, TILE_OCCUPIED);
 	return(Entity);
 }
@@ -1168,22 +1209,17 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 
 		GameState->TileMap = push_size(&GameState->TileMapArena, tile_map);
 		tile_map *TileMap = GameState->TileMap;
-
-		TileMap->tile_count_x = 17;
-		TileMap->tile_count_y = 9;
-		TileMap->tile_side_in_meters = 12.0f;
-
 		TileMap->tiles = push_array(&GameState->TileMapArena, TileMap->tile_count_x * TileMap->tile_count_y, u32);
+		tile_map_initialize(TileMap, 12.0f);
 
 		entity *EntityPlayer = player_add(GameState);
 		GameState->player_entity_index = EntityPlayer->index;
 
-
 		f32 asteroid_scales[3] = {1.5f, 3.0f, 5.0f};
 
 		srand(2023);
-		asteroid_add(GameState);
-		familiar_add(GameState);
+		//asteroid_add(GameState);
+		//familiar_add(GameState);
 
 		GameInput->Mouse.x = BackBuffer->width / 2;
 		GameInput->Mouse.y = BackBuffer->height / 2;
@@ -1261,8 +1297,6 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 	// NOTE(Justin): Player projectiles
 	//
 
-	// TODO(Justin) Entity projectiles?
-
 	if (GameInput->Controller.Space.ended_down) {
 		if (!EntityPlayer->is_shooting) {
 			projectile_add(GameState);
@@ -1307,6 +1341,7 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 	// NOTE(Justin): Render
 	//
 
+#if 0
 	entity_visible_piece_group PieceGroup;
 	for (u32 entity_index = 1; entity_index < GameState->entity_count; entity_index++) {
 
@@ -1337,6 +1372,9 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 				T.Vertices[2] += BottomLeft; 
 
 				triangle_draw(BackBuffer, &T, 1.0f, 1.0f, 1.0f);
+
+
+				rectangle_draw(BackBuffer, T.Centroid, T.Centroid + V2F(5.0f, 5.0f), White);
 
 
 				v2f Alignment = {(f32)GameState->Ship.width / 2.0f, (f32)GameState->Ship.height / 2.0f};
@@ -1405,6 +1443,7 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 			}
 		}
 	}
+#endif
 
 #if 1
 	v2f Delta = {};

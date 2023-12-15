@@ -1,6 +1,27 @@
 #if !defined(GAME_INTRINSICS_H)
 
 inline f32
+f32_infinity(void)
+{
+	u32 inf = 0x7f800000;
+	f32 *Result = (f32 *)&inf;
+	return(*Result);
+}
+
+inline f32
+f32_neg_infinity(void)
+{
+	u32 neg_inf = 0xff800000;
+	f32 *Result = (f32 *)&neg_inf;
+	return(*Result);	
+}
+inline f32
+square_root(f32 x)
+{
+	f32 Result = sqrtf(x);
+	return(Result);
+}
+inline f32
 absolute_value(f32 x)
 {
 	f32 Result = fabs(x);
@@ -17,15 +38,15 @@ f32_round_to_s16(f32 x)
 inline s32
 f32_round_to_s32(f32 x)
 {
-	s32 result = (s32)roundf(x);
-	return(result);
+	s32 Result = (s32)roundf(x);
+	return(Result);
 }
 
 inline u32
 f32_round_to_u32(f32 x)
 {
-	u32 result = (u32)(x + 0.5f);
-	return(result);
+	u32 Result = (u32)(x + 0.5f);
+	return(Result);
 }
 
 inline s32

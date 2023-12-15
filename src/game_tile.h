@@ -21,9 +21,7 @@ struct tile_map
 {
 	s32 tile_count_x;
 	s32 tile_count_y;
-	s32 tile_side_in_pixels;
 	f32 tile_side_in_meters;
-	f32 meters_to_pixels;
 
 	u32* tiles;
 };

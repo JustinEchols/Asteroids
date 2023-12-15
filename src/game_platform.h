@@ -27,6 +27,8 @@ typedef float		f32;
 #define ASSERT(expression)
 #endif
 
+#define INVALID_CODE_PATH ASSERT(!"Invaid code path")
+
 #define ARRAY_COUNT(a) (sizeof(a) / sizeof((a)[0]))
 
 #define KILOBYTES(kilobyte_count) 1024 * kilobyte_count
@@ -76,16 +78,6 @@ typedef struct
 
 } back_buffer;
 
-enum 
-{
-	KEY_W,
-	KEY_A,
-	KEY_S,
-	KEY_D,
-	KEY_SPACE,
-
-	KEY_COUNT
-};
 
 typedef struct
 {
@@ -97,7 +89,7 @@ typedef struct
 {
 	union
 	{
-		game_button_state Buttons[6];
+		game_button_state Buttons[10];
 		struct
 		{
 			game_button_state Up;
@@ -108,13 +100,30 @@ typedef struct
 			game_button_state Shift;
 			game_button_state ArrowUp;
 			game_button_state ArrowDown;
+			game_button_state ArrowLeft;
+			game_button_state ArrowRight;
 		};
 	};
 } game_controller_input;
 
 typedef struct
 {
+	union
+	{
+		game_button_state Buttons[2];
+		struct
+		{
+			game_button_state Right;
+			game_button_state Left;
+		};
+	};
+	int x, y;
+} game_mouse_input; 
+
+typedef struct
+{
 	game_controller_input Controller;
+	game_mouse_input Mouse;
 	f32 dt_for_frame;
 } game_input;
 

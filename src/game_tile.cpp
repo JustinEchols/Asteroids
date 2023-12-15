@@ -1,13 +1,35 @@
 
-internal v2f
-tile_map_get_screen_coordinates(tile_map *TileMap, tile_map_position *TileMapPos, v2f BottomLeft)
+#define TILE_NOT_USED INT32_MAX
+
+inline tile_map_position
+tile_map_null_position(void)
+{
+
+	tile_map_position Result = {};
+
+	Result.Tile.x = TILE_NOT_USED;
+
+	return(Result);
+}
+
+inline b32
+tile_map_position_is_valid(tile_map_position TileMapPos)
+{
+	b32 Result = (TileMapPos.Tile.x != TILE_NOT_USED);
+
+	return(Result);
+}
+
+inline v2f
+tile_map_get_screen_coordinates(tile_map *TileMap, tile_map_position *TileMapPos, v2f BottomLeft,
+		f32 tile_side_in_pixels, f32 meters_to_pixels)
 {
 	v2f Result = {};
 
-	Result.x = BottomLeft.x + TileMap->tile_side_in_pixels * TileMapPos->Tile.x + 
-		(TileMap->tile_side_in_pixels / 2) + TileMap->meters_to_pixels * TileMapPos->TileOffset.x;
-	Result.y = BottomLeft.y + TileMap->tile_side_in_pixels * TileMapPos->Tile.y +
-		(TileMap->tile_side_in_pixels / 2) + TileMap->meters_to_pixels * TileMapPos->TileOffset.y;
+	Result.x = BottomLeft.x + tile_side_in_pixels * TileMapPos->Tile.x + 
+		(tile_side_in_pixels / 2) + meters_to_pixels * TileMapPos->TileOffset.x;
+	Result.y = BottomLeft.y + tile_side_in_pixels * TileMapPos->Tile.y +
+		(tile_side_in_pixels / 2) + meters_to_pixels * TileMapPos->TileOffset.y;
 
 	return(Result);
 }
@@ -15,12 +37,17 @@ tile_map_get_screen_coordinates(tile_map *TileMap, tile_map_position *TileMapPos
 inline u32
 tile_map_get_tile_value_unchecked(tile_map *TileMap, v2i Tile)
 {
-	u32 TileValue = TileMap->tiles[Tile.y * TileMap->tile_count_x + Tile.x];
+	u32 TileValue = 0;
+	if ((Tile.x >= 0) && (Tile.x < TileMap->tile_count_x) &&
+		(Tile.y >= 0) && (Tile.y < TileMap->tile_count_y)) {
+
+		TileValue = TileMap->tiles[Tile.y * TileMap->tile_count_x + Tile.x];
+	}
 	return(TileValue);
 
 }
 
-internal b32
+inline b32
 tile_map_tile_is_empty(tile_map *TileMap, v2i TestTile)
 {
 	b32 Result = 0;
@@ -72,6 +99,14 @@ tile_map_tile_set_value(tile_map *TileMap, v2i Tile, u32 tile_value)
 	TileMap->tiles[Tile.y * TileMap->tile_count_x + Tile.x] = tile_value;
 }
 
+internal void
+tile_map_initialize(tile_map *TileMap, f32 tile_side_in_meters)
+{
+	TileMap->tile_count_x = 17;
+	TileMap->tile_count_y = 9;
+	TileMap->tile_side_in_meters = 12.0f;
+}
+
 inline b32
 tile_map_is_tile_value_empty(u32 tile_value)
 {
@@ -79,7 +114,6 @@ tile_map_is_tile_value_empty(u32 tile_value)
 
 	return(Result);
 }
-
 
 inline tile_map_position
 tile_map_get_centered_position(s32 tile_x, s32 tile_y)
@@ -91,8 +125,6 @@ tile_map_get_centered_position(s32 tile_x, s32 tile_y)
 
 	return(Result);
 }
-
-
 
 internal tile_map_pos_delta
 tile_map_get_pos_delta(tile_map *TileMap, tile_map_position *Pos1, tile_map_position *Pos2)
@@ -111,7 +143,7 @@ tile_map_get_pos_delta(tile_map *TileMap, tile_map_position *Pos1, tile_map_posi
 }
 
 inline b32
-tile_map_on_same_tile(tile_map_position *Pos1, tile_map_position *Pos2)
+tile_map_is_same_tile(tile_map_position *Pos1, tile_map_position *Pos2)
 {
 	b32 Result = ((Pos1->Tile.x == Pos2->Tile.x) &&
 				 (Pos1->Tile.y == Pos2->Tile.y));
@@ -121,3 +153,13 @@ tile_map_on_same_tile(tile_map_position *Pos1, tile_map_position *Pos2)
 
 }
 
+inline v2f
+tile_map_get_absolute_pos(tile_map *TileMap, tile_map_position TileMapPos)
+{
+	v2f Result = {};
+
+	Result.x = TileMapPos.Tile.x * TileMap->tile_side_in_meters + TileMapPos.TileOffset.x;
+	Result.y = TileMapPos.Tile.y * TileMap->tile_side_in_meters + TileMapPos.TileOffset.y;
+
+	return(Result);
+}

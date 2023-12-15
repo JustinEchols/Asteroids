@@ -1,9 +1,8 @@
 #if !defined(GAME_MATH_H)
 
-struct m3x3
-{
-	f32 e[3][3];
-};
+//
+// NOTE(Justin): Math types
+//
 
 struct v2i
 {
@@ -43,11 +42,49 @@ union v3f
 	{
 		f32 u, v, w;
 	};
+	struct
+	{
+		f32 r, g, b;
+	};
+	struct
+	{
+		v2f xy;
+		f32 ignored0_;
+	};
+	struct
+	{
+		f32 ignored1_;
+		v2f yz;
+	};
+	struct
+	{
+		v2f uv;
+		f32 ignored2_;
+	};
 	f32 e[3];
 };
 
+union v4f
+{
+	struct
+	{
+		f32 x, y, z, w;
+	};
+	struct
+	{
+		f32 r, g, b, a;
+	};
+	f32 e[4];
+};
+
+struct m3x3
+{
+	f32 e[3][3];
+};
+
+
 inline v2i
-v2i_create(s32 x, s32 y)
+V2I(s32 x, s32 y)
 {
 	v2i Result = {0};
 	Result.x = x;
@@ -56,43 +93,55 @@ v2i_create(s32 x, s32 y)
 
 }
 
-inline v2i
-v2i_scale(f32 c, v2i V)
-{
-	v2i Result = {0};
-	Result.x = (s32)(c * V.x);
-	Result.y = (s32)(c * V.y);
-	return(Result);
-}
-
-inline v2i
-v2i_add(v2i V1, v2i V2)
-{
-	v2i Result = {0};
-
-	Result.x = V1.x + V2.x;
-	Result.y = V1.y + V2.y;
-
-	return(Result);
-}
-
-inline v2i
-v2i_subtract(v2i V1, v2i V2)
-{
-	v2i Result = {0};
-
-	Result.x = V1.x - V2.x;
-	Result.y = V1.y - V2.y;
-
-	return(Result);
-}
-
 inline v2f
-v2f_create(f32 x, f32 y)
+V2F(f32 x, f32 y)
 {
 	v2f Result;
 	Result.x = x;
 	Result.y = y;
+
+	return(Result);
+}
+
+//
+// NOTE(Justin): v2 operations
+//
+
+inline v2f
+v2f_perp(v2f V)
+{
+	v2f Result = {-V.y, V.x};
+	return(Result);
+}
+
+inline v2i
+operator *(f32 c, v2i V)
+{
+	v2i Result;
+
+	Result.x = (s32)(c * V.x);
+	Result.y = (s32)(c * V.y);
+
+	return(Result);
+}
+
+inline v2i
+operator *(v2i V, f32 c)
+{
+	v2i Result;
+
+	Result = c * V;
+
+	return(Result);
+}
+
+inline v2i
+operator +(v2i V1, v2i V2)
+{
+	v2i Result;
+
+	Result.x = V1.x + V2.x;
+	Result.y = V1.y + V2.y;
 
 	return(Result);
 }
@@ -119,6 +168,7 @@ inline v2f &
 operator *=(v2f &V, f32 c)
 {
 	V = c * V;
+
 	return(V);
 }
 
@@ -126,6 +176,7 @@ inline v2f
 operator +(v2f U, v2f V)
 {
 	v2f Result;
+
 	Result.x = U.x + V.x;
 	Result.y = U.y + V.y;
 
@@ -163,7 +214,7 @@ v2f_normalize(v2f V)
 {
 	v2f Result;
 
-	f32 c = sqrtf(v2f_dot(V, V));
+	f32 c = (1.0f / f32_sqrt(v2f_dot(V, V)));
 
 	Result = c * V;
 
@@ -222,13 +273,8 @@ m2x2_rotation_create(f32 angle)
 }
 
 
-
-
-
-
-
 inline v3f
-v3f_create(f32 x, f32 y, f32 z)
+V3F(f32 x, f32 y, f32 z)
 {
 	v3f Result = {0};
 
@@ -240,9 +286,9 @@ v3f_create(f32 x, f32 y, f32 z)
 }
 
 inline v3f
-v3f_scale(f32 c, v3f V)
+operator *(f32 c, v3f V)
 {
-	v3f Result = {0};
+	v3f Result = {};
 
 	Result.x = c * V.x;
 	Result.y = c * V.y;
@@ -251,10 +297,14 @@ v3f_scale(f32 c, v3f V)
 	return(Result);
 }
 
+//
+// NOTE(Justin): Matrix operations
+//
+
 inline m3x3
 m3x3_identity_create()
 {
-	m3x3 Result = {0};
+	m3x3 Result = {};
 
 	Result.e[0][0] = 1.0f;
 	Result.e[1][1] = 1.0f;
@@ -263,11 +313,10 @@ m3x3_identity_create()
 	return(Result);
 }
 
-
 inline v3f
 m3x3_transform_v3f(m3x3 M, v3f V)
 {
-	v3f Result = {0};
+	v3f Result = {};
 
 
 	Result.x = M.e[0][0] * V.x + M.e[0][1] * V.y + M.e[0][2] * V.z;
@@ -277,18 +326,38 @@ m3x3_transform_v3f(m3x3 M, v3f V)
 	return(Result);
 }
 
+inline v3f
+operator *(m3x3 T, v3f V)
+{
+	v3f Result = {};
+
+	Result = m3x3_transform_v3f(T, V);
+
+	return(Result);
+}
+
 inline v2f
 m3x3_transform_v2f(m3x3 M, v2f V)
 {
-	v2f Result = {0};
+	v2f Result = {};
 
-	v3f U = v3f_create(V.x, V.y, 1.0f);
+	v3f U = V3F(V.x, V.y, 1.0f);
 
 	U = m3x3_transform_v3f(M, U);
 
 	Result.x = U.x;
 	Result.y = U.y;
 	
+	return(Result);
+}
+
+inline v2f
+operator *(m3x3 M, v2f V)
+{
+	v2f Result = {};
+
+	Result = m3x3_transform_v2f(M, V);
+
 	return(Result);
 }
 
@@ -301,18 +370,6 @@ m3x3_translation_create(v2f V)
 		{0.0f, 1.0f, V.y},
 		{0.0f, 0.0f, 1.0f}},
 	};
-	return(Result);
-}
-
-inline v2f
-m3x3_translate_v2f(m3x3 T, v2f V)
-{
-	// TODO(Justin): Assert T is a translation matrix;
-	v2f Result = {0};
-
-	Result.x = V.x + T.e[0][2];
-	Result.y = V.y + T.e[1][2];
-	//Result = m3x3_transform_v2f(T, V);
 	return(Result);
 }
 
@@ -345,7 +402,7 @@ m3x3_rotate_about_origin(f32 angle)
 inline m3x3
 m3x3_matrix_mult(m3x3 A, m3x3 B)
 {
-	m3x3 Result = {0};
+	m3x3 Result = {};
 
 	for (u32 row = 0; row <= 2; row++) {
 		for (u32 col = 0; col <= 2; col++) {
@@ -357,25 +414,14 @@ m3x3_matrix_mult(m3x3 A, m3x3 B)
 	return(Result);
 }
 
-#if 0
-inline v2f
-m3x3_transform_to_screen_space(m3x3 MapToScreenSpace, v2f V)
+inline m3x3
+operator *(m3x3 A, m3x3 B)
 {
-	v2f Result = {0};
+	m3x3 R = m3x3_matrix_mult(A, B);
 
-	v3f U = v3f_create(V.x, V.y, 1.0f);
-
-	U = m3x3_transform_v3f(MapToScreenSpace, U);
-
-	Result.x = U.x;
-	Result.y = U.y;
-
-	return(Result);
-
-
-
+	return(R);
 }
-#endif
+
 #define GAME_MATH_H
 #endif
 

@@ -1,0 +1,5 @@
+Should the types in the platform layer adhere strictily to the types that
+are understood in the OS layer? E.g. instead of using s32, use int in the
+platform layer?
+
+
