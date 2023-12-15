@@ -53,6 +53,10 @@
 #include "game_asset.cpp"
 
 #define White V3F(1.0f, 1.0f, 1.0f)
+#define Red V3F(1.0f, 0.0f, 0.0f)
+#define Green V3F(0.0f, 1.0f, 0.0f)
+#define Blue V3F(0.0f, 0.0f, 1.0f)
+#define Black V3F(0.0f, 0.0f, 0.0f)
 
 internal void
 debug_sound_buffer_fill(sound_buffer *SoundBuffer)
@@ -801,6 +805,22 @@ entity_move(game_state *GameState, entity *Entity, v2f ddPos, f32 dt_for_frame)
 	EntityNewPos = tile_map_position_remap(TileMap, EntityNewPos);
 
 	v2f NewVel = dt_for_frame * ddPos + Entity->dPos;
+	f32 max_speed = 50.0f;
+	if(ABS(NewVel.x) > 50.0f) {
+
+		// NOTE(Justin): Have to normalize the components by the magnitude of
+		// the component. Otherwise the direction may change upon multiplication
+		// of a negative times a negative.
+
+		NewVel.x *= ABS(1.0f / NewVel.x);
+		NewVel.x *= max_speed;
+	}
+
+	if(ABS(NewVel.y) > 50.0f) {
+		NewVel.y *= ABS(1.0f / NewVel.y);
+		NewVel.y *= max_speed;
+	}
+
 	v2f OldVel = Entity->dPos;
 
 	Entity->dPos = NewVel;
@@ -1107,6 +1127,18 @@ push_piece(entity_visible_piece_group *PieceGroup, loaded_bitmap *Bitmap, v2f Of
 }
 
 internal void
+triangle_draw(back_buffer *BackBuffer, triangle *Triangle, v3f Color)
+{
+	v2f Right = Triangle->Vertices[0];
+	v2f Middle = Triangle->Vertices[1];
+	v2f Left = Triangle->Vertices[2];
+
+	line_dda_draw(BackBuffer, Right, Middle, Color.r, Color.g, Color.b);
+	line_dda_draw(BackBuffer, Middle, Left, Color.r, Color.g, Color.b); 
+	line_dda_draw(BackBuffer, Left, Right, Color.r, Color.g, Color.b);
+}
+
+internal void
 triangle_draw(back_buffer *BackBuffer, triangle *Triangle, f32 r, f32 g, f32 b)
 {
 	v2f Right = Triangle->Vertices[0];
@@ -1341,7 +1373,6 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 	// NOTE(Justin): Render
 	//
 
-#if 0
 	entity_visible_piece_group PieceGroup;
 	for (u32 entity_index = 1; entity_index < GameState->entity_count; entity_index++) {
 
@@ -1443,7 +1474,6 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 			}
 		}
 	}
-#endif
 
 #if 1
 	v2f Delta = {};
