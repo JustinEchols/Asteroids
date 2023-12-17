@@ -34,19 +34,6 @@ tile_map_get_screen_coordinates(tile_map *TileMap, tile_map_position *TileMapPos
 	return(Result);
 }
 
-inline u32
-tile_map_get_tile_value_unchecked(tile_map *TileMap, v2i Tile)
-{
-	u32 TileValue = 0;
-	if ((Tile.x >= 0) && (Tile.x < TileMap->tile_count_x) &&
-		(Tile.y >= 0) && (Tile.y < TileMap->tile_count_y)) {
-
-		TileValue = TileMap->tiles[Tile.y * TileMap->tile_count_x + Tile.x];
-	}
-	return(TileValue);
-
-}
-
 inline b32
 tile_map_tile_is_empty(tile_map *TileMap, v2i TestTile)
 {
@@ -92,12 +79,7 @@ tile_map_position_remap(tile_map *TileMap, tile_map_position TileMapPos)
 	return(Result);
 }
 
-inline void
-tile_map_tile_set_value(tile_map *TileMap, v2i Tile, u32 tile_value)
-{
-	ASSERT(TileMap->tiles);
-	TileMap->tiles[Tile.y * TileMap->tile_count_x + Tile.x] = tile_value;
-}
+
 
 internal void
 tile_map_initialize(tile_map *TileMap, f32 tile_side_in_meters)
@@ -107,13 +89,7 @@ tile_map_initialize(tile_map *TileMap, f32 tile_side_in_meters)
 	TileMap->tile_side_in_meters = 12.0f;
 }
 
-inline b32
-tile_map_is_tile_value_empty(u32 tile_value)
-{
-	b32 Result = (tile_value == 0);
 
-	return(Result);
-}
 
 inline tile_map_position
 tile_map_get_centered_position(s32 tile_x, s32 tile_y)
@@ -163,3 +139,33 @@ tile_map_get_absolute_pos(tile_map *TileMap, tile_map_position TileMapPos)
 
 	return(Result);
 }
+
+/*
+inline u32
+tile_map_get_tile_value_unchecked(tile_map *TileMap, v2i Tile)
+{
+	u32 TileValue = 0;
+	if ((Tile.x >= 0) && (Tile.x < TileMap->tile_count_x) &&
+		(Tile.y >= 0) && (Tile.y < TileMap->tile_count_y)) {
+
+		TileValue = TileMap->tiles[Tile.y * TileMap->tile_count_x + Tile.x];
+	}
+	return(TileValue);
+
+}
+
+inline void
+tile_map_tile_set_value(tile_map *TileMap, v2i Tile, u32 tile_value)
+{
+	ASSERT(TileMap->tiles);
+	TileMap->tiles[Tile.y * TileMap->tile_count_x + Tile.x] = tile_value;
+}
+
+inline b32
+tile_map_is_tile_value_empty(u32 tile_value)
+{
+	b32 Result = (tile_value == 0);
+
+	return(Result);
+}
+*/
