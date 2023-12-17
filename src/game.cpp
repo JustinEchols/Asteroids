@@ -270,9 +270,6 @@ circle_support_point(circle *Circle, v2f Dir)
 	return(Result);
 }
 
-
-
-
 internal void
 circle_draw(back_buffer *BackBuffer, circle *Circle, f32 r, f32 b, f32 g)
 {
@@ -315,10 +312,6 @@ circle_draw(back_buffer *BackBuffer, circle *Circle, v3f Color)
 {
 	circle_draw(BackBuffer, Circle, Color.r, Color.g, Color.b);
 }
-
-
-
-
 
 // TODO(Justin): Use symmetry to draw? ALthough this is for debugginh purposes.
 #if 0
@@ -541,7 +534,6 @@ rectangle_transparent_draw(back_buffer *BackBuffer, v2f Min, v2f Max, f32 r, f32
 	s32 x_max = f32_round_to_s32(Max.x);
 	s32 y_max = f32_round_to_s32(Max.y);
 
-	// Check bounds
 	if (x_min < 0) {
 		x_min = 0;
 	}
@@ -756,33 +748,6 @@ debug_vector_draw_at_point(back_buffer * BackBuffer, v2f Point, v2f Direction)
 	f32 c = 60.0f;
 	line_dda_draw(BackBuffer, Point, Point + c * Direction, 1.0f, 1.0f, 1.0f);
 }
-
-internal b32
-test_tile_side(f32 max_corner_x, f32 rel_x, f32 rel_y, f32 *t_min,
-		  f32 player_delta_x, f32 player_delta_y, f32 min_corner_y, f32 max_corner_y)
-{
-	// NOTE(Justin): Using epsilons is not ideal..
-	b32 hit = false;
-	f32 epsilon = 0.001f;
-	f32 wall_x = max_corner_x;
-	if (player_delta_x != 0) {
-		f32 t_result = (wall_x - rel_x) / player_delta_x;
-		f32 y = rel_y + t_result * player_delta_y;
-		if ((t_result >= 0.0f) && (*t_min > t_result)) {
-			if ((y >= min_corner_y) && (y <= max_corner_y)) {
-				*t_min = MAX(0.0f, t_result - epsilon);
-				hit = true;
-			}
-		}
-	}
-	return(hit);
-}
-
-struct projected_interval
-{
-	f32 min;
-	f32 max;
-};
 
 internal projected_interval 
 triangle_project_onto_axis(triangle *Triangle, v2f ProjectedAxis)
@@ -1104,18 +1069,8 @@ entity_move(game_state *GameState, entity *Entity, v2f ddPos, f32 dt_for_frame)
 		}
 	}
 
-	// TODO(Justin): Need to map the (x,y) back into the world.
 	Entity->Pos = EntityNewPos;
 }
-
-#if 0
-inline void
-entity_remove(game_state *GameState, entity *Entity)
-{
-	tile_map_tile_set_value(GameState->TileMap, Entity->TileMapPos.Tile, TILE_EMPTY);
-	GameState->entity_count--;
-}
-#endif
 
 internal triangle
 triangle_init(v2f *Vertices, u32 vertex_count)
@@ -1170,10 +1125,6 @@ player_add(game_state *GameState, back_buffer *BackBuffer)
 	Entity->is_shielded = true;
 
 	Entity->Pos = V2F((f32)BackBuffer->width / 2.0f, (f32)BackBuffer->height / 2.0f);
-	//Entity->TileMapPos.Tile.x = TileMap->tile_count_x / 2;
-	//Entity->TileMapPos.Tile.y = TileMap->tile_count_y / 2;
-	//Entity->TileMapPos.TileOffset.x = 0.0f;
-	//Entity->TileMapPos.TileOffset.y = 0.0f;
 	Entity->height = 10.0f;
 	Entity->base_half_width = 4.0f;
 	Entity->Right = {1.0f, 0.0f};
@@ -1186,9 +1137,6 @@ player_add(game_state *GameState, back_buffer *BackBuffer)
 
 	Entity->shape = SHAPE_TRIANGLE;
 
-	//v2f Vertices[3] = {};
-
-	//tile_map_tile_set_value(TileMap, Entity->TileMapPos.Tile, TILE_OCCUPIED);
 	return(Entity);
 }
 
@@ -1230,28 +1178,11 @@ asteroid_add(game_state *GameState, back_buffer *BackBuffer)
 {
 	entity *Entity = entity_add(GameState, ENTITY_ASTEROID);
 
-	//tile_map *TileMap = GameState->TileMap;
-
 	Entity->exists = true;
 	Entity->collides = true;
 
-#if 0
-	f32 x_offset = (12.0f * ((f32)rand() / (f32)RAND_MAX) - 6);
-	f32 y_offset = (12.0f * ((f32)rand() / (f32)RAND_MAX) - 6);
-
-	s32 tile_x =  (s32)((TileMap->tile_count_x - 1) * ((f32)rand() / (f32)(RAND_MAX)));
-	s32 tile_y =  (s32)((TileMap->tile_count_y - 1) * ((f32)rand() / (f32)(RAND_MAX)));
-
-	Entity->TileMapPos.TileOffset = {x_offset, y_offset};
-	Entity->TileMapPos.Tile = {tile_x, tile_y};
-#endif
-
-	//f32 x_dir = ((f32)rand() / (f32)RAND_MAX) - 0.5f;
-	//f32 y_dir = ((f32)rand() / (f32)RAND_MAX) - 0.5f;
-
 	f32 speed_scale = ((f32)rand() / (f32)RAND_MAX);
 
-	//Entity->Direction = V2F(x_dir, y_dir);
 	Entity->Direction = v2f_normalize(V2F(f32_rand(-1.0f, 1.0f), f32_rand(-1.0f, 1.0f)));
 	Entity->speed = 9.0f;
 
@@ -1260,12 +1191,9 @@ asteroid_add(game_state *GameState, back_buffer *BackBuffer)
 	Entity->Pos = v2f_rand((f32)BackBuffer->width, (f32)BackBuffer->height);
 	Entity->dPos = asteroid_speed * Entity->Direction;
 
-	//tile_map_tile_set_value(TileMap, Entity->TileMapPos.Tile, TILE_OCCUPIED);
-
 	// TODO(Jusitn): Rand scaling, orientation, size, and mass.
 	
 	Entity->shape = SHAPE_CIRCLE;
-	//Entity->vertex_count = 0;
 	return(Entity);
 }
 
@@ -1278,8 +1206,6 @@ familiar_add(game_state *GameState)
 	Entity->collides = true;
 
 	Entity->speed = 1.0f;
-
-	//tile_map_tile_set_value(GameState->TileMap, Entity->TileMapPos.Tile, TILE_OCCUPIED);
 
 	return(Entity);
 }
@@ -1295,13 +1221,10 @@ projectile_add(game_state *GameState)
 	entity *EntityPlayer = GameState->Entities + GameState->player_entity_index;
 
 	Entity->Pos = EntityPlayer->Pos;
-	//Entity->TileMapPos = EntityPlayer->TileMapPos;
 	Entity->distance_remaining = 100.0f;
 	Entity->Direction = EntityPlayer->Direction;
 	Entity->speed = 30.0f;
 	Entity->dPos = Entity->speed * Entity->Direction;
-
-	//tile_map_tile_set_value(GameState->TileMap, Entity->TileMapPos.Tile, TILE_OCCUPIED);
 
 	return(Entity);
 }
@@ -1337,8 +1260,8 @@ circle_add(game_state *GameState, v2f Pos, v2f Dir)
 	Entity->collides = true;
 
 	world *World = GameState->World;
-	Entity->Pos = Pos;//v2f_rand((f32)BackBuffer->width, (f32)BackBuffer->height);
-	Entity->Direction = Dir;// v2f_normalize(V2F(f32_rand(-1.0f, 1.0f), f32_rand(-1.0f, 1.0f)));
+	Entity->Pos = Pos;
+	Entity->Direction = Dir;
 	
 	//Entity->Pos = v2f_rand((f32)World->width, (f32)World->height);
 	//Entity->Direction = v2f_normalize(V2F(f32_rand(-1.0f, 1.0f), f32_rand(-1.0f, 1.0f)));
@@ -1387,7 +1310,6 @@ triangle_draw(back_buffer *BackBuffer, triangle *Triangle, f32 r, f32 g, f32 b)
 internal void
 familiar_update(game_state *GameState, entity *Entity, f32 dt_for_frame)
 {
-	//tile_map *TileMap = GameState->TileMap;
 	// TODO(Justin): Spatial partition search
 	
 	// NOTE(Justin): 10 meter maximum search
@@ -1697,7 +1619,7 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 		}
 	}
 
-#if 1
+#if 0
 	v2f Delta = {};
 	if (GameInput->Controller.ArrowLeft.ended_down) {
 		Delta += V2F(-1.0f, 0.0f);
