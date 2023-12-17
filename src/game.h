@@ -43,12 +43,6 @@ push_size_(memory_arena *MemoryArena, memory_index size)
 
 #include "game_asset.h"
 
-struct color
-{
-	char *name;
-	v3f Value;
-};
-
 struct bounding_box
 {
 	v2f Min;
@@ -104,7 +98,6 @@ struct projectile
 	f32 distance_remaining;
 	b32 is_active;
 
-
 	projectile_trail Trails[4];
 	u32 trail_next;
 	f32 time_between_next_trail;
@@ -117,6 +110,9 @@ enum entity_type
 	ENTITY_ASTEROID,
 	ENTITY_FAMILIAR,
 	ENTITY_PROJECTILE,
+	ENTITY_TRIANGLE,
+	ENTITY_CIRCLE,
+
 	ENTITY_NOT_USED
 };
 
@@ -155,20 +151,30 @@ struct entity
 	u8 hit_point_max;
 	hit_point HitPoints;
 
-	tile_map_position TileMapPos;
+	v2f Pos;
 
 	entity_type type;
 	shape_type shape;
 
 	circle CircleHitBox;
 	triangle TriangleHitBox;
+
+	f32 radius;
 };
 
-
+struct world
+{
+	f32 meters_to_pixels;
+	f32 width;
+	f32 height;
+};
 
 struct game_state
 {
 	// TODO(Justin): Should we break up some bitmaps for VFX purposes?
+
+	memory_arena WorldArena;
+	world *World;
 
 	loaded_bitmap Background;
 	loaded_bitmap Ship;
@@ -186,6 +192,7 @@ struct game_state
 	f32 time_between_new_projectiles;
 
 	u32 asteroid_count;
+
 	u32 entity_count;
 	entity Entities[256];
 
@@ -195,7 +202,8 @@ struct game_state
 	u32 test_sample_index;
 
 	triangle Triangle;
-	circle Circle;
+	circle CircleA;
+	circle CircleB;
 
 	b32 is_initialized;
 };
