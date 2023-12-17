@@ -18,6 +18,9 @@
  *			- Shield
  *				- Appears on collision
  *				- Fades shortly thereafter
+ *			- Ship phasing
+ *				- Ship can enter a "flux state" and temporarily phase through
+ *				objects avoiding collisions
  * 		- Particles
  *			- Ship thrusters
  *			- Energy beam
@@ -35,7 +38,9 @@
  *		- Profiling
  *		- SIMD
  *		- Intrinsics
-
+	- Physics
+		- Angular momentum
+		- Mass
  * 	- Audio mixing
 
  * 	- Bitmap transformations (rotations, scaling, ...)
@@ -703,9 +708,10 @@ internal b32
 triangle_circle_collision(triangle *Triangle, circle *Circle)
 {
 	// NOTE(Justin): The collision detection algorithim is an implementation of the Separated Axis
-	// Theorem.
+	// Algorithm.
 
 	b32 GapExists = false;
+
 	for (u32 vertex_i = 0; vertex_i < ARRAY_COUNT(Triangle->Vertices); vertex_i++) {
 
 		// Define edges s.t. a normal to the edge, the projection axis,
@@ -789,7 +795,7 @@ circles_collision(circle *CircleA, circle *CircleB)
 internal void
 entity_move(game_state *GameState, entity *Entity, v2f ddPos, f32 dt_for_frame)
 {
-	tile_map *TileMap = GameState->TileMap;
+//	tile_map *TileMap = GameState->TileMap;
 	f32 ddp_length_squared = v2f_length_squared(ddPos);
 	if (ddp_length_squared > 1.0f) {
 		ddPos *= (1.0f / f32_sqrt(ddp_length_squared));
@@ -798,40 +804,53 @@ entity_move(game_state *GameState, entity *Entity, v2f ddPos, f32 dt_for_frame)
 
 	v2f EntityDelta = (0.5f * ddPos * SQUARE(dt_for_frame) + dt_for_frame * Entity->dPos);
 
-	tile_map_position EntityOldPos = Entity->TileMapPos;
-	tile_map_position EntityNewPos = Entity->TileMapPos;
 
-	EntityNewPos.TileOffset = EntityNewPos.TileOffset + EntityDelta;
-	EntityNewPos = tile_map_position_remap(TileMap, EntityNewPos);
+	v2f EntityOldPos = Entity->Pos;
+	v2f EntityNewPos = Entity->Pos;
+//	tile_map_position EntityOldPos = Entity->TileMapPos;
+//	tile_map_position EntityNewPos = Entity->TileMapPos;
+
+	EntityNewPos = EntityOldPos + EntityDelta;
+//	EntityNewPos.TileOffset = EntityNewPos.TileOffset + EntityDelta;
+//	EntityNewPos = tile_map_position_remap(TileMap, EntityNewPos);
 
 	v2f NewVel = dt_for_frame * ddPos + Entity->dPos;
 	f32 max_speed = 50.0f;
-	if(ABS(NewVel.x) > 50.0f) {
+	f32 dp_length_squared = v2f_length_squared(NewVel);
+	if(dp_length_squared > 75.0f) {
+		if(ABS(NewVel.x) > 50.0f) {
 
-		// NOTE(Justin): Have to normalize the components by the magnitude of
-		// the component. Otherwise the direction may change upon multiplication
-		// of a negative times a negative.
+			// NOTE(Justin): Have to normalize the components by the magnitude of
+			// the component. Otherwise the direction may change upon multiplication
+			// of a negative times a negative.
 
-		NewVel.x *= ABS(1.0f / NewVel.x);
-		NewVel.x *= max_speed;
+			NewVel.x *= ABS(1.0f / NewVel.x);
+			NewVel.x *= max_speed;
+		}
+
+		if(ABS(NewVel.y) > 50.0f) {
+			NewVel.y *= ABS(1.0f / NewVel.y);
+			NewVel.y *= max_speed;
+		}
 	}
 
-	if(ABS(NewVel.y) > 50.0f) {
-		NewVel.y *= ABS(1.0f / NewVel.y);
-		NewVel.y *= max_speed;
-	}
 
-	v2f OldVel = Entity->dPos;
+	//v2f OldVel = Entity->dPos;
 
 	Entity->dPos = NewVel;
 
+#if 0
 	s32 tile_min_x = MIN(EntityOldPos.Tile.x, EntityNewPos.Tile.x);
 	s32 tile_min_y = MIN(EntityOldPos.Tile.y, EntityNewPos.Tile.y);
 	s32 tile_max_x_one_past = MAX(EntityOldPos.Tile.x, EntityNewPos.Tile.x) + 1;
 	s32 tile_max_y_one_past = MAX(EntityOldPos.Tile.y, EntityNewPos.Tile.y) + 1;
 
-	// TODO(Justin): Collision detection against asteroids not tiles. Tiles
-	// should be used to check whether or not something exists in it. If
+	// TODO(Justin): Collision detection against asteroids/entities not tiles. Tiles
+	// should be used to check whether or not something exists in it.
+	
+	// TODO(Justin): If an entity cannot be collided with, the collision
+	// detection should be completely skipped.
+
 
 	f32 t_min = 1.0f;
 	v2f TileNormal = {};
@@ -932,6 +951,9 @@ entity_move(game_state *GameState, entity *Entity, v2f ddPos, f32 dt_for_frame)
 			}
 		}
 	}
+#endif
+	// TODO(Justin): Need to map the (x,y) back into the world.
+	Entity->Pos = EntityNewPos;
 }
 
 inline entity *
@@ -959,12 +981,14 @@ entity_add(game_state *GameState, entity_type type)
 	return(Entity);
 }
 
+#if 0
 inline void
 entity_remove(game_state *GameState, entity *Entity)
 {
 	tile_map_tile_set_value(GameState->TileMap, Entity->TileMapPos.Tile, TILE_EMPTY);
 	GameState->entity_count--;
 }
+#endif
 
 internal triangle
 triangle_init(v2f *Vertices, u32 vertex_count)
@@ -1006,7 +1030,7 @@ triangle_init(v2f *Vertices, u32 vertex_count)
 }
 
 internal entity *
-player_add(game_state *GameState)
+player_add(game_state *GameState, back_buffer *BackBuffer)
 {
 	entity *Entity = entity_add(GameState, ENTITY_PLAYER);
 
@@ -1018,10 +1042,11 @@ player_add(game_state *GameState)
 	Entity->is_warping = false;
 	Entity->is_shielded = true;
 
-	Entity->TileMapPos.Tile.x = TileMap->tile_count_x / 2;
-	Entity->TileMapPos.Tile.y = TileMap->tile_count_y / 2;
-	Entity->TileMapPos.TileOffset.x = 0.0f;
-	Entity->TileMapPos.TileOffset.y = 0.0f;
+	Entity->Pos = V2F((f32)BackBuffer->width / 2.0f, (f32)BackBuffer->height / 2.0f);
+	//Entity->TileMapPos.Tile.x = TileMap->tile_count_x / 2;
+	//Entity->TileMapPos.Tile.y = TileMap->tile_count_y / 2;
+	//Entity->TileMapPos.TileOffset.x = 0.0f;
+	//Entity->TileMapPos.TileOffset.y = 0.0f;
 	Entity->height = 10.0f;
 	Entity->base_half_width = 4.0f;
 	Entity->Right = {1.0f, 0.0f};
@@ -1036,20 +1061,52 @@ player_add(game_state *GameState)
 
 	//v2f Vertices[3] = {};
 
-	tile_map_tile_set_value(TileMap, Entity->TileMapPos.Tile, TILE_OCCUPIED);
+	//tile_map_tile_set_value(TileMap, Entity->TileMapPos.Tile, TILE_OCCUPIED);
 	return(Entity);
 }
 
+inline f32
+f32_rand_percent(void)
+{
+	f32 Result = 0.0f;
+
+	Result = ((f32)rand() / (f32)RAND_MAX);
+
+	return(Result);
+}
+
+inline f32
+f32_rand(f32 min, f32 max)
+{
+	f32 Result = 0.0f;
+
+	Result = min + (f32_rand_percent()) * (max - min);
+}
+
+inline v2f
+v2f_rand(f32 x_max, f32 y_max)
+{
+	v2f Result = {};
+
+	f32 x = f32_rand(0.0f, x_max);
+	f32 y = f32_rand(0.0f, y_max);
+
+	Result = V2F(x, y);
+
+	return(Result);
+}
+
 internal entity *
-asteroid_add(game_state *GameState)
+asteroid_add(game_state *GameState, back_buffer *BackBuffer)
 {
 	entity *Entity = entity_add(GameState, ENTITY_ASTEROID);
 
-	tile_map *TileMap = GameState->TileMap;
+	//tile_map *TileMap = GameState->TileMap;
 
 	Entity->exists = true;
 	Entity->collides = true;
 
+#if 0
 	f32 x_offset = (12.0f * ((f32)rand() / (f32)RAND_MAX) - 6);
 	f32 y_offset = (12.0f * ((f32)rand() / (f32)RAND_MAX) - 6);
 
@@ -1058,20 +1115,23 @@ asteroid_add(game_state *GameState)
 
 	Entity->TileMapPos.TileOffset = {x_offset, y_offset};
 	Entity->TileMapPos.Tile = {tile_x, tile_y};
+#endif
 
-	f32 x_dir = ((f32)rand() / (f32)RAND_MAX) - 0.5f;
-	f32 y_dir = ((f32)rand() / (f32)RAND_MAX) - 0.5f;
+	//f32 x_dir = ((f32)rand() / (f32)RAND_MAX) - 0.5f;
+	//f32 y_dir = ((f32)rand() / (f32)RAND_MAX) - 0.5f;
 
 	f32 speed_scale = ((f32)rand() / (f32)RAND_MAX);
 
-	Entity->Direction = {x_dir, y_dir};
+	//Entity->Direction = V2F(x_dir, y_dir);
+	Entity->Direction = v2f_normalize(V2F(f32_rand(-1.0f, 1.0f), f32_rand(-1.0f, 1.0f)));
 	Entity->speed = 9.0f;
 
 	f32 asteroid_speed = speed_scale * Entity->speed;
 
+	Entity->Pos = v2f_rand((f32)BackBuffer->width, (f32)BackBuffer->height);
 	Entity->dPos = asteroid_speed * Entity->Direction;
 
-	tile_map_tile_set_value(TileMap, Entity->TileMapPos.Tile, TILE_OCCUPIED);
+	//tile_map_tile_set_value(TileMap, Entity->TileMapPos.Tile, TILE_OCCUPIED);
 
 	// TODO(Jusitn): Rand scaling, orientation, size, and mass.
 	
@@ -1090,7 +1150,7 @@ familiar_add(game_state *GameState)
 
 	Entity->speed = 1.0f;
 
-	tile_map_tile_set_value(GameState->TileMap, Entity->TileMapPos.Tile, TILE_OCCUPIED);
+	//tile_map_tile_set_value(GameState->TileMap, Entity->TileMapPos.Tile, TILE_OCCUPIED);
 
 	return(Entity);
 }
@@ -1105,13 +1165,14 @@ projectile_add(game_state *GameState)
 
 	entity *EntityPlayer = GameState->Entities + GameState->player_entity_index;
 
-	Entity->TileMapPos = EntityPlayer->TileMapPos;
+	Entity->Pos = EntityPlayer->Pos;
+	//Entity->TileMapPos = EntityPlayer->TileMapPos;
 	Entity->distance_remaining = 100.0f;
 	Entity->Direction = EntityPlayer->Direction;
 	Entity->speed = 30.0f;
 	Entity->dPos = Entity->speed * Entity->Direction;
 
-	tile_map_tile_set_value(GameState->TileMap, Entity->TileMapPos.Tile, TILE_OCCUPIED);
+	//tile_map_tile_set_value(GameState->TileMap, Entity->TileMapPos.Tile, TILE_OCCUPIED);
 
 	return(Entity);
 }
@@ -1161,14 +1222,14 @@ familiar_update(game_state *GameState, entity *Entity, f32 dt_for_frame)
 	f32 distance_sq_max = SQUARE(100.0f);
 	f32 closest_dist = 0.0f;
 
-	v2f PlayerAbsPos = {};
-	v2f EntityAbsPos = tile_map_get_absolute_pos(TileMap, Entity->TileMapPos);
+	v2f PlayerPos = {};
+	v2f EntityPos = Entity->Pos;//tile_map_get_absolute_pos(TileMap, Entity->TileMapPos);
 	for (u32 entity_index = 1; entity_index < GameState->entity_count; entity_index++) {
 		entity *TestEntity = entity_get(GameState, entity_index);
 		if (TestEntity->type == ENTITY_PLAYER) {
-			PlayerAbsPos = tile_map_get_absolute_pos(TileMap, TestEntity->TileMapPos);
+			PlayerPos = TestEntity->Pos;//tile_map_get_absolute_pos(TileMap, TestEntity->TileMapPos);
 			//EntityAbsPos = tile_map_get_absolute_pos(TileMap, Entity->TileMapPos);
-			f32 test_distance_sq = v2f_length_squared(EntityAbsPos - PlayerAbsPos);
+			f32 test_distance_sq = v2f_length_squared(EntityPos - PlayerPos);
 			if (test_distance_sq < distance_sq_max) {
 				Player = *TestEntity;
 				closest_dist = test_distance_sq;
@@ -1179,7 +1240,7 @@ familiar_update(game_state *GameState, entity *Entity, f32 dt_for_frame)
 	if (closest_dist > 0.0f) {
 		f32 acceleration = 1.0f;
 		f32 one_over_length = acceleration / f32_sqrt(distance_sq_max);
-		ddPos = one_over_length * (PlayerAbsPos - EntityAbsPos);
+		ddPos = one_over_length * (PlayerPos - EntityPos);
 		Entity->Direction = ddPos;
 	}
 	entity_move(GameState, Entity, ddPos, dt_for_frame);
@@ -1197,7 +1258,7 @@ projectile_update(game_state *GameState, entity *Entity, f32 dt_for_frame)
 		entity_move(GameState, Entity, ddPos, dt_for_frame);
 	} else {
 		// TODO(Justin): Remove from entity set? Or just overwrite it? 
-		entity_remove(GameState, Entity);
+		//entity_remove(GameState, Entity);
 	}
 }
 
@@ -1239,12 +1300,12 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 		memory_arena_initialize(&GameState->TileMapArena, GameMemory->total_size - sizeof(game_state),
 				(u8 *)GameMemory->permanent_storage + sizeof(game_state));
 
-		GameState->TileMap = push_size(&GameState->TileMapArena, tile_map);
-		tile_map *TileMap = GameState->TileMap;
-		TileMap->tiles = push_array(&GameState->TileMapArena, TileMap->tile_count_x * TileMap->tile_count_y, u32);
-		tile_map_initialize(TileMap, 12.0f);
+		//GameState->TileMap = push_size(&GameState->TileMapArena, tile_map);
+		//tile_map *TileMap = GameState->TileMap;
+		//TileMap->tiles = push_array(&GameState->TileMapArena, TileMap->tile_count_x * TileMap->tile_count_y, u32);
+		//tile_map_initialize(TileMap, 12.0f);
 
-		entity *EntityPlayer = player_add(GameState);
+		entity *EntityPlayer = player_add(GameState, BackBuffer);
 		GameState->player_entity_index = EntityPlayer->index;
 
 		f32 asteroid_scales[3] = {1.5f, 3.0f, 5.0f};
@@ -1265,47 +1326,19 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 		GameMemory->is_initialized = true;
 	}
 
-	tile_map *TileMap = GameState->TileMap;
+	//tile_map *TileMap = GameState->TileMap;
 
-	f32 tile_side_in_pixels = 56;
-	f32 meters_to_pixels = tile_side_in_pixels / TileMap->tile_side_in_meters;
+	//f32 tile_side_in_pixels = 56;
+	//f32 meters_to_pixels = tile_side_in_pixels / TileMap->tile_side_in_meters;
 
 	v2f BottomLeft = {5.0f, 5.0f};
 
 	entity *EntityPlayer = entity_get(GameState, GameState->player_entity_index);
-	v2f temp = tile_map_get_absolute_pos(TileMap, EntityPlayer->TileMapPos);
+	//v2f temp = tile_map_get_absolute_pos(TileMap, EntityPlayer->TileMapPos);
 
-#if DEBUG_TILE_MAP
-	v2f MinScreenXY = {};
-	v2f MaxScreenXY = V2F((f32)BackBuffer->width, (f32)BackBuffer->height);
-	rectangle_draw(BackBuffer, MinScreenXY, MaxScreenXY, 0.0f, 0.0f, 0.0f);
 
-	for (s32 row = 0; row < TileMap->tile_count_y; row++) {
-		for (s32 col = 0; col < TileMap->tile_count_x ; col++) {
-			u32 tile_value = TileMap->tiles[row * TileMap->tile_count_x + col];
-			f32 gray = 0.5f;
-			if (tile_value == 1) {
-				gray = 1.0f;
-			} 
-			v2f Min, Max;
-
-			Min.x = BottomLeft.x + (f32)col * tile_side_in_pixels;
-			Min.y = BottomLeft.y + (f32)row * tile_side_in_pixels;
-			Max.x = Min.x + tile_side_in_pixels;
-			Max.y = Min.y + tile_side_in_pixels;
-			rectangle_draw(BackBuffer, Min, Max, gray, gray, gray);
-		}
-	}
-
-	MinScreenXY.x = BottomLeft.x + (f32)EntityPlayer->TileMapPos.Tile.x * tile_side_in_pixels;
-	MinScreenXY.y = BottomLeft.y + (f32)EntityPlayer->TileMapPos.Tile.y * tile_side_in_pixels;
-	MaxScreenXY.x = MinScreenXY.x + tile_side_in_pixels;
-	MaxScreenXY.y = MinScreenXY.y + tile_side_in_pixels;
-	rectangle_draw(BackBuffer, MinScreenXY, MaxScreenXY, 1.0f, 1.0f, 0.0f);
-
-#else
 	bitmap_draw(BackBuffer, &GameState->Background, 0.0f, 0.0f);
-#endif
+
 	f32 dt_for_frame = GameInput->dt_for_frame;
 
 	v2f PlayerNewRight = EntityPlayer->Right;
@@ -1329,7 +1362,8 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 	// NOTE(Justin): Player projectiles
 	//
 
-	if (GameInput->Controller.Space.ended_down) {
+	game_controller_input *KeyboardController = &GameInput->Controller;
+	if (KeyboardController->Space.ended_down) {
 		if (!EntityPlayer->is_shooting) {
 			projectile_add(GameState);
 			EntityPlayer->is_shooting = true;
@@ -1356,7 +1390,7 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 
 	v2f PlayerAccel = {};
 	if (GameInput->Controller.Up.ended_down) {
-		PlayerAccel = {PlayerNewDirection.x, PlayerNewDirection.y};
+		PlayerAccel = V2F(PlayerNewDirection.x, PlayerNewDirection.y);
 	}
 	entity_move(GameState, EntityPlayer, PlayerAccel, dt_for_frame);
 
@@ -1381,12 +1415,13 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 		switch(Entity->type) {
 			case ENTITY_PLAYER:
 			{
-				v2f PlayerScreenPos = tile_map_get_screen_coordinates(TileMap, &Entity->TileMapPos,
-						BottomLeft, tile_side_in_pixels, meters_to_pixels);
+				//v2f PlayerScreenPos = tile_map_get_screen_coordinates(TileMap, &Entity->TileMapPos,
+						//BottomLeft, tile_side_in_pixels, meters_to_pixels);
 
-				debug_vector_draw_at_point(BackBuffer, PlayerScreenPos, Entity->Direction);
+				//debug_vector_draw_at_point(BackBuffer, PlayerScreenPos, Entity->Direction);
+				v2f PlayerPos = Entity->Pos;
 				triangle T ={};
-				T.Centroid = tile_map_get_absolute_pos(TileMap, Entity->TileMapPos);
+				T.Centroid = Entity->Pos;//tile_map_get_absolute_pos(TileMap, Entity->TileMapPos);
 
 				v2f Right = -1.0f * v2f_perp(Entity->Direction);
 
@@ -1394,9 +1429,9 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 				T.Vertices[1] = T.Centroid + -1.0f * Entity->base_half_width * Right + -1.0f *Entity->Direction;
 				T.Vertices[2] = T.Centroid + Entity->height * Entity->Direction;
 
-				T.Vertices[0] *= meters_to_pixels; 
-				T.Vertices[1] *= meters_to_pixels; 
-				T.Vertices[2] *= meters_to_pixels; 
+				//T.Vertices[0] *= meters_to_pixels; 
+				//T.Vertices[1] *= meters_to_pixels; 
+				//T.Vertices[2] *= meters_to_pixels; 
 
 				T.Vertices[0] += BottomLeft; 
 				T.Vertices[1] += BottomLeft; 
@@ -1409,11 +1444,11 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 
 
 				v2f Alignment = {(f32)GameState->Ship.width / 2.0f, (f32)GameState->Ship.height / 2.0f};
-				push_piece(&PieceGroup, &GameState->Ship, PlayerScreenPos, Alignment);
+				push_piece(&PieceGroup, &GameState->Ship, PlayerPos, Alignment);
 
 #if DEBUG_DRAW_PLAYER_POS
 				v2f OffsetInPixels = {10.0f, 10.0f};
-				Min = PlayerScreenPos;
+				Min = PlayerPos;
 				Min += -0.5f * OffsetInPixels;
 				Max = Min + OffsetInPixels;
 				rectangle_draw(BackBuffer, Min, Max, 0.0f, 0.0f, 0.0f);
@@ -1421,38 +1456,39 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 			} break;
 			case ENTITY_ASTEROID:
 			{
-				v2f AsteroidScreenPos = tile_map_get_screen_coordinates(TileMap, &Entity->TileMapPos,
-						BottomLeft, tile_side_in_pixels, meters_to_pixels);
+				//v2f AsteroidScreenPos = tile_map_get_screen_coordinates(TileMap, &Entity->TileMapPos,
+				//		BottomLeft, tile_side_in_pixels, meters_to_pixels);
+				v2f AsteroidPos = Entity->Pos;
 				v2f Alignment = {(f32)GameState->AsteroidSprite.width / 2.0f,
 					(f32)GameState->AsteroidSprite.height / 2.0f};
 
-				push_piece(&PieceGroup, &GameState->AsteroidSprite, AsteroidScreenPos, Alignment);
+				push_piece(&PieceGroup, &GameState->AsteroidSprite, AsteroidPos, Alignment);
 
 			} break;
 			case ENTITY_FAMILIAR:
 			{
-				familiar_update(GameState, Entity, dt_for_frame);
+				//familiar_update(GameState, Entity, dt_for_frame);
 
-				v2f AsteroidScreenPos = tile_map_get_screen_coordinates(TileMap, &Entity->TileMapPos,
-						BottomLeft, tile_side_in_pixels, meters_to_pixels);
-				debug_vector_draw_at_point(BackBuffer, AsteroidScreenPos, Entity->Direction);
-				v2f Alignment = {(f32)GameState->AsteroidSprite.width / 2.0f,
-								 (f32)GameState->AsteroidSprite.height / 2.0f};
+				//v2f AsteroidScreenPos = tile_map_get_screen_coordinates(TileMap, &Entity->TileMapPos,
+				//		BottomLeft, tile_side_in_pixels, meters_to_pixels);
+				//debug_vector_draw_at_point(BackBuffer, AsteroidScreenPos, Entity->Direction);
+				//v2f Alignment = {(f32)GameState->AsteroidSprite.width / 2.0f,
+				//				 (f32)GameState->AsteroidSprite.height / 2.0f};
 
-				push_piece(&PieceGroup, &GameState->AsteroidSprite, AsteroidScreenPos, Alignment);
+				//push_piece(&PieceGroup, &GameState->AsteroidSprite, AsteroidScreenPos, Alignment);
 
 			} break;
 			case ENTITY_PROJECTILE:
 			{
 				projectile_update(GameState, Entity, dt_for_frame);
 
-				v2f OffsetInPixels = V2F(5.0f, 5.0f);
+				//v2f OffsetInPixels = V2F(5.0f, 5.0f);
 
-				v2f Min = tile_map_get_screen_coordinates(TileMap, &Entity->TileMapPos, BottomLeft,
-														  tile_side_in_pixels, meters_to_pixels);
-				Min += (f32)(GameState->Ship.width / 2.0f) * Entity->Direction;
-				v2f Max = Min + OffsetInPixels;
-				rectangle_draw(BackBuffer, Min, Max, 0.0f, 0.0f, 1.0f);
+				//v2f Min = tile_map_get_screen_coordinates(TileMap, &Entity->TileMapPos, BottomLeft,
+				//										  tile_side_in_pixels, meters_to_pixels);
+				//Min += (f32)(GameState->Ship.width / 2.0f) * Entity->Direction;
+				//v2f Max = Min + OffsetInPixels;
+				//rectangle_draw(BackBuffer, Min, Max, 0.0f, 0.0f, 1.0f);
 
 			} break;
 			default:
@@ -1475,7 +1511,7 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 		}
 	}
 
-#if 1
+#if 0
 	v2f Delta = {};
 	if (GameInput->Controller.ArrowLeft.ended_down) {
 		Delta += V2F(-1.0f, 0.0f);
