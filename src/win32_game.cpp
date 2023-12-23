@@ -63,18 +63,22 @@ internal void
 win32_toggle_full_screen(HWND WindowHandle)
 {
 	DWORD window_style = GetWindowLong(WindowHandle, GWL_STYLE);
-	if (window_style & WS_OVERLAPPEDWINDOW) {
+	if(window_style & WS_OVERLAPPEDWINDOW)
+	{
 		MONITORINFO MonitorInfo = {sizeof(MonitorInfo)};
-		if (GetWindowPlacement(WindowHandle, &GlobalWindowPosition) && GetMonitorInfo(MonitorFromWindow(WindowHandle, MONITOR_DEFAULTTOPRIMARY), &MonitorInfo)) {
-			SetWindowLong(WindowHandle, GWL_STYLE,
-					window_style & ~WS_OVERLAPPEDWINDOW);
+		if(GetWindowPlacement(WindowHandle, &GlobalWindowPosition) && GetMonitorInfo(MonitorFromWindow(WindowHandle, MONITOR_DEFAULTTOPRIMARY), &MonitorInfo))
+		{
+			SetWindowLong(WindowHandle, GWL_STYLE, window_style & ~WS_OVERLAPPEDWINDOW);
+
 			SetWindowPos(WindowHandle, HWND_TOP,
 					MonitorInfo.rcMonitor.left, MonitorInfo.rcMonitor.top,
 					MonitorInfo.rcMonitor.right - MonitorInfo.rcMonitor.left,
 					MonitorInfo.rcMonitor.bottom - MonitorInfo.rcMonitor.top,
 					SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
 		}
-	} else {
+	}
+	else
+	{
 		SetWindowLong(WindowHandle, GWL_STYLE, window_style | WS_OVERLAPPEDWINDOW);
 		SetWindowPlacement(WindowHandle, &GlobalWindowPosition);
 		SetWindowPos(WindowHandle, NULL, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
@@ -84,13 +88,16 @@ internal void
 win32_dsound_init(HWND WindowHandle, s32 secondary_buffer_size)
 {
 	HMODULE dsound_dll = LoadLibraryA("dsound.dll");
-	if (dsound_dll) {
+	if(dsound_dll)
+	{
 		direct_sound_create *dsound_create =
 			(direct_sound_create *)GetProcAddress(dsound_dll, "DirectSoundCreate");
 
 		LPDIRECTSOUND DSound;
-		if (dsound_create) {
-			if (SUCCEEDED(dsound_create(0, &DSound, 0))) {
+		if(dsound_create)
+		{
+			if(SUCCEEDED(dsound_create(0, &DSound, 0)))
+			{
 				WAVEFORMATEX WaveFormat = {0};
 				WaveFormat.wFormatTag = WAVE_FORMAT_PCM;
 				WaveFormat.nChannels = 2;
@@ -100,7 +107,8 @@ win32_dsound_init(HWND WindowHandle, s32 secondary_buffer_size)
 				WaveFormat.nAvgBytesPerSec = WaveFormat.nSamplesPerSec * WaveFormat.nBlockAlign;
 				WaveFormat.cbSize = 0;
 
-				if (SUCCEEDED(DSound->SetCooperativeLevel(WindowHandle, DSSCL_PRIORITY))) {
+				if(SUCCEEDED(DSound->SetCooperativeLevel(WindowHandle, DSSCL_PRIORITY)))
+				{
 					DSBUFFERDESC BufferDesc;
 					BufferDesc.dwSize = sizeof(BufferDesc);
 					BufferDesc.dwFlags = DSBCAPS_PRIMARYBUFFER;
@@ -110,16 +118,24 @@ win32_dsound_init(HWND WindowHandle, s32 secondary_buffer_size)
 					BufferDesc.guid3DAlgorithm = GUID_NULL;
 
 					LPDIRECTSOUNDBUFFER PrimaryBuffer;
-					if (SUCCEEDED(DSound->CreateSoundBuffer(&BufferDesc, &PrimaryBuffer, 0))) {
-						if (SUCCEEDED(PrimaryBuffer->SetFormat(&WaveFormat))) {
+					if(SUCCEEDED(DSound->CreateSoundBuffer(&BufferDesc, &PrimaryBuffer, 0)))
+					{
+						if(SUCCEEDED(PrimaryBuffer->SetFormat(&WaveFormat)))
+						{
 							OutputDebugStringA("Primary buffer format set successfully.\n");
-						} else {
+						}
+						else
+						{
 							// TODO: Diagnostic
 						}
-					} else {
+					}
+					else
+					{
 						// TODO: Diagnostic
 					}
-				} else {
+				}
+				else
+				{
 					// TODO: Diagnostic
 				}
 
@@ -132,18 +148,27 @@ win32_dsound_init(HWND WindowHandle, s32 secondary_buffer_size)
 				BufferDesc.guid3DAlgorithm = GUID_NULL;
 
 				// NOTE(Justin): Using Win32GlobalSecondaryBuffer here!
-				if (SUCCEEDED(DSound->CreateSoundBuffer(&BufferDesc, &Win32GlobalSecondaryBuffer, 0))) {
+				if(SUCCEEDED(DSound->CreateSoundBuffer(&BufferDesc, &Win32GlobalSecondaryBuffer, 0)))
+				{
 					OutputDebugStringA("Secondary buffer created successfully.\n");
-				} else {
+				}
+				else
+				{
 					// TODO: Diagnostic
 				}
-			} else {
+			}
+			else
+			{
 				// TODO: Diagnostic
 			}
-		} else {
+		}
+		else
+		{
 			// TODO: Diagnostic
 		}
-	} else {
+	}
+	else
+	{
 		// TODO: Diagnostic
 	}
 }
@@ -166,15 +191,17 @@ win32_sound_buffer_clear(win32_sound_buffer *Win32SoundBuffer)
 	// If we are clearing the sound buffer can probably only clear in one loop
 	// as region 1 should probably be the entire buffer. region_2 returns NULL
 	// and the size is 0 so the second loop does not start...
-	if (SUCCEEDED(secondary_buffer_lock)) {
-
+	if(SUCCEEDED(secondary_buffer_lock))
+	{
 		u8 *sample_byte = (u8 *)region_1;
-		for (DWORD byte_index = 0; byte_index < region_1_size; byte_index++) {
+		for(DWORD byte_index = 0; byte_index < region_1_size; byte_index++)
+		{
 			*sample_byte++ = 0;
 		}
 
 		sample_byte = (u8 *)region_2;
-		for (DWORD byte_index = 0; byte_index < region_2_size; byte_index++) {
+		for(DWORD byte_index = 0; byte_index < region_2_size; byte_index++)
+		{
 			*sample_byte++ = 0;
 		}
 
@@ -182,13 +209,16 @@ win32_sound_buffer_clear(win32_sound_buffer *Win32SoundBuffer)
 			Win32GlobalSecondaryBuffer->Unlock(region_1, region_1_size,
 											   region_2, region_2_size);
 
-		if (SUCCEEDED(secondary_buffer_unlock)) {
+		if(SUCCEEDED(secondary_buffer_unlock))
+		{
 			return;
 		}
-		else {
+		else
+		{
 		}
 	}
-	else {
+	else
+	{
 	}
 }
 
@@ -218,12 +248,14 @@ win32_sound_buffer_fill(win32_sound_buffer *Win32SoundBuffer, DWORD byte_to_lock
 										 &region_2, &region_2_size,
 										 0);
 
-	if (SUCCEEDED(secondary_buffer_lock)) {
+	if(SUCCEEDED(secondary_buffer_lock))
+	{
 		DWORD region_1_sample_count = region_1_size / Win32SoundBuffer->bytes_per_sample;
 
 		s16 *sample_src = SoundBuffer->samples;
 		s16 *sample_dest = (s16 *)region_1;
-		for (DWORD sample_index = 0; sample_index < region_1_sample_count; sample_index++) {
+		for(DWORD sample_index = 0; sample_index < region_1_sample_count; sample_index++)
+		{
 			*sample_dest++ = *sample_src++;
 			*sample_dest++ = *sample_src++;
 
@@ -232,7 +264,8 @@ win32_sound_buffer_fill(win32_sound_buffer *Win32SoundBuffer, DWORD byte_to_lock
 
 		DWORD region_2_sample_count = region_2_size / Win32SoundBuffer->bytes_per_sample;
 		sample_dest = (s16 *)region_2;
-		for (DWORD sample_index = 0; sample_index < region_2_sample_count; sample_index++) {
+		for(DWORD sample_index = 0; sample_index < region_2_sample_count; sample_index++)
+		{
 			*sample_dest++ = *sample_src++;
 			*sample_dest++ = *sample_src++;
 
@@ -247,7 +280,8 @@ win32_sound_buffer_fill(win32_sound_buffer *Win32SoundBuffer, DWORD byte_to_lock
 internal void
 win32_back_buffer_resize(win32_back_buffer *Win32GlobalBackBuffer, int width, int height)
 {
-	if (Win32GlobalBackBuffer->memory) {
+	if(Win32GlobalBackBuffer->memory)
+	{
 		VirtualFree(Win32GlobalBackBuffer->memory, 0, MEM_RELEASE);
 	}
 
@@ -273,17 +307,55 @@ win32_back_buffer_resize(win32_back_buffer *Win32GlobalBackBuffer, int width, in
 	int bitmap_memory_size =  
 		Win32GlobalBackBuffer->width * Win32GlobalBackBuffer->height * Win32GlobalBackBuffer->bytes_per_pixel;
 
-	Win32GlobalBackBuffer->memory = VirtualAlloc((LPVOID)0, bitmap_memory_size, 
+	Win32GlobalBackBuffer->memory = VirtualAlloc(0, bitmap_memory_size, 
 			MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
 }
 
+internal win32_client_dimensions
+win32_get_window_dimension(HWND Window)
+{
+	win32_client_dimensions Result = {};
+
+	RECT ClientRect;
+	GetClientRect(Window, &ClientRect);
+	Result.width = ClientRect.right - ClientRect.left;
+	Result.height = ClientRect.top - ClientRect.bottom;
+	//Result.height = ClientRect.bottom - ClientRect.top;
+
+	return(Result);
+}
+
+internal void
+win32_display_buffer_to_window(win32_back_buffer *Win32BackBuffer, HDC DeviceContext,
+														int window_width, int window_height)
+{
+	if((window_width >= Win32BackBuffer->width * 2) &&
+			(window_height >= Win32BackBuffer->height * 2))
+	{
+		StretchDIBits(DeviceContext,
+				0, 0, Win32BackBuffer->width * 2, Win32BackBuffer->height * 2,
+				0, 0, Win32BackBuffer->width, Win32BackBuffer->height,
+				Win32BackBuffer->memory, &Win32BackBuffer->Info,
+				DIB_RGB_COLORS, SRCCOPY);
+
+	}
+	else
+	{
+		StretchDIBits(DeviceContext,
+				0, 0, Win32BackBuffer->width, Win32BackBuffer->height,
+				0, 0, Win32BackBuffer->width, Win32BackBuffer->height,
+				Win32BackBuffer->memory, &Win32BackBuffer->Info,
+				DIB_RGB_COLORS, SRCCOPY);
+	}
+}
 
 
 LRESULT CALLBACK
 WndProc(HWND WindowHandle, UINT Message, WPARAM wParam, LPARAM lParam)
 {
 	LRESULT result = 0;
-	switch (Message) {
+	switch (Message)
+	{
 		case WM_CLOSE:
 		{
 			Win32GlobalRunning = FALSE;
@@ -315,11 +387,9 @@ WndProc(HWND WindowHandle, UINT Message, WPARAM wParam, LPARAM lParam)
 			PAINTSTRUCT PaintStruct;
 			HDC DeviceContext = BeginPaint(WindowHandle, &PaintStruct);
 
-			StretchDIBits(DeviceContext,
-					0, 0, Win32GlobalBackBuffer.width, Win32GlobalBackBuffer.height,
-					0, 0, Win32GlobalBackBuffer.width, Win32GlobalBackBuffer.height,
-					Win32GlobalBackBuffer.memory, &Win32GlobalBackBuffer.Info,
-					DIB_RGB_COLORS, SRCCOPY);
+			win32_client_dimensions WindowDimensions = win32_get_window_dimension(WindowHandle);
+
+			win32_display_buffer_to_window(&Win32GlobalBackBuffer, DeviceContext, WindowDimensions.width, WindowDimensions.height);
 
 			EndPaint(WindowHandle, &PaintStruct);
 		} break;
@@ -332,11 +402,23 @@ WndProc(HWND WindowHandle, UINT Message, WPARAM wParam, LPARAM lParam)
 }
 
 internal void
-win32_process_pending_messgaes(game_controller_input *KeyboardController, game_mouse_input *Mouse)
+win32_process_keyboard_messages(game_button_state *NewState, b32 is_down)
+{
+	if(NewState->ended_down != is_down)
+	{
+		NewState->ended_down = is_down;
+		++NewState->half_transition_count;
+	}
+}
+
+internal void
+win32_process_pending_messgaes(game_controller_input *KeyboardController)
 {
 	MSG Message; 
-	while (PeekMessageA(&Message, 0, 0, 0, PM_REMOVE)) {
-		switch(Message.message) {
+	while(PeekMessageA(&Message, 0, 0, 0, PM_REMOVE))
+	{
+		switch(Message.message)
+		{
 			case WM_QUIT:
 			{
 				Win32GlobalRunning = FALSE;
@@ -346,11 +428,13 @@ win32_process_pending_messgaes(game_controller_input *KeyboardController, game_m
 			case WM_KEYDOWN:
 			case WM_KEYUP:
 			{
-				WPARAM vk_code = Message.wParam;
-				s32 key_was_down = ((Message.lParam & (1 << 30)) != 0);
-				s32 key_is_down = ((Message.lParam & (1 << 31)) == 0);
-				if (key_was_down != key_is_down) {
-					switch(vk_code) {
+				u32 vk_code = (u32)Message.wParam;
+				b32 key_was_down = ((Message.lParam & (1 << 30)) != 0);
+				b32 key_is_down = ((Message.lParam & (1 << 31)) == 0);
+				if(key_was_down != key_is_down)
+				{
+					switch(vk_code)
+					{
 						case VK_LBUTTON:
 						{
 						} break;
@@ -359,53 +443,43 @@ win32_process_pending_messgaes(game_controller_input *KeyboardController, game_m
 						} break;
 						case VK_LEFT:
 						{
-							KeyboardController->ArrowLeft.ended_down = key_is_down;
-							KeyboardController->ArrowLeft.half_transition_count++;
+							win32_process_keyboard_messages(&KeyboardController->ArrowLeft, key_is_down);
 						} break;
 						case VK_UP:
 						{
-							KeyboardController->ArrowUp.ended_down = key_is_down;
-							KeyboardController->ArrowUp.half_transition_count++;
+							win32_process_keyboard_messages(&KeyboardController->ArrowUp, key_is_down);
 						} break;
 						case VK_DOWN:
 						{
-							KeyboardController->ArrowDown.ended_down = key_is_down;
-							KeyboardController->ArrowDown.half_transition_count++;
+							win32_process_keyboard_messages(&KeyboardController->ArrowDown, key_is_down);
 						} break;
 						case VK_RIGHT:
 						{
-							KeyboardController->ArrowRight.ended_down = key_is_down;
-							KeyboardController->ArrowRight.half_transition_count++;
+							win32_process_keyboard_messages(&KeyboardController->ArrowRight, key_is_down);
 						} break;
 						case VK_SPACE:
 						{
-							KeyboardController->Space.ended_down = key_is_down;
-							KeyboardController->Space.half_transition_count++;
+							win32_process_keyboard_messages(&KeyboardController->Space, key_is_down);
 						} break;
 						case 'W':
 						{
-							KeyboardController->Up.ended_down = key_is_down;
-							KeyboardController->Up.half_transition_count++;
+							win32_process_keyboard_messages(&KeyboardController->Up, key_is_down);
 						} break;
 						case 'A':
 						{
-							KeyboardController->Left.ended_down = key_is_down;
-							KeyboardController->Left.half_transition_count++;
+							win32_process_keyboard_messages(&KeyboardController->Left, key_is_down);
 						} break;
 						case 'S':
 						{
-							KeyboardController->Down.ended_down = key_is_down;
-							KeyboardController->Down.half_transition_count++;
+							win32_process_keyboard_messages(&KeyboardController->Down, key_is_down);
 						} break;
 						case 'D':
 						{
-							KeyboardController->Right.ended_down = key_is_down;
-							KeyboardController->Right.half_transition_count++;
+							win32_process_keyboard_messages(&KeyboardController->Right, key_is_down);
 						} break;
 						case VK_SHIFT:
 						{
-							KeyboardController->Shift.ended_down = key_is_down;
-							KeyboardController->Shift.half_transition_count++;
+							win32_process_keyboard_messages(&KeyboardController->Shift, key_is_down);
 						} break;
 						case VK_ESCAPE:
 						{
@@ -414,21 +488,19 @@ win32_process_pending_messgaes(game_controller_input *KeyboardController, game_m
 						} break;
 
 					}
-					if (key_is_down) {
+					if(key_is_down)
+					{
 						b32 alt_key_was_down = (Message.lParam & (1 << 29));
-						if ((vk_code == VK_RETURN) && (alt_key_was_down)) {
-							if (Message.hwnd) {
+						if((vk_code == VK_RETURN) && (alt_key_was_down))
+						{
+							if(Message.hwnd)
+							{
 								win32_toggle_full_screen(Message.hwnd);
 							}
 						}
 					}
 				}
 			}
-			case WM_MOUSEMOVE:
-			{
-				Mouse->x = (Message.lParam & 0xFFFF);
-				Mouse->y = Win32GlobalBackBuffer.height - ((Message.lParam & (0xFFFF << 16)) >> 16);
-			} break;
 			default:
 			{
 				TranslateMessage(&Message);
@@ -459,7 +531,8 @@ win32_get_wall_clock(void)
 internal void
 platform_file_free_memory(void *file_memory)
 {
-	if (file_memory) {
+	if(file_memory)
+	{
 		VirtualFree(file_memory, 0, MEM_RELEASE);
 	}
 }
@@ -469,27 +542,39 @@ platform_file_read_entire(char *filename)
 {
 	debug_file_read  Result = {0};
 	HANDLE FileHandle = CreateFileA(filename, GENERIC_READ, FILE_SHARE_READ, 0, OPEN_EXISTING, 0, 0);
-	if (FileHandle != INVALID_HANDLE_VALUE) {
+	if(FileHandle != INVALID_HANDLE_VALUE)
+	{
 		DWORD FileSize = GetFileSize(FileHandle, &FileSize);
-		if (FileSize != 0) {
+		if(FileSize != 0)
+		{
 			Result.contents = VirtualAlloc(0, FileSize, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
-			if (Result.contents) {
+			if(Result.contents)
+			{
 				DWORD BytesRead;
 				ReadFile(FileHandle, Result.contents, FileSize, &BytesRead, 0);
-				if (FileSize == BytesRead) {
+				if(FileSize == BytesRead)
+				{
 					Result.size = FileSize;
-				} else {
+				}
+				else
+				{
 
 					platform_file_free_memory(Result.contents);
 					Result.contents = 0;
 				}
-			} else {
+			}
+			else
+			{
 
 			}
-		} else {
+		}
+		else
+		{
 
 		}
-	} else {
+	}
+	else
+	{
 		CloseHandle(FileHandle);
 	}
 	return(Result);
@@ -498,7 +583,7 @@ platform_file_read_entire(char *filename)
 
 
 
-int WINAPI
+int CALLBACK 
 WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR CmdLine, int nCmdShow)
 {
 	const char window_class_name[]	= "TestWindowClass";
@@ -535,15 +620,22 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR CmdLine, int nCmdSho
 	int game_hz = monitor_hz / 2;
 	f32 seconds_per_frame_target = 1.0f / (f32)game_hz;
 
-	if (RegisterClassEx(&WindowClass))  {
+	if(RegisterClassEx(&WindowClass))
+	{
 		WindowHandle = CreateWindowEx(0,
 				window_class_name,
 				window_title,
 				WS_OVERLAPPEDWINDOW | WS_VISIBLE,
-				CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT,
-				0, 0, hInstance, 0);
-
-		if (WindowHandle) {
+				CW_USEDEFAULT,
+				CW_USEDEFAULT,
+				CW_USEDEFAULT,
+				CW_USEDEFAULT,
+				0,
+				0,
+				hInstance,
+				0);
+		if(WindowHandle)
+		{
 			HDC DeviceContext = GetDC(WindowHandle);
 
 			win32_back_buffer_resize(&Win32GlobalBackBuffer, 960, 540);
@@ -569,7 +661,8 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR CmdLine, int nCmdSho
 			GameMemory.permanent_storage = VirtualAlloc((LPVOID)0, GameMemory.total_size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
 
 
-			if (GameMemory.permanent_storage && samples) {
+			if(GameMemory.permanent_storage && samples)
+			{
 
 				win32_dsound_init(WindowHandle, Win32SoundBuffer.secondary_buffer_size);
 
@@ -595,34 +688,43 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR CmdLine, int nCmdSho
 				// NOTE(Justin): Game loop.
 				//
 				f32 seconds_per_frame_actual = 0.0f;
-				while (Win32GlobalRunning) {
+				while(Win32GlobalRunning)
+				{
 					game_controller_input *NewKeyboardController = &NewInput->Controller;
 					game_controller_input *OldKeyboardController = &OldInput->Controller;
 					game_controller_input ZeroController = {0}; 
 					*NewKeyboardController = ZeroController;
 
-					game_mouse_input *NewMouse = &NewInput->Mouse;
-					game_mouse_input *OldMouse = &OldInput->Mouse;
-					game_mouse_input ZeroMouse = {};
-					*NewMouse = ZeroMouse;
-					NewMouse->x = OldMouse->x;
-					NewMouse->y = OldMouse->y;
-
-					for (u32 button_index = 0;
+					for(u32 button_index = 0;
 							button_index < ARRAY_COUNT(NewKeyboardController->Buttons);
-								button_index++) {
+								button_index++)
+					{
 						NewKeyboardController->Buttons[button_index].ended_down =
 							OldKeyboardController->Buttons[button_index].ended_down;
 					}
 
-					for (u32 button_index = 0;
-							button_index < ARRAY_COUNT(NewMouse->Buttons);
-								button_index++) {
-						NewMouse->Buttons[button_index].ended_down =
-							OldMouse->Buttons[button_index].ended_down;
-					}
+					win32_process_pending_messgaes(NewKeyboardController);
 
-					win32_process_pending_messgaes(NewKeyboardController, NewMouse);
+					POINT MousePos;
+					GetCursorPos(&MousePos);
+					ScreenToClient(WindowHandle, &MousePos);
+
+					NewInput->mouse_x = MousePos.x;
+					NewInput->mouse_y = Win32GlobalBackBuffer.height - MousePos.y;
+
+					win32_process_keyboard_messages(&NewInput->MouseButtons[0],
+													GetKeyState(VK_LBUTTON) & (1 << 15));
+					win32_process_keyboard_messages(&NewInput->MouseButtons[1],
+													GetKeyState(VK_MBUTTON) & (1 << 15));
+					win32_process_keyboard_messages(&NewInput->MouseButtons[2],
+													GetKeyState(VK_RBUTTON) & (1 << 15));
+					win32_process_keyboard_messages(&NewInput->MouseButtons[3],
+													GetKeyState(VK_XBUTTON1) & (1 << 15));
+					win32_process_keyboard_messages(&NewInput->MouseButtons[4],
+													GetKeyState(VK_XBUTTON2) & (1 << 15));
+
+
+
 
 
 					DWORD play_cursor;
@@ -635,7 +737,8 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR CmdLine, int nCmdSho
 					HRESULT get_current_position =
 						Win32GlobalSecondaryBuffer->GetCurrentPosition(&play_cursor, &write_cursor);
 
-					if (SUCCEEDED(get_current_position)) {
+					if(SUCCEEDED(get_current_position))
+					{
 						byte_to_lock =  ((Win32SoundBuffer.sample_count * Win32SoundBuffer.bytes_per_sample) % 
 								Win32SoundBuffer.secondary_buffer_size);
 
@@ -643,24 +746,29 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR CmdLine, int nCmdSho
 									(Win32SoundBuffer.bytes_per_sample * Win32SoundBuffer.sample_count_latency)) % 
 								Win32SoundBuffer.secondary_buffer_size);
 
-						if (byte_to_lock > target_cursor) {
+						if(byte_to_lock > target_cursor)
+						{
 							bytes_to_write = Win32SoundBuffer.secondary_buffer_size - byte_to_lock;
 							bytes_to_write += target_cursor;
-						} else {
+						}
+						else
+						{
 							bytes_to_write = target_cursor - byte_to_lock;
 						}
 						sound_is_valid = TRUE;
-					} else {
+					}
+					else
+					{
 						byte_to_lock = 0;
 						bytes_to_write = 0;
 					}
 
-					sound_buffer SoundBuffer = {0};
+					sound_buffer SoundBuffer = {};
 					SoundBuffer.samples_per_second = Win32SoundBuffer.samples_per_second;
 					SoundBuffer.sample_count = bytes_to_write / Win32SoundBuffer.bytes_per_sample;
 					SoundBuffer.samples = samples;
 
-					back_buffer BackBuffer = {NULL, 0, 0, 0};
+					back_buffer BackBuffer = {};
 					BackBuffer.memory = Win32GlobalBackBuffer.memory;
 					BackBuffer.width = Win32GlobalBackBuffer.width;
 					BackBuffer.height = Win32GlobalBackBuffer.height;
@@ -669,7 +777,8 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR CmdLine, int nCmdSho
 
 					update_and_render(&GameMemory, &BackBuffer, &SoundBuffer, NewInput);
 
-					if (sound_is_valid) {
+					if(sound_is_valid)
+					{
 						win32_sound_buffer_fill(&Win32SoundBuffer, byte_to_lock, bytes_to_write, &SoundBuffer);
 					}
 
@@ -684,9 +793,12 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR CmdLine, int nCmdSho
 
 					seconds_per_frame_actual = (f32)ticks_elapsed / (f32)ticks_per_second;
 
-					if (seconds_per_frame_actual < seconds_per_frame_target) {
-						while (seconds_per_frame_actual < seconds_per_frame_target) {
-							if (sleep_is_granular) {
+					if(seconds_per_frame_actual < seconds_per_frame_target)
+					{
+						while(seconds_per_frame_actual < seconds_per_frame_target)
+						{
+							if(sleep_is_granular)
+							{
 								DWORD ms_to_sleep =
 									(DWORD)(1000 *(seconds_per_frame_target - seconds_per_frame_actual));
 								Sleep(ms_to_sleep);
@@ -696,16 +808,17 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR CmdLine, int nCmdSho
 							ticks_elapsed = tick_count_after_sleep.QuadPart - tick_count_last.QuadPart;
 							seconds_per_frame_actual = (f32)ticks_elapsed / (f32)ticks_per_second;
 						}
-					} else {
+					}
+					else
+					{
 						// Missed frame
 					}
 
-					StretchDIBits(DeviceContext,
-							0, 0, Win32GlobalBackBuffer.width, Win32GlobalBackBuffer.height,
-							0, 0, Win32GlobalBackBuffer.width, Win32GlobalBackBuffer.height,
-							Win32GlobalBackBuffer.memory, 
-							&Win32GlobalBackBuffer.Info,
-							DIB_RGB_COLORS, SRCCOPY);
+					win32_client_dimensions WindowDimensions = win32_get_window_dimension(WindowHandle);
+					HDC DeviceContext = GetDC(WindowHandle);
+					win32_display_buffer_to_window(&Win32GlobalBackBuffer, DeviceContext,
+							WindowDimensions.width, WindowDimensions.height);
+					ReleaseDC(WindowHandle, DeviceContext);
 
 					f32 fps = (f32)ticks_per_second / (f32)ticks_elapsed;
 					f32 miliseconds_elapsed = (((1000 * (f32)ticks_elapsed) * time_for_each_tick));
@@ -724,10 +837,16 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR CmdLine, int nCmdSho
 					OldInput = Temp;
 				}
 			}
-		} else {
-
+			else
+			{
+			}
 		}
-	} else {
+		else
+		{
+		}
+	}
+	else
+	{
 	}
 
 	return 0;

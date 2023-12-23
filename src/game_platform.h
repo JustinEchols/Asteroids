@@ -106,24 +106,13 @@ typedef struct
 	};
 } game_controller_input;
 
+// TODO(Justin): Enum for mouse buttons
 typedef struct
 {
-	union
-	{
-		game_button_state Buttons[2];
-		struct
-		{
-			game_button_state Right;
-			game_button_state Left;
-		};
-	};
-	int x, y;
-} game_mouse_input; 
+	game_button_state MouseButtons[5];
+	s32 mouse_x, mouse_y;
 
-typedef struct
-{
 	game_controller_input Controller;
-	game_mouse_input Mouse;
 	f32 dt_for_frame;
 } game_input;
 

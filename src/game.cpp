@@ -1238,8 +1238,9 @@ player_add(game_state *GameState)
 	Entity->is_warping = false;
 	Entity->is_shielded = true;
 
-	Entity->height = 20.0f;
-	Entity->base_half_width = 4.0f;
+	//Entity->height = 20.0f;
+	Entity->height = 18.0f;
+	Entity->base_half_width = 14.0f;
 
 	Entity->Pos = V2F(0.0f, 0.0f);
 	Entity->Right = V2F(1.0f, 0.0f);
@@ -1549,6 +1550,7 @@ v2f_screen_pos(game_state *GameState, v2f BottomLeft, v2f Pos)
 	return(Result);
 }
 
+
 internal void
 update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer *SoundBuffer, game_input *GameInput)
 {
@@ -1612,8 +1614,6 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 		asteroid_add(GameState, ASTEROID_SMALL);
 		asteroid_add(GameState, ASTEROID_SMALL);
 
-		GameInput->Mouse.x = BackBuffer->width / 2;
-		GameInput->Mouse.y = BackBuffer->height / 2;
 
 		GameMemory->is_initialized = true;
 	}
@@ -1714,7 +1714,35 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 
 				push_piece(&PieceGroup, &GameState->Ship, ScreenPos, Alignment);
 
-#if 1
+				v2f Vertices[6] = {};
+
+				// Front center
+				v2f P0 = Entity->Pos + Entity->height * Entity->Direction;
+				// Front left
+				v2f P2 = P0 + V2F(0.0f, 2.0f);
+				// Front right
+				v2f P3 = P0 + V2F(0.0f, -2.0f);
+
+				P0 = v2f_screen_pos(GameState, BottomLeft, P0);
+				P2 = v2f_screen_pos(GameState, BottomLeft, P2);
+
+				// Back center
+				v2f P1 = Entity->Pos - Entity->height * Entity->Direction;
+
+
+				P1 = v2f_screen_pos(GameState, BottomLeft, P1);
+				P3 = v2f_screen_pos(GameState, BottomLeft, P3);
+
+
+				line_dda_draw(BackBuffer, ScreenPos, P0, White);
+				line_dda_draw(BackBuffer, ScreenPos, P1, White);
+
+				line_dda_draw(BackBuffer, ScreenPos, P2, White);
+				line_dda_draw(BackBuffer, ScreenPos, P3, White);
+
+
+
+#if 0
 				triangle T = player_triangle(GameState, Entity);
 
 				T.Centroid = v2f_screen_pos(GameState, BottomLeft, T.Centroid);
