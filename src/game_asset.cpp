@@ -63,17 +63,38 @@ struct wave_format_chunk
 };
 #pragma pack(pop)
 
+// NOTE(Justin): If the bitmap contains 16 or 32 bits per pixel, then only a Compression value of 
+// 3 is supported, per the BMP file format docs.
 
-
-
+// NOTE(Justin): The masks contained in the header specify which bits in
+// the pixel of the bitmap correspond to a color channel. That is for
+// red_mask the set bits tell us where the red color channel is in the
+// pixel value. The backbuffer expects pixels to be in AARRGGBB format.
+// Thereforw we need to, for each pixel in the bitmap, convert it to the
+// correct format.
+//
+// The way this is done is by:
+//	(1) use the masks to determine the shift amount for each color
+//	channel
+//
+//	(2) For each color channel in a pixel value, shift it by this shift
+//	amount.
+//
+//	(3) The value of the color channel is then obtained by masking the
+//	shifted pixel value with 0xFF. This is because the color channel has
+//	been shifted to the LSB.
+//
+//	(4) Bitwise OR each channel to create the pixel value that is in the
+//	correct format
 
 internal loaded_bitmap
 bitmap_file_read_entire(char *filename)
 {
-	loaded_bitmap Result = {0};
+	loaded_bitmap Result = {};
 
 	debug_file_read  BitmapFile = platform_file_read_entire(filename);
-	if (BitmapFile.size != 0) {
+	if(BitmapFile.size != 0)
+	{
 		bitmap_header *BitmapHeader = (bitmap_header *)BitmapFile.contents;
 		u32 *pixels = (u32 *)((u8 *)BitmapFile.contents + BitmapHeader->bitmap_offset);
 		Result.memory = (void *)pixels;
@@ -82,58 +103,48 @@ bitmap_file_read_entire(char *filename)
 		Result.bytes_per_pixel = BitmapHeader->bits_per_pixel / 8;
 		Result.stride = BitmapHeader->width * Result.bytes_per_pixel;
 
-		// NOTE(Justin): If the bitmap contains 16 or 32 bits per pixel, then only a Compression value of 
-		// 3 is supported, per the BMP file format docs.
-
 		ASSERT(BitmapHeader->compression == 3);
-
-		// NOTE(Justin): The masks contained in the header specify which bits in
-		// the pixel of the bitmap correspond to a color channel. That is for
-		// red_mask the set bits tell us where the red color channel is in the
-		// pixel value. The backbuffer expects pixels to be in AARRGGBB format.
-		// Thereforw we need to, for each pixel in the bitmap, convert it to the
-		// correct format.
-		//
-		// The way this is done is by:
-		//	(1) use the masks to determine the shift amount for each color
-		//	channel
-		//
-		//	(2) For each color channel in a pixel value, shift it by this shift
-		//	amount.
-		//
-		//	(3) The value of the color channel is then obtained by masking the
-		//	shifted pixel value with 0xFF. This is because the color channel has
-		//	been shifted to the LSB.
-		//
-		//	(4) Bitwise OR each channel to create the pixel value that is in the
-		//	correct format
 
 		u32 red_mask = BitmapHeader->red_mask;
 		u32 green_mask = BitmapHeader->green_mask;
 		u32 blue_mask = BitmapHeader->blue_mask;
 		u32 alpha_mask = ~(red_mask | green_mask | blue_mask);
 
-		bit_scan_result red_shift_amount = find_first_bit_set_u32(red_mask);
-		bit_scan_result green_shift_amount = find_first_bit_set_u32(green_mask);
-		bit_scan_result blue_shift_amount = find_first_bit_set_u32(blue_mask);
-		bit_scan_result alpha_shift_amount = find_first_bit_set_u32(alpha_mask);
+		bit_scan_result red_scan = find_first_bit_set_u32(red_mask);
+		bit_scan_result green_scan = find_first_bit_set_u32(green_mask);
+		bit_scan_result blue_scan = find_first_bit_set_u32(blue_mask);
+		bit_scan_result alpha_scan = find_first_bit_set_u32(alpha_mask);
 
-		ASSERT(red_shift_amount.found);
-		ASSERT(green_shift_amount.found);
-		ASSERT(blue_shift_amount.found);
-		ASSERT(alpha_shift_amount.found);
+		ASSERT(red_scan.found);
+		ASSERT(green_scan.found);
+		ASSERT(blue_scan.found);
+		ASSERT(alpha_scan.found);
+
+		s32 red_shift = 16 - (s32)red_scan.index;
+		s32 green_shift = 8 - (s32)green_scan.index;
+		s32 blue_shift = 0 - (s32)blue_scan.index;
+		s32 alpha_shift = 24 - (s32)alpha_scan.index;
 
 		u32 *pixel = pixels;
-		for (s32 y = 0; y < BitmapHeader->height; y++) {
-			for (s32 x = 0; x < BitmapHeader->width; x++) {
+		for(s32 y = 0; y < BitmapHeader->height; y++)
+		{
+			for(s32 x = 0; x < BitmapHeader->width; x++)
+			{
 				u32 c = *pixel;
 
+#if 0
 				u32 red = ((c >> red_shift_amount.index) & 0xFF);
 				u32 green = ((c >> green_shift_amount.index) & 0xFF);
 				u32 blue = ((c >> blue_shift_amount.index) & 0xFF);
 				u32 alpha = ((c >> alpha_shift_amount.index) & 0xFF);
 
 				*pixel++ = ((alpha << 24) | (red << 16) | (green << 8) | (blue << 0));
+#else
+				*pixel++ = (rotate_left(c & red_mask, red_shift) |
+						   rotate_left(c & green_mask, green_shift) |
+						   rotate_left(c & blue_mask, blue_shift) |
+						   rotate_left(c & alpha_mask, alpha_shift));
+#endif
 			}
 		}
 	}
@@ -201,7 +212,8 @@ wav_file_read_entire(char *filename)
 {
 	loaded_sound Result = {0};
 	debug_file_read WavFile = platform_file_read_entire(filename);
-	if (WavFile.size != 0) {
+	if(WavFile.size != 0)
+	{
 		wave_header *WaveHeader = (wave_header *)WavFile.contents;
 
 		ASSERT(WaveHeader->chunk_id == WAVE_CHUNK_ID_RIFF);
@@ -210,10 +222,12 @@ wav_file_read_entire(char *filename)
 		u32 channel_count = 0;
 		u32 samples_data_size = 0;
 		s16 *samples = 0;
-		for (riff_iterator Iter = parse_chunk_at(WaveHeader + 1, (u8 *)(WaveHeader + 1) + WaveHeader->chunk_size - 4);
+		for(riff_iterator Iter = parse_chunk_at(WaveHeader + 1, (u8 *)(WaveHeader + 1) + WaveHeader->chunk_size - 4);
 				iterator_is_valid(Iter);
-				Iter = next_chunk(Iter)) {
-			switch (get_type(Iter)) {
+				Iter = next_chunk(Iter))
+		{
+			switch (get_type(Iter))
+			{
 				case WAVE_CHUNK_ID_FORMAT:
 				{
 					wave_format_chunk *WaveFormat = (wave_format_chunk *)get_chunk_data(Iter);
@@ -234,19 +248,25 @@ wav_file_read_entire(char *filename)
 
 		Result.channel_count = channel_count;
 		Result.sample_count = samples_data_size / (sizeof(s16) * channel_count);
-		if (channel_count == 1) {
+		if(channel_count == 1)
+		{
 			Result.samples[0] = samples;
 			Result.samples[1] = 0;
-		} else if(channel_count == 2) {
+		}
+		else if(channel_count == 2)
+		{
 			Result.samples[0] = samples;
 			Result.samples[1] = samples + Result.sample_count;
 
-			for (u32 sample_index = 0; sample_index < Result.sample_count; sample_index++) {
+			for(u32 sample_index = 0; sample_index < Result.sample_count; sample_index++)
+			{
 				s16 source = samples[2 * sample_index];
 				samples[2 * sample_index] = samples[sample_index];
 				samples[sample_index] = source;
 			}
-		} else {
+		}
+		else
+		{
 			ASSERT(!"Invalid channel count in WAV file");
 		}
 		//TODO(Justin): Left and right channels.
