@@ -15,12 +15,14 @@ f32_neg_infinity(void)
 	f32 *Result = (f32 *)&neg_inf;
 	return(*Result);	
 }
+
 inline f32
 square_root(f32 x)
 {
 	f32 Result = sqrtf(x);
 	return(Result);
 }
+
 inline f32
 absolute_value(f32 x)
 {
@@ -60,9 +62,12 @@ inline f32
 f32_fractional_part(f32 x)
 {
 	f32 Result = 0.0f;
-	if (x > 0) {
+	if(x > 0)
+	{
 		Result = x - f32_round_to_s32(x);
-	} else {
+	}
+	else
+	{
 		Result = x - f32_round_to_s32(x + 1.0f);
 	}
 	return(Result);
@@ -107,8 +112,10 @@ find_first_bit_set_u32(u32 x)
 #if COMPILER_MSVC
 	Result.found = _BitScanForward((unsigned long *)&Result.index, x);
 #else
-	for (u32 scan_index = 0; scan_index < 32; scan_index++) {
-		if ((1 << scan_index) & x) {
+	for(u32 scan_index = 0; scan_index < 32; scan_index++)
+	{
+		if((1 << scan_index) & x)
+		{
 			Result.index = scan_index;
 			Result.found = true;
 			break;
@@ -118,6 +125,17 @@ find_first_bit_set_u32(u32 x)
 	return(Result);
 }
 
+inline u32
+rotate_left(u32 value, s32 amount)
+{
+#if COMPILER_MSVC
+	u32 Result = _rotl(value, amount);
+#else
+	amount &= 31;
+	u32 Result = ((value >> amount) | (value >> (32 - amount)));
+#endif
+	return(Result);
+}
 
 #define GAME_INTRINSICS_H
 #endif
