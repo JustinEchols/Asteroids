@@ -98,50 +98,6 @@ sound_buffer_fill(game_state *GameState, sound_buffer *SoundBuffer)
 	GameState->test_sample_index += SoundBuffer->sample_count;
 }
 
-
-internal void 
-rectangle_draw(back_buffer *BackBuffer, v2f Min, v2f Max, v3f Color)
-{
-	s32 x_min = f32_round_to_s32(Min.x);
-	s32 y_min = f32_round_to_s32(Min.y);
-	s32 x_max = f32_round_to_s32(Max.x);
-	s32 y_max = f32_round_to_s32(Max.y);
-
-	if(x_min < 0)
-	{
-		x_min += BackBuffer->width;
-	}
-	if(x_max > BackBuffer->width)
-	{
-		x_max -= BackBuffer->width;
-	}
-	if(y_min < 0)
-	{
-		y_min += BackBuffer->height;
-	}
-	if(y_max > BackBuffer->height)
-	{
-		y_max -= BackBuffer->height;
-	}
-
-	u32 red = f32_round_to_u32(255.0f * Color.r);
-	u32 green = f32_round_to_u32(255.0f * Color.g);
-	u32 blue = f32_round_to_u32(255.0f * Color.b);
-	u32 color = ((red << 16) | (green << 8) | (blue << 0));
-
-	u8 *pixel_row = (u8 *)BackBuffer->memory + BackBuffer->stride * y_min + BackBuffer->bytes_per_pixel * x_min ;
-	for(int row = y_min; row < y_max; row++)
-	{
-		u32 *pixel = (u32 *)pixel_row;
-		for(int col = x_min; col < x_max; col++)
-		{
-			*pixel++ = color;
-		}
-		pixel_row += BackBuffer->stride;
-	}
-}
-
-
 internal void 
 rectangle_draw(back_buffer *BackBuffer, v2f Min, v2f Max, f32 r, f32 g, f32 b)
 {
@@ -182,6 +138,12 @@ rectangle_draw(back_buffer *BackBuffer, v2f Min, v2f Max, f32 r, f32 g, f32 b)
 		}
 		pixel_row += BackBuffer->stride;
 	}
+}
+
+internal void 
+rectangle_draw(back_buffer *BackBuffer, v2f Min, v2f Max, v3f Color)
+{
+	rectangle_draw(BackBuffer, Min, Max, Color.r, Color.g, Color.b);
 }
 
 internal void
@@ -317,118 +279,6 @@ circle_draw(back_buffer *BackBuffer, circle *Circle, v3f Color)
 {
 	circle_draw(BackBuffer, Circle, Color.r, Color.g, Color.b);
 }
-
-// TODO(Justin): Use symmetry to draw? ALthough this is for debugginh purposes.
-#if 0
-	internal void
-circle_draw(back_buffer *BackBuffer, circle *Circle, f32 r, f32 b, f32 g)
-{
-	bounding_box CircleBoudingBox = circle_bounding_box_find(*Circle);
-
-	s32 x_min = f32_round_to_s32(CircleBoudingBox.Min.x);
-	s32 y_min = f32_round_to_s32(CircleBoudingBox.Min.y);
-	s32 x_max = f32_round_to_s32(CircleBoudingBox.Max.x);
-	s32 y_max = f32_round_to_s32(CircleBoudingBox.Max.y);
-
-	b32 circle_across_x_boundary = false;
-	b32 circle_across_y_boundary = false;
-
-	s32 region_1_x_min = 0;
-	s32 region_1_x_max = 0;
-	s32 region_2_x_min = 0;
-	s32 region_2_x_max = 0;
-
-	s32 region_1_y_min = 0;
-	s32 region_1_y_max = 0;
-	s32 region_2_y_min = 0;
-	s32 region_2_y_max = 0;
-
-	if(x_min < 0) {
-		region_1_x_min = 0;
-		region_1_x_max = x_max;
-		region_2_x_min = x_min + BackBuffer->width;
-		region_2_x_max = BackBuffer->width;
-		circle_across_x_boundary = true;
-	} else {
-		region_1_x_min = x_min;
-		region_1_x_max = x_max;
-		region_2_x_min = x_min;
-		region_2_x_max = x_max;
-	}
-
-	if(x_max > BackBuffer->width) {
-		region_1_x_min = x_min;
-		region_1_x_max = BackBuffer->width;
-		region_2_x_min = 0;
-		region_2_x_max = x_max - BackBuffer->width;
-		circle_across_x_boundary = true;
-	} else {
-		region_1_x_min = x_min;
-		region_1_x_max = x_max;
-		region_2_x_min = x_min;
-		region_2_x_max = x_max;
-	}
-
-	if(y_min < 0) {
-		region_1_y_min = 0;
-		region_1_y_max = y_max;
-		region_2_y_min = BackBuffer->height + y_min;
-		region_2_y_max = BackBuffer->height;
-		circle_across_y_boundary = true;
-
-	} else {
-		region_1_y_min = y_min;
-		region_1_y_max = y_max;
-		region_2_y_min = y_min;
-		region_2_y_max = y_max;
-	}
-
-	if(y_max > BackBuffer->height) {
-		region_1_y_min = y_min;
-		region_1_y_max = BackBuffer->height;
-		region_2_y_min = 0;
-		region_2_y_max = y_max - BackBuffer->height;
-		circle_across_y_boundary = true;
-	} else {
-		region_1_y_min = y_min;
-		region_1_y_max = y_max;
-		region_2_y_min = y_min;
-		region_2_y_max = y_max;
-	}
-
-
-
-	u32 red = f32_round_to_u32(255.0f * r);
-	u32 green = f32_round_to_u32(255.0f * g);
-	u32 blue = f32_round_to_u32(255.0f * b);
-	u32 color = ((red << 16) | (green << 8) | (blue << 0));
-
-
-	if(!(circle_across_x_boundary || circle_across_y_boundary)) {
-		u8 *pixel_row = (u8 *)BackBuffer->memory + BackBuffer->stride * y_min + BackBuffer->bytes_per_pixel * x_min;
-		v2f Center = Circle->Center;
-		f32 radius =  Circle->radius;
-		for(s32 row = y_min; row < y_max; row++) {
-			u32 *pixel = (u32 *)pixel_row;
-			for(s32 col = x_min; col < x_max; col++) {
-				f32 dx = Center.x - col;
-				f32 dy = Center.y - row;
-
-				f32 d = (f32)sqrt((dx * dx) + (dy * dy));
-
-				if(d <= radius) {
-					*pixel++ = color;
-				} else {
-					pixel++;
-				}
-			}
-			pixel_row += BackBuffer->stride;
-		}
-	} else {
-
-	}
-}
-#endif
 
 internal circle
 circle_init(v2f Center, f32 radius)
@@ -779,6 +629,30 @@ debug_vector_draw_at_point(back_buffer * BackBuffer, v2f Point, v2f Direction, v
 	line_dda_draw(BackBuffer, Point, Point + c * Direction, Color.r, Color.g, Color.b);
 }
 
+
+internal projected_interval 
+sat_projected_interval(v2f *Vertices, u32 vertex_count, v2f ProjectedAxis)
+{
+	projected_interval Result = {};
+
+	f32 min = f32_infinity();
+	f32 max = f32_neg_infinity();
+	for(u32 vertex_i = 0; vertex_i < vertex_count; vertex_i++)
+	{
+		v2f Vertex = Vertices[vertex_i];
+
+		f32 c = v2f_dot(Vertex, ProjectedAxis);
+		min = MIN(c, min);
+		max = MAX(c, max);
+	}
+
+	Result.min = min;
+	Result.max = max;
+
+	return(Result);
+}
+
+#if 0
 internal projected_interval 
 triangle_project_onto_axis(triangle *Triangle, v2f ProjectedAxis)
 {
@@ -804,6 +678,7 @@ triangle_project_onto_axis(triangle *Triangle, v2f ProjectedAxis)
 
 	return(Result);
 }
+#endif
 
 internal projected_interval
 circle_project_onto_axis(circle *Circle, v2f ProjectedAxis)
@@ -855,6 +730,86 @@ triangle_closest_point_to_circle(triangle *Triangle, circle *Circle)
 // TODO(Justin): Could Pass two entities in if the sat_collision does in fact handle all
 // convex polygons
 
+internal v2f 
+closest_point_to_circle(v2f *Vertices, u32 vertex_count, circle *Circle)
+{
+	v2f Result = {};
+
+	v2f ClosestPoint = Vertices[0];
+	v2f CenterToVertex = ClosestPoint - Circle->Center;
+	f32 min_sq_distance = v2f_dot(CenterToVertex, CenterToVertex);
+	for(u32 vertex_i = 1; vertex_i < vertex_count; vertex_i++)
+	{
+		v2f Vertex = Vertices[vertex_i];
+		CenterToVertex = Vertex - Circle->Center;
+		f32 sq_distance = v2f_dot(CenterToVertex, CenterToVertex);
+		if(sq_distance < min_sq_distance)
+		{
+			ClosestPoint = Vertex;
+			min_sq_distance = sq_distance;
+		}
+	}
+	Result = ClosestPoint;
+
+	return(Result);
+}
+
+
+// TODO(Justin): Need to figure the shapes associated with the entities. ATM they
+// this only works in a special case and was implemented in this way as a step
+// towards the final game.
+internal b32
+sat_collision(entity *EntityA, entity *EntityB)
+{
+	b32 GapExists = false;
+
+	circle Circle = circle_init(EntityB->Pos, EntityB->radius);
+	for(u32 vertex_i = 0; vertex_i < ARRAY_COUNT(EntityA->Poly.Vertices); vertex_i++)
+	{
+		v2f P0 = EntityA->Poly.Vertices[vertex_i];
+		v2f P1 = EntityA->Poly.Vertices[(vertex_i + 1) % ARRAY_COUNT(EntityA->Poly.Vertices)];
+		v2f D = P1 - P0;
+
+		v2f ProjectedAxis = v2f_normalize(-1.0f * v2f_perp(D));
+
+		projected_interval EntityAInterval = sat_projected_interval(EntityA->Poly.Vertices,
+				ARRAY_COUNT(EntityA->Poly.Vertices), ProjectedAxis);
+
+		projected_interval EntityBInterval = circle_project_onto_axis(&Circle, ProjectedAxis);
+
+		if(EntityBInterval.min > EntityBInterval.max)
+		{
+			f32 temp = EntityBInterval.min;
+			EntityBInterval.min = EntityBInterval.max;
+			EntityBInterval.max = temp;
+		}
+
+		if(!((EntityBInterval.max >= EntityAInterval.min) &&
+			 (EntityAInterval.max >= EntityBInterval.min)))
+		{
+
+			return(GapExists);
+		}
+	}
+
+	v2f ClosestPoint = closest_point_to_circle(EntityA->Poly.Vertices,
+			ARRAY_COUNT(EntityA->Poly.Vertices), &Circle);
+
+	v2f ProjectedAxis = v2f_normalize(ClosestPoint - Circle.Center);
+
+	projected_interval EntityAInterval = sat_projected_interval(EntityA->Poly.Vertices, ARRAY_COUNT(EntityA->Poly.Vertices), ProjectedAxis);
+	projected_interval EntityBInterval = circle_project_onto_axis(&Circle, ProjectedAxis);
+
+	if(!((EntityBInterval.max >= EntityAInterval.min) &&
+		 (EntityAInterval.max >= EntityBInterval.min)))
+	{
+		return(GapExists);
+	}
+
+	return(!GapExists);
+}
+
+#if 0
 internal b32
 triangle_circle_collision(triangle *Triangle, circle *Circle)
 {
@@ -917,6 +872,7 @@ triangle_circle_collision(triangle *Triangle, circle *Circle)
 	}
 	return(!GapExists);
 }
+#endif
 
 internal b32
 circles_collision(circle *CircleA, circle *CircleB)
@@ -1005,7 +961,7 @@ player_triangle(game_state *GameState, entity *EntityPlayer)
 }
 
 internal void
-player_update_polygon(entity *EntityPlayer)
+player_polygon_update(entity *EntityPlayer)
 {
 	v2f FrontCenter = EntityPlayer->Pos + EntityPlayer->height * EntityPlayer->Direction;
 	v2f FrontLeft = FrontCenter + -1.5f * EntityPlayer->Right;
@@ -1054,7 +1010,6 @@ entity_move(game_state *GameState, entity *Entity, v2f ddPos, f32 dt)
 	v2f EntityNewPos = Entity->Pos;
 
 	EntityNewPos = EntityOldPos + EntityDelta;
-
 	if(EntityNewPos.x > World->Dim.x)
 	{
 		EntityNewPos.x = EntityNewPos.x - 2.0f * World->Dim.x;
@@ -1063,12 +1018,10 @@ entity_move(game_state *GameState, entity *Entity, v2f ddPos, f32 dt)
 	{
 		EntityNewPos.x += 2.0f * World->Dim.x;
 	}
-
 	if(EntityNewPos.y > World->Dim.y)
 	{
 		EntityNewPos.y = EntityNewPos.y - 2.0f * World->Dim.y;
 	}
-
 	if(EntityNewPos.y < -World->Dim.y)
 	{
 		EntityNewPos.y += 2.0f * World->Dim.y;
@@ -1082,15 +1035,9 @@ entity_move(game_state *GameState, entity *Entity, v2f ddPos, f32 dt)
 	{
 		if(ABS(NewVel.x) > 50.0f)
 		{
-
-			// NOTE(Justin): Have to normalize the components by the magnitude of
-			// the component. Otherwise the direction may change upon multiplication
-			// of a negative times a negative.
-
 			NewVel.x *= ABS(1.0f / NewVel.x);
 			NewVel.x *= max_speed;
 		}
-
 		if(ABS(NewVel.y) > 50.0f)
 		{
 			NewVel.y *= ABS(1.0f / NewVel.y);
@@ -1124,11 +1071,28 @@ entity_move(game_state *GameState, entity *Entity, v2f ddPos, f32 dt)
 					{
 						// TODO(Justin) Collision based on whether or not the
 						// player is shielded.
-						circle EntityCircle = circle_init(Entity->Pos, Entity->radius);
-						triangle PlayerTriangle =  player_triangle(GameState, TestEntity);
-						if(triangle_circle_collision(&PlayerTriangle, &EntityCircle))
+						//circle EntityCircle = circle_init(Entity->Pos, Entity->radius);
+						//triangle PlayerTriangle =  player_triangle(GameState, TestEntity);
+						if(sat_collision(TestEntity, Entity))
 						{
-							v2f Delta = PlayerTriangle.Centroid - EntityCircle.Center;
+							//v2f Delta = PlayerTriangle.Centroid - EntityCircle.Center;
+							v2f Delta = TestEntity->Pos - Entity->Pos;
+
+							for(u32 vertex_i = 0; vertex_i < ARRAY_COUNT(TestEntity->Poly.Vertices); vertex_i++)
+							{
+								v2f P0 = TestEntity->Poly.Vertices[vertex_i];
+								v2f P1 = TestEntity->Poly.Vertices[(vertex_i + 1)  % ARRAY_COUNT(TestEntity->Poly.Vertices)];
+
+								v2f Edge = P1 - P0;
+								v2f Perp = -1.0f * v2f_perp(Edge);
+
+								if(v2f_dot(Perp, Delta) < 0.0f)
+								{
+									Normal = v2f_normalize(Perp);
+									break;
+								}
+							}
+#if 0
 							for(u32 vertex_i = 0; vertex_i < ARRAY_COUNT(PlayerTriangle.Vertices); vertex_i++)
 							{
 								v2f P0 = PlayerTriangle.Vertices[vertex_i];
@@ -1143,6 +1107,7 @@ entity_move(game_state *GameState, entity *Entity, v2f ddPos, f32 dt)
 									break;
 								}
 							}
+#endif
 							entity_hit_index = TestEntity->index;
 						}
 					}
@@ -1218,7 +1183,7 @@ entity_move(game_state *GameState, entity *Entity, v2f ddPos, f32 dt)
 
 	if(Entity->type == ENTITY_PLAYER)
 	{
-		player_update_polygon(Entity);
+		player_polygon_update(Entity);
 	}
 
 	// TODO(Justin): Updating Bounding Box/Poly after moving the entity
@@ -1265,10 +1230,6 @@ triangle_init(v2f *Vertices, u32 vertex_count)
 
 	return(Result);
 }
-
-
-
-
 
 internal entity *
 player_add(game_state *GameState)
@@ -1536,18 +1497,6 @@ push_piece(entity_visible_piece_group *PieceGroup, loaded_bitmap *Bitmap, v2f Of
 }
 
 internal void
-triangle_draw(back_buffer *BackBuffer, triangle *Triangle, v3f Color)
-{
-	v2f Right = Triangle->Vertices[0];
-	v2f Middle = Triangle->Vertices[1];
-	v2f Left = Triangle->Vertices[2];
-
-	line_dda_draw(BackBuffer, Right, Middle, Color.r, Color.g, Color.b);
-	line_dda_draw(BackBuffer, Middle, Left, Color.r, Color.g, Color.b); 
-	line_dda_draw(BackBuffer, Left, Right, Color.r, Color.g, Color.b);
-}
-
-internal void
 triangle_draw(back_buffer *BackBuffer, triangle *Triangle, f32 r, f32 g, f32 b)
 {
 	v2f Right = Triangle->Vertices[0];
@@ -1558,6 +1507,14 @@ triangle_draw(back_buffer *BackBuffer, triangle *Triangle, f32 r, f32 g, f32 b)
 	line_dda_draw(BackBuffer, Middle, Left, r, g, b); 
 	line_dda_draw(BackBuffer, Left, Right, r, g, b);
 }
+
+internal void
+triangle_draw(back_buffer *BackBuffer, triangle *Triangle, v3f Color)
+{
+	triangle_draw(BackBuffer, Triangle, Color.r, Color.g, Color.b);
+}
+
+
 
 internal void
 familiar_update(game_state *GameState, entity *Entity, f32 dt)
@@ -1720,31 +1677,13 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 		entity *EntityPlayer = player_add(GameState);
 		GameState->player_entity_index = EntityPlayer->index;
 
-		f32 asteroid_scales[3] = {1.5f, 3.0f, 5.0f};
-
 		srand(2023);
 
 		// TODO(Justin): This size of the asteroid should be random.
 		asteroid_add(GameState, ASTEROID_SMALL);
-
-#if 0
 		asteroid_add(GameState, ASTEROID_SMALL);
 		asteroid_add(GameState, ASTEROID_SMALL);
 		asteroid_add(GameState, ASTEROID_SMALL);
-		asteroid_add(GameState, ASTEROID_SMALL);
-		asteroid_add(GameState, ASTEROID_SMALL);
-		asteroid_add(GameState, ASTEROID_SMALL);
-		asteroid_add(GameState, ASTEROID_SMALL);
-		asteroid_add(GameState, ASTEROID_SMALL);
-		asteroid_add(GameState, ASTEROID_SMALL);
-		asteroid_add(GameState, ASTEROID_SMALL);
-		asteroid_add(GameState, ASTEROID_SMALL);
-		asteroid_add(GameState, ASTEROID_SMALL);
-		asteroid_add(GameState, ASTEROID_SMALL);
-		asteroid_add(GameState, ASTEROID_SMALL);
-		asteroid_add(GameState, ASTEROID_SMALL);
-		asteroid_add(GameState, ASTEROID_SMALL);
-#endif
 
 		for(u32 i = 0; i < ARRAY_COUNT(GameState->Squares); i++)
 		{
@@ -1797,9 +1736,6 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 		}
 		else
 		{
-
-			// NOTE(Justin): If the player is already shooting, wait some time
-			// before shooting a new projectile. Otherwise MACHINE GUN.
 			GameState->time_between_new_projectiles += dt;
 			if(GameState->time_between_new_projectiles > 0.6f)
 			{
@@ -1851,50 +1787,8 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 
 				push_piece(&PieceGroup, &GameState->Ship, ScreenPos, Alignment);
 
-				player_draw_collision_box(BackBuffer, GameState, BottomLeft, Entity);
 #if 0
-				// Front center
-				v2f FrontCenter = Entity->Pos + Entity->height * Entity->Direction;
-
-				// Front left
-				v2f FrontLeft = FrontCenter + -1.5f * Entity->Right;
-
-				// Front right
-				v2f FrontRight = FrontCenter + 1.5f * Entity->Right;
-
-				// Back center
-				v2f BackCenter = Entity->Pos - 0.5f * Entity->height * Entity->Direction;
-
-				v2f Right = Entity->Pos + 0.75f * Entity->base_half_width * Entity->Right;
-				v2f Left = Entity->Pos -0.75f * Entity->base_half_width * Entity->Right;
-
-				v2f RearLeftEngine= Left -1.0f * Entity->height * Entity->Direction;
-				v2f RearRightEngine= Right - 1.0f * Entity->height * Entity->Direction;
-
-				v2f SideLeftEngine = BackCenter -1.0f * Entity->base_half_width * Entity->Right;
-				v2f SideRightEngine = BackCenter + 1.0f * Entity->base_half_width * Entity->Right;
-
-				v2f ScreenFrontCenter = v2f_world_to_screen(GameState, BottomLeft, FrontCenter);
-				v2f ScreenBackCenter = v2f_world_to_screen(GameState, BottomLeft, BackCenter);
-				v2f ScreenFrontLeft = v2f_world_to_screen(GameState, BottomLeft, FrontLeft);
-				v2f ScreenFrontRight = v2f_world_to_screen(GameState, BottomLeft, FrontRight);
-
-				v2f ScreenRearLeftEngine = v2f_world_to_screen(GameState, BottomLeft, RearLeftEngine);
-				v2f ScreenRearRightEngine = v2f_world_to_screen(GameState, BottomLeft, RearRightEngine);
-
-				v2f ScreenSideLeftEngine = v2f_world_to_screen(GameState, BottomLeft, SideLeftEngine);
-				v2f ScreenSideRightEngine = v2f_world_to_screen(GameState, BottomLeft, SideRightEngine);
-
-				line_dda_draw(BackBuffer, ScreenPos, ScreenBackCenter, White);
-				line_dda_draw(BackBuffer, ScreenPos, ScreenFrontLeft, White);
-				line_dda_draw(BackBuffer, ScreenPos, ScreenFrontRight, White);
-				line_dda_draw(BackBuffer, ScreenBackCenter, ScreenRearLeftEngine, White);
-				line_dda_draw(BackBuffer, ScreenBackCenter, ScreenRearRightEngine, White);
-				line_dda_draw(BackBuffer, ScreenRearLeftEngine, ScreenSideLeftEngine, White);
-				line_dda_draw(BackBuffer, ScreenRearRightEngine, ScreenSideRightEngine, White);
-				line_dda_draw(BackBuffer, ScreenFrontLeft, ScreenSideLeftEngine, White);
-				line_dda_draw(BackBuffer, ScreenFrontRight, ScreenSideRightEngine, White);
-
+				player_draw_collision_box(BackBuffer, GameState, BottomLeft, Entity);
 #endif
 			} break;
 			case ENTITY_ASTEROID:
