@@ -852,6 +852,9 @@ triangle_closest_point_to_circle(triangle *Triangle, circle *Circle)
 	return(Result);
 }
 
+// TODO(Justin): Could Pass two entities in if the sat_collision does in fact handle all
+// convex polygons
+
 internal b32
 triangle_circle_collision(triangle *Triangle, circle *Circle)
 {
@@ -999,6 +1002,32 @@ player_triangle(game_state *GameState, entity *EntityPlayer)
 	Result.Vertices[2] = Result.Centroid + 0.75f * GameState->Ship.height * EntityPlayer->Direction;
 
 	return(Result);
+}
+
+internal void
+player_update_polygon(entity *EntityPlayer)
+{
+	v2f FrontCenter = EntityPlayer->Pos + EntityPlayer->height * EntityPlayer->Direction;
+	v2f FrontLeft = FrontCenter + -1.5f * EntityPlayer->Right;
+	v2f FrontRight = FrontCenter + 1.5f * EntityPlayer->Right;
+	v2f BackCenter = EntityPlayer->Pos - 0.5f * EntityPlayer->height * EntityPlayer->Direction;
+
+	v2f Right = EntityPlayer->Pos + 0.75f * EntityPlayer->base_half_width * EntityPlayer->Right;
+	v2f Left = EntityPlayer->Pos -0.75f * EntityPlayer->base_half_width * EntityPlayer->Right;
+
+	v2f RearLeftEngine = Left -1.0f * EntityPlayer->height * EntityPlayer->Direction;
+	v2f RearRightEngine = Right - 1.0f * EntityPlayer->height * EntityPlayer->Direction;
+
+	v2f SideLeftEngine = BackCenter -1.0f * EntityPlayer->base_half_width * EntityPlayer->Right;
+	v2f SideRightEngine = BackCenter + 1.0f * EntityPlayer->base_half_width * EntityPlayer->Right;
+
+	EntityPlayer->Poly.Vertices[0] = FrontLeft;
+	EntityPlayer->Poly.Vertices[1] = SideLeftEngine;
+	EntityPlayer->Poly.Vertices[2] = RearLeftEngine;
+	EntityPlayer->Poly.Vertices[3] = BackCenter;
+	EntityPlayer->Poly.Vertices[4] = RearRightEngine;
+	EntityPlayer->Poly.Vertices[5] = SideRightEngine;
+	EntityPlayer->Poly.Vertices[6] = FrontRight;
 }
 
 struct move_spec
@@ -1154,6 +1183,11 @@ entity_move(game_state *GameState, entity *Entity, v2f ddPos, f32 dt)
 				}
 				Entity->dPos = Entity->dPos - 2.0f * v2f_dot(Entity->dPos, Normal) * Normal;
 			}
+
+			//TODO(Justin): Not sure if this sshould be updated exactly here.
+			//But it nedds to be updated after the pl
+			//create one on the fly whenever we need to do collision testing
+
 		}
 		else if(Entity->type == ENTITY_ASTEROID)
 		{
@@ -1181,6 +1215,11 @@ entity_move(game_state *GameState, entity *Entity, v2f ddPos, f32 dt)
 	}
 
 	Entity->Pos = EntityNewPos;
+
+	if(Entity->type == ENTITY_PLAYER)
+	{
+		player_update_polygon(Entity);
+	}
 
 	// TODO(Justin): Updating Bounding Box/Poly after moving the entity
 }
@@ -1227,6 +1266,10 @@ triangle_init(v2f *Vertices, u32 vertex_count)
 	return(Result);
 }
 
+
+
+
+
 internal entity *
 player_add(game_state *GameState)
 {
@@ -1240,17 +1283,45 @@ player_add(game_state *GameState)
 
 	//Entity->height = 20.0f;
 	Entity->height = 18.0f;
-	Entity->base_half_width = 14.0f;
+	Entity->base_half_width = 15.0f;
 
 	Entity->Pos = V2F(0.0f, 0.0f);
 	Entity->Right = V2F(1.0f, 0.0f);
-	Entity->Direction = V2F(1.0f, 0.0f);
+	Entity->Direction = V2F(0.0f, 1.0f);
 	Entity->speed = 60.0f;
 
 	Entity->hit_point_max = 3;
 	Entity->HitPoints.count = Entity->hit_point_max;
 
 	Entity->shape = SHAPE_TRIANGLE;
+
+	// NOTE(Justin): This is not a vertex but used for calculating vertices
+	v2f FrontCenter = Entity->Pos + Entity->height * Entity->Direction;
+	// Front left
+	v2f FrontLeft = FrontCenter + -1.5f * Entity->Right;
+
+	// Front right
+	v2f FrontRight = FrontCenter + 1.5f * Entity->Right;
+
+	// Back center
+	v2f BackCenter = Entity->Pos - 0.5f * Entity->height * Entity->Direction;
+
+	v2f Right = Entity->Pos + 0.75f * Entity->base_half_width * Entity->Right;
+	v2f Left = Entity->Pos -0.75f * Entity->base_half_width * Entity->Right;
+
+	v2f RearLeftEngine = Left -1.0f * Entity->height * Entity->Direction;
+	v2f RearRightEngine = Right - 1.0f * Entity->height * Entity->Direction;
+
+	v2f SideLeftEngine = BackCenter -1.0f * Entity->base_half_width * Entity->Right;
+	v2f SideRightEngine = BackCenter + 1.0f * Entity->base_half_width * Entity->Right;
+
+	Entity->Poly.Vertices[0] = FrontLeft;
+	Entity->Poly.Vertices[1] = SideLeftEngine;
+	Entity->Poly.Vertices[2] = RearLeftEngine;
+	Entity->Poly.Vertices[3] = BackCenter;
+	Entity->Poly.Vertices[4] = RearRightEngine;
+	Entity->Poly.Vertices[5] = SideRightEngine;
+	Entity->Poly.Vertices[6] = FrontRight;
 
 	return(Entity);
 }
@@ -1317,6 +1388,16 @@ asteroid_add(game_state *GameState, asteroid_size SIZE)
 	{
 		Entity->radius = 8.0f;
 	}
+
+	return(Entity);
+}
+
+internal entity *
+asteroid_add(game_state *GameState, asteroid_size SIZE, v2f Pos)
+{
+	entity *Entity = asteroid_add(GameState, SIZE);
+
+	Entity->Pos = Pos;
 
 	return(Entity);
 }
@@ -1542,13 +1623,61 @@ struct basis
 };
 
 internal v2f
-v2f_screen_pos(game_state *GameState, v2f BottomLeft, v2f Pos)
+v2f_world_to_screen(game_state *GameState, v2f BottomLeft, v2f Pos)
 {
 
 	v2f Result = BottomLeft + 0.5f * GameState->pixels_per_meter * (Pos + GameState->World->Dim);
 
 	return(Result);
 }
+
+internal v2f
+v2f_screen_to_world(game_state *GameState, v2f ScreenXY)
+{
+	v2f Result = {};
+
+	world *World = GameState->World;
+
+	Result.x = (2.0f * ScreenXY.x - World->Dim.x * GameState->pixels_per_meter) / GameState->pixels_per_meter;
+	Result.y = (2.0f * ScreenXY.y - World->Dim.y * GameState->pixels_per_meter) / GameState->pixels_per_meter;
+
+	return(Result);
+}
+
+internal void
+player_draw_collision_box(back_buffer *BackBuffer, game_state *GameState, v2f BottomLeft, entity *EntityPlayer)
+{
+	v2f FrontLeft = EntityPlayer->Poly.Vertices[0];
+	v2f SideLeftEngine = EntityPlayer->Poly.Vertices[1];
+	v2f RearLeftEngine = EntityPlayer->Poly.Vertices[2];
+	v2f BackCenter = EntityPlayer->Poly.Vertices[3];
+	v2f RearRightEngine = EntityPlayer->Poly.Vertices[4];
+	v2f SideRightEngine = EntityPlayer->Poly.Vertices[5];
+	v2f FrontRight = EntityPlayer->Poly.Vertices[6];
+
+	v2f ScreenPos = v2f_world_to_screen(GameState, BottomLeft, EntityPlayer->Pos);
+	v2f ScreenBackCenter = v2f_world_to_screen(GameState, BottomLeft, BackCenter);
+	v2f ScreenFrontLeft = v2f_world_to_screen(GameState, BottomLeft, FrontLeft);
+	v2f ScreenFrontRight = v2f_world_to_screen(GameState, BottomLeft, FrontRight);
+
+	v2f ScreenRearLeftEngine = v2f_world_to_screen(GameState, BottomLeft, RearLeftEngine);
+	v2f ScreenRearRightEngine = v2f_world_to_screen(GameState, BottomLeft, RearRightEngine);
+
+	v2f ScreenSideLeftEngine = v2f_world_to_screen(GameState, BottomLeft, SideLeftEngine);
+	v2f ScreenSideRightEngine = v2f_world_to_screen(GameState, BottomLeft, SideRightEngine);
+
+	line_dda_draw(BackBuffer, ScreenPos, ScreenBackCenter, White);
+	line_dda_draw(BackBuffer, ScreenPos, ScreenFrontLeft, White);
+	line_dda_draw(BackBuffer, ScreenPos, ScreenFrontRight, White);
+	line_dda_draw(BackBuffer, ScreenBackCenter, ScreenRearLeftEngine, White);
+	line_dda_draw(BackBuffer, ScreenBackCenter, ScreenRearRightEngine, White);
+	line_dda_draw(BackBuffer, ScreenRearLeftEngine, ScreenSideLeftEngine, White);
+	line_dda_draw(BackBuffer, ScreenRearRightEngine, ScreenSideRightEngine, White);
+	line_dda_draw(BackBuffer, ScreenFrontLeft, ScreenSideLeftEngine, White);
+	line_dda_draw(BackBuffer, ScreenFrontRight, ScreenSideRightEngine, White);
+
+}
+
 
 
 internal void
@@ -1564,7 +1693,7 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 
 		//GameState->TestSound = wav_file_read_entire("sfx/bloop_00.wav");
 		GameState->Background = bitmap_file_read_entire("space_background.bmp");
-		GameState->Ship = bitmap_file_read_entire("ship/blueships1.bmp");
+		GameState->Ship = bitmap_file_read_entire("ship/blueships1_up.bmp");
 
 		GameState->WarpFrames[0] = bitmap_file_read_entire("vfx/warp_01.bmp");
 		GameState->WarpFrames[1] = bitmap_file_read_entire("vfx/warp_02.bmp");
@@ -1597,6 +1726,8 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 
 		// TODO(Justin): This size of the asteroid should be random.
 		asteroid_add(GameState, ASTEROID_SMALL);
+
+#if 0
 		asteroid_add(GameState, ASTEROID_SMALL);
 		asteroid_add(GameState, ASTEROID_SMALL);
 		asteroid_add(GameState, ASTEROID_SMALL);
@@ -1613,6 +1744,12 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 		asteroid_add(GameState, ASTEROID_SMALL);
 		asteroid_add(GameState, ASTEROID_SMALL);
 		asteroid_add(GameState, ASTEROID_SMALL);
+#endif
+
+		for(u32 i = 0; i < ARRAY_COUNT(GameState->Squares); i++)
+		{
+			GameState->Squares[i].half_width = 5.0f;
+		}
 
 
 		GameMemory->is_initialized = true;
@@ -1709,67 +1846,61 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 			case ENTITY_PLAYER:
 			{
 				v2f PlayerPos = Entity->Pos;
-				v2f ScreenPos = v2f_screen_pos(GameState, BottomLeft, PlayerPos);
+				v2f ScreenPos = v2f_world_to_screen(GameState, BottomLeft, PlayerPos);
 				v2f Alignment = {(f32)GameState->Ship.width / 2.0f, (f32)GameState->Ship.height / 2.0f};
 
 				push_piece(&PieceGroup, &GameState->Ship, ScreenPos, Alignment);
 
-				v2f Vertices[6] = {};
-
+				player_draw_collision_box(BackBuffer, GameState, BottomLeft, Entity);
+#if 0
 				// Front center
-				v2f P0 = Entity->Pos + Entity->height * Entity->Direction;
-				// Front left
-				v2f P2 = P0 + V2F(0.0f, 2.0f);
-				// Front right
-				v2f P3 = P0 + V2F(0.0f, -2.0f);
+				v2f FrontCenter = Entity->Pos + Entity->height * Entity->Direction;
 
-				P0 = v2f_screen_pos(GameState, BottomLeft, P0);
-				P2 = v2f_screen_pos(GameState, BottomLeft, P2);
+				// Front left
+				v2f FrontLeft = FrontCenter + -1.5f * Entity->Right;
+
+				// Front right
+				v2f FrontRight = FrontCenter + 1.5f * Entity->Right;
 
 				// Back center
-				v2f P1 = Entity->Pos - Entity->height * Entity->Direction;
+				v2f BackCenter = Entity->Pos - 0.5f * Entity->height * Entity->Direction;
 
+				v2f Right = Entity->Pos + 0.75f * Entity->base_half_width * Entity->Right;
+				v2f Left = Entity->Pos -0.75f * Entity->base_half_width * Entity->Right;
 
-				P1 = v2f_screen_pos(GameState, BottomLeft, P1);
-				P3 = v2f_screen_pos(GameState, BottomLeft, P3);
+				v2f RearLeftEngine= Left -1.0f * Entity->height * Entity->Direction;
+				v2f RearRightEngine= Right - 1.0f * Entity->height * Entity->Direction;
 
+				v2f SideLeftEngine = BackCenter -1.0f * Entity->base_half_width * Entity->Right;
+				v2f SideRightEngine = BackCenter + 1.0f * Entity->base_half_width * Entity->Right;
 
-				line_dda_draw(BackBuffer, ScreenPos, P0, White);
-				line_dda_draw(BackBuffer, ScreenPos, P1, White);
+				v2f ScreenFrontCenter = v2f_world_to_screen(GameState, BottomLeft, FrontCenter);
+				v2f ScreenBackCenter = v2f_world_to_screen(GameState, BottomLeft, BackCenter);
+				v2f ScreenFrontLeft = v2f_world_to_screen(GameState, BottomLeft, FrontLeft);
+				v2f ScreenFrontRight = v2f_world_to_screen(GameState, BottomLeft, FrontRight);
 
-				line_dda_draw(BackBuffer, ScreenPos, P2, White);
-				line_dda_draw(BackBuffer, ScreenPos, P3, White);
+				v2f ScreenRearLeftEngine = v2f_world_to_screen(GameState, BottomLeft, RearLeftEngine);
+				v2f ScreenRearRightEngine = v2f_world_to_screen(GameState, BottomLeft, RearRightEngine);
 
+				v2f ScreenSideLeftEngine = v2f_world_to_screen(GameState, BottomLeft, SideLeftEngine);
+				v2f ScreenSideRightEngine = v2f_world_to_screen(GameState, BottomLeft, SideRightEngine);
 
-
-#if 0
-				triangle T = player_triangle(GameState, Entity);
-
-				T.Centroid = v2f_screen_pos(GameState, BottomLeft, T.Centroid);
-				for(u32 i = 0; i < ARRAY_COUNT(T.Vertices); i++)
-				{
-					T.Vertices[i] = v2f_screen_pos(GameState, BottomLeft, T.Vertices[i]);
-				}
-
-				//triangle_draw(BackBuffer, &T, 1.0f, 1.0f, 1.0f);
-
-				v2f Perp1 = v2f_normalize(-1.0f * v2f_perp(T.Vertices[0] - T.Vertices[1]));
-				v2f Perp2 = v2f_normalize(-1.0f * v2f_perp(T.Vertices[1] - T.Vertices[2]));
-				v2f Perp3 = v2f_normalize(-1.0f * v2f_perp(T.Vertices[2] - T.Vertices[0]));
-
-				debug_vector_draw_at_point(BackBuffer, ScreenPos, Perp1, Red);
-				debug_vector_draw_at_point(BackBuffer, ScreenPos, Perp2, Green);
-				debug_vector_draw_at_point(BackBuffer, ScreenPos, Perp3, Blue);
-
-				debug_vector_draw_at_point(BackBuffer, ScreenPos, Entity->Direction, White);
-
+				line_dda_draw(BackBuffer, ScreenPos, ScreenBackCenter, White);
+				line_dda_draw(BackBuffer, ScreenPos, ScreenFrontLeft, White);
+				line_dda_draw(BackBuffer, ScreenPos, ScreenFrontRight, White);
+				line_dda_draw(BackBuffer, ScreenBackCenter, ScreenRearLeftEngine, White);
+				line_dda_draw(BackBuffer, ScreenBackCenter, ScreenRearRightEngine, White);
+				line_dda_draw(BackBuffer, ScreenRearLeftEngine, ScreenSideLeftEngine, White);
+				line_dda_draw(BackBuffer, ScreenRearRightEngine, ScreenSideRightEngine, White);
+				line_dda_draw(BackBuffer, ScreenFrontLeft, ScreenSideLeftEngine, White);
+				line_dda_draw(BackBuffer, ScreenFrontRight, ScreenSideRightEngine, White);
 
 #endif
 			} break;
 			case ENTITY_ASTEROID:
 			{
 				v2f AsteroidPos = Entity->Pos;
-				v2f ScreenPos = v2f_screen_pos(GameState, BottomLeft, AsteroidPos);
+				v2f ScreenPos = v2f_world_to_screen(GameState, BottomLeft, AsteroidPos);
 				v2f Alignment = {(f32)GameState->AsteroidSprite.width / 2.0f, (f32)GameState->AsteroidSprite.height / 2.0f};
 
 				push_piece(&PieceGroup, &GameState->AsteroidSprite, ScreenPos, Alignment);
@@ -1799,7 +1930,7 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 				projectile_update(GameState, Entity, dt);
 
 				v2f LaserPos = Entity->Pos;
-				v2f ScreenPos = v2f_screen_pos(GameState, BottomLeft, LaserPos);
+				v2f ScreenPos = v2f_world_to_screen(GameState, BottomLeft, LaserPos);
 				v2f Alignment = {(f32)GameState->LaserBlue.width / 2.0f, (f32)GameState->LaserBlue.height / 2.0f};
 
 				push_piece(&PieceGroup, &GameState->LaserBlue, ScreenPos, Alignment);
@@ -1855,6 +1986,39 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 			}
 		}
 	}
+
+
+
+#if 0
+	if(GameInput->MouseButtons[0].ended_down)
+	{
+		f32 x = (f32)GameInput->mouse_x;
+		f32 y = (f32)GameInput->mouse_y;
+
+
+		v2f WorldPos = v2f_screen_to_world(GameState, V2F(x, y));
+		asteroid_add(GameState, ASTEROID_SMALL, WorldPos);
+	}
+#endif
+#if 0
+	if(GameInput->MouseButtons[0].ended_down)
+	{
+		square *Square = GameState->Squares + GameState->square_count++;
+		Square->Center = V2F((f32)GameInput->mouse_x, (f32)GameInput->mouse_y);
+		if(GameState->square_count >= ARRAY_COUNT(GameState->Squares))
+		{
+			GameState->square_count = 0;
+		}
+	}
+
+	for(u32 i = 0; i < GameState->square_count; i++)
+	{
+		square *Square = GameState->Squares + i;
+		v2f Min = Square->Center;
+		v2f Offset = V2F(Square->half_width, Square->half_width);
+		rectangle_draw(BackBuffer, Min - Offset, Min + Offset, White);
+	}
+#endif
 
 #if 0
 	v2f Delta = {};
