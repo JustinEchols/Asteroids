@@ -4,10 +4,6 @@
  *		- Asteroid collisions
  *		- Projectile collisions
  *
- *	- Hash table tile map storage?
- *		- Use has value to get tiles that are actually set
- *		- No need to loop through entire tile map
-
  * 	- Asset loading
  * 	- VfX
  *		- Animations
@@ -37,16 +33,15 @@
  *		- Profiling
  *		- SIMD
  *		- Intrinsics
- - Physics
- - Angular momentum
- - Mass
- * 	- Audio mixing
+ * Physics
+	 - Angular velocity
+	 - Mass
 
+ * 	- Audio mixing
  * 	- Bitmap transformations (rotations, scaling, ...)
  * 	- UV coordinate mapping
  * 	- Normal mapping
- * 	- Asteroid collision 
- * 	- Angular momentum
+ *
  */
 
 #include "game.h"
@@ -232,6 +227,24 @@ circle_support_point(circle *Circle, v2f Dir)
 	return(Result);
 }
 
+struct interval
+{
+	f32 min;
+	f32 max;
+};
+
+internal b32
+interval_contains(interval Interval, f32 x)
+{
+	b32 Result = false;
+
+	if((x >= Interval.min) && (x <= Interval.max))
+	{
+		Result = true;
+	}
+	return(Result);
+}
+
 internal void
 circle_draw(back_buffer *BackBuffer, circle *Circle, f32 r, f32 b, f32 g)
 {
@@ -249,8 +262,10 @@ circle_draw(back_buffer *BackBuffer, circle *Circle, f32 r, f32 b, f32 g)
 
 
 	u8 *pixel_row = (u8 *)BackBuffer->memory + BackBuffer->stride * y_min + BackBuffer->bytes_per_pixel * x_min;
+
 	v2f Center = Circle->Center;
 	f32 radius =  Circle->radius;
+	interval Interval = {};
 	for(s32 row = y_min; row < y_max; row++)
 	{
 		u32 *pixel = (u32 *)pixel_row;
@@ -261,7 +276,9 @@ circle_draw(back_buffer *BackBuffer, circle *Circle, f32 r, f32 b, f32 g)
 
 			f32 d = (f32)sqrt((dx * dx) + (dy * dy));
 
-			if(d == radius)
+			Interval.min = d - 1.0f;
+			Interval.max = d + 1.0f;
+			if(interval_contains(Interval, radius))
 			{
 				*pixel++ = color;
 			}
@@ -630,10 +647,13 @@ debug_vector_draw_at_point(back_buffer * BackBuffer, v2f Point, v2f Direction, v
 }
 
 
-internal projected_interval 
+// NOTE(Jusitn): Confirmed that this works with not only triangles but with
+// the convex polygon of the player spacesphip bounding polygon.
+
+internal interval 
 sat_projected_interval(v2f *Vertices, u32 vertex_count, v2f ProjectedAxis)
 {
-	projected_interval Result = {};
+	interval Result = {};
 
 	f32 min = f32_infinity();
 	f32 max = f32_neg_infinity();
@@ -680,10 +700,10 @@ triangle_project_onto_axis(triangle *Triangle, v2f ProjectedAxis)
 }
 #endif
 
-internal projected_interval
+internal interval
 circle_project_onto_axis(circle *Circle, v2f ProjectedAxis)
 {
-	projected_interval Result = {};
+	interval Result = {};
 
 	f32 min = f32_infinity();
 	f32 max = f32_neg_infinity();
@@ -691,11 +711,11 @@ circle_project_onto_axis(circle *Circle, v2f ProjectedAxis)
 	v2f CircleMin = circle_support_point(Circle, -1.0f * ProjectedAxis);
 	v2f CircleMax = circle_support_point(Circle, ProjectedAxis);
 
-	f32 a = v2f_dot(CircleMin, ProjectedAxis);
-	f32 b = v2f_dot(CircleMax, ProjectedAxis);
+	f32 projected_min = v2f_dot(CircleMin, ProjectedAxis);
+	f32 projected_max = v2f_dot(CircleMax, ProjectedAxis);
 
-	min = MIN(a, min);
-	max = MAX(b, max);
+	min = MIN(projected_min, min);
+	max = MAX(projected_max, max);
 
 	Result.min = min;
 	Result.max = max;
@@ -754,7 +774,6 @@ closest_point_to_circle(v2f *Vertices, u32 vertex_count, circle *Circle)
 	return(Result);
 }
 
-
 // TODO(Justin): Need to figure the shapes associated with the entities. ATM they
 // this only works in a special case and was implemented in this way as a step
 // towards the final game.
@@ -772,10 +791,10 @@ sat_collision(entity *EntityA, entity *EntityB)
 
 		v2f ProjectedAxis = v2f_normalize(-1.0f * v2f_perp(D));
 
-		projected_interval EntityAInterval = sat_projected_interval(EntityA->Poly.Vertices,
-				ARRAY_COUNT(EntityA->Poly.Vertices), ProjectedAxis);
+		interval EntityAInterval = sat_projected_interval(EntityA->Poly.Vertices,
+															ARRAY_COUNT(EntityA->Poly.Vertices), ProjectedAxis);
 
-		projected_interval EntityBInterval = circle_project_onto_axis(&Circle, ProjectedAxis);
+		interval EntityBInterval = circle_project_onto_axis(&Circle, ProjectedAxis);
 
 		if(EntityBInterval.min > EntityBInterval.max)
 		{
@@ -793,12 +812,14 @@ sat_collision(entity *EntityA, entity *EntityB)
 	}
 
 	v2f ClosestPoint = closest_point_to_circle(EntityA->Poly.Vertices,
-			ARRAY_COUNT(EntityA->Poly.Vertices), &Circle);
+															ARRAY_COUNT(EntityA->Poly.Vertices), &Circle);
 
 	v2f ProjectedAxis = v2f_normalize(ClosestPoint - Circle.Center);
 
-	projected_interval EntityAInterval = sat_projected_interval(EntityA->Poly.Vertices, ARRAY_COUNT(EntityA->Poly.Vertices), ProjectedAxis);
-	projected_interval EntityBInterval = circle_project_onto_axis(&Circle, ProjectedAxis);
+	interval EntityAInterval = sat_projected_interval(EntityA->Poly.Vertices,
+															ARRAY_COUNT(EntityA->Poly.Vertices), ProjectedAxis);
+
+	interval EntityBInterval = circle_project_onto_axis(&Circle, ProjectedAxis);
 
 	if(!((EntityBInterval.max >= EntityAInterval.min) &&
 		 (EntityAInterval.max >= EntityBInterval.min)))
@@ -881,11 +902,11 @@ circles_collision(circle *CircleA, circle *CircleB)
 
 	v2f ProjectedAxis = v2f_normalize(CircleB->Center - CircleA->Center);
 
-	projected_interval CircleAInterval = circle_project_onto_axis(CircleA, ProjectedAxis);
-	projected_interval CircleBInterval = circle_project_onto_axis(CircleB, ProjectedAxis);
+	interval CircleAInterval = circle_project_onto_axis(CircleA, ProjectedAxis);
+	interval CircleBInterval = circle_project_onto_axis(CircleB, ProjectedAxis);
 
 	if(!((CircleAInterval.max >= CircleBInterval.min) &&
-				(CircleBInterval.max >= CircleAInterval.min)))
+		 (CircleBInterval.max >= CircleAInterval.min)))
 	{
 		return(GapExists);
 	}
@@ -896,7 +917,7 @@ circles_collision(circle *CircleA, circle *CircleB)
 	CircleBInterval = circle_project_onto_axis(CircleB, ProjectedAxis);
 
 	if(!((CircleAInterval.max >= CircleBInterval.min) &&
-				(CircleBInterval.max >= CircleAInterval.min)))
+		 (CircleBInterval.max >= CircleAInterval.min)))
 	{
 		return(GapExists);
 	}
@@ -919,11 +940,32 @@ entity_add(game_state *GameState, entity_type type)
 {
 	ASSERT(GameState->entity_count < ARRAY_COUNT(GameState->Entities));
 
-	u32 entity_index = GameState->entity_count++;
+	u32 entity_index = 0;
+	if(type == ENTITY_PROJECTILE)
+	{
+		b32 projectile_overwrite = false;
+		for(u32 i = 0; i < ARRAY_COUNT(GameState->Entities); i++)
+		{
+			entity *Entity = GameState->Entities + i;
+			if((Entity->type == ENTITY_PROJECTILE) && (!Entity->exists))
+			{
+				entity_index = i;
+				projectile_overwrite = true;
+				break;
+			}
+		}
+		if(!projectile_overwrite)
+		{
+			entity_index = GameState->entity_count++;
+		}
+	}
+	else
+	{
+		entity_index = GameState->entity_count++;
+	}
 
 	entity *Entity = GameState->Entities + entity_index;
 	*Entity = {};
-
 	Entity->index = entity_index;
 	Entity->type = type;
 
@@ -941,7 +983,6 @@ entities_are_same(entity *EntityA, entity *EntityB)
 	}
 
 	return(Result);
-
 }
 
 internal triangle
@@ -990,6 +1031,8 @@ struct move_spec
 {
 	b32 use_normalized_accel;
 	f32 speed;
+	f32 angular_speed;
+	f32 mass;
 };
 
 internal void
@@ -1047,9 +1090,6 @@ entity_move(game_state *GameState, entity *Entity, v2f ddPos, f32 dt)
 
 	Entity->dPos = NewVel;
 
-	// TODO(Justin): Collision detection against asteroids/entities not tiles. Tiles
-	// should be used to check whether or not something exists in it.
-
 	// TODO(Justin): If an entity cannot be collided with, the collision
 	// detection should be completely skipped.
 
@@ -1069,15 +1109,20 @@ entity_move(game_state *GameState, entity *Entity, v2f ddPos, f32 dt)
 				{
 					if(TestEntity->type == ENTITY_PLAYER)
 					{
+						// TODO(Jusitn): Right now the order of the entites
+						// passed to the sat_collision function matters. Fix
+						// this.
+
 						// TODO(Justin) Collision based on whether or not the
 						// player is shielded.
-						//circle EntityCircle = circle_init(Entity->Pos, Entity->radius);
-						//triangle PlayerTriangle =  player_triangle(GameState, TestEntity);
+
+						// TODO(Justin): Getting the normal of the ship's side
+						// that the asteroid makes contact with, I think, is
+						// incorrect.
+
 						if(sat_collision(TestEntity, Entity))
 						{
-							//v2f Delta = PlayerTriangle.Centroid - EntityCircle.Center;
 							v2f Delta = TestEntity->Pos - Entity->Pos;
-
 							for(u32 vertex_i = 0; vertex_i < ARRAY_COUNT(TestEntity->Poly.Vertices); vertex_i++)
 							{
 								v2f P0 = TestEntity->Poly.Vertices[vertex_i];
@@ -1092,22 +1137,6 @@ entity_move(game_state *GameState, entity *Entity, v2f ddPos, f32 dt)
 									break;
 								}
 							}
-#if 0
-							for(u32 vertex_i = 0; vertex_i < ARRAY_COUNT(PlayerTriangle.Vertices); vertex_i++)
-							{
-								v2f P0 = PlayerTriangle.Vertices[vertex_i];
-								v2f P1 = PlayerTriangle.Vertices[(vertex_i + 1)  % ARRAY_COUNT(PlayerTriangle.Vertices)];
-
-								v2f Edge = P1 - P0;
-								v2f Perp = -1.0f * v2f_perp(Edge);
-
-								if(v2f_dot(Perp, Delta) < 0.0f)
-								{
-									Normal = v2f_normalize(Perp);
-									break;
-								}
-							}
-#endif
 							entity_hit_index = TestEntity->index;
 						}
 					}
@@ -1131,6 +1160,8 @@ entity_move(game_state *GameState, entity *Entity, v2f ddPos, f32 dt)
 
 	if(entity_hit_index)
 	{
+		entity *HitEntity = entity_get(GameState, entity_hit_index);
+
 		if(Entity->type == ENTITY_PLAYER)
 		{
 			if(!Entity->is_shielded)
@@ -1256,7 +1287,8 @@ player_add(game_state *GameState)
 
 	Entity->shape = SHAPE_TRIANGLE;
 
-	// NOTE(Justin): This is not a vertex but used for calculating vertices
+	// NOTE(Justin): This is not a vertex but used for calculating vertices.
+	// Vertices are also stored in CCW order which is requried.
 	v2f FrontCenter = Entity->Pos + Entity->height * Entity->Direction;
 	// Front left
 	v2f FrontLeft = FrontCenter + -1.5f * Entity->Right;
@@ -1379,23 +1411,22 @@ familiar_add(game_state *GameState)
 internal entity *
 projectile_add(game_state *GameState)
 {
+	// TODO(Justin): Maybe need a separate array of entities specifically
+	// for projectiles. We can sort the arrray by whether or not the projectile
+	// is used or not used. If it is not used it is safe to overwrite the
+	// projectile
 	entity *Entity = entity_add(GameState, ENTITY_PROJECTILE);
 
 	Entity->exists = true;
 	Entity->collides = true;
 
-	// NOTE(Justin): We can have different kinds of projectiles if needed in
-	// the future. Right now there is only one projectile and it is tied to the
-	// player as an energy weapon. So we need to get the player entity when
-	// adding a projectile.
-
 	entity *EntityPlayer = GameState->Entities + GameState->player_entity_index;
 
-	Entity->distance_remaining = 100.0f;
+	Entity->distance_remaining = 200.0f;
 	Entity->Direction = EntityPlayer->Direction;
 	Entity->Pos = EntityPlayer->Pos + EntityPlayer->height * Entity->Direction;
 
-	Entity->speed = 30.0f;
+	Entity->speed = 85.0f;
 	Entity->dPos = Entity->speed * Entity->Direction;
 
 	return(Entity);
@@ -1568,7 +1599,8 @@ projectile_update(game_state *GameState, entity *Entity, f32 dt)
 	else
 	{
 		// TODO(Justin): Remove from entity set? Or just overwrite it? 
-		//entity_remove(GameState, Entity);
+		Entity->exists = false;
+		GameState->entity_count--;
 	}
 }
 
@@ -1602,7 +1634,7 @@ v2f_screen_to_world(game_state *GameState, v2f ScreenXY)
 }
 
 internal void
-player_draw_collision_box(back_buffer *BackBuffer, game_state *GameState, v2f BottomLeft, entity *EntityPlayer)
+player_polygon_draw(back_buffer *BackBuffer, game_state *GameState, v2f BottomLeft, entity *EntityPlayer)
 {
 	v2f FrontLeft = EntityPlayer->Poly.Vertices[0];
 	v2f SideLeftEngine = EntityPlayer->Poly.Vertices[1];
@@ -1634,8 +1666,6 @@ player_draw_collision_box(back_buffer *BackBuffer, game_state *GameState, v2f Bo
 	line_dda_draw(BackBuffer, ScreenFrontRight, ScreenSideRightEngine, White);
 
 }
-
-
 
 internal void
 update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer *SoundBuffer, game_input *GameInput)
@@ -1680,6 +1710,17 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 		srand(2023);
 
 		// TODO(Justin): This size of the asteroid should be random.
+		asteroid_add(GameState, ASTEROID_SMALL);
+		asteroid_add(GameState, ASTEROID_SMALL);
+		asteroid_add(GameState, ASTEROID_SMALL);
+		asteroid_add(GameState, ASTEROID_SMALL);
+		asteroid_add(GameState, ASTEROID_SMALL);
+		asteroid_add(GameState, ASTEROID_SMALL);
+		asteroid_add(GameState, ASTEROID_SMALL);
+		asteroid_add(GameState, ASTEROID_SMALL);
+		asteroid_add(GameState, ASTEROID_SMALL);
+		asteroid_add(GameState, ASTEROID_SMALL);
+		asteroid_add(GameState, ASTEROID_SMALL);
 		asteroid_add(GameState, ASTEROID_SMALL);
 		asteroid_add(GameState, ASTEROID_SMALL);
 		asteroid_add(GameState, ASTEROID_SMALL);
@@ -1757,7 +1798,6 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 	}
 	entity_move(GameState, EntityPlayer, PlayerAccel, dt);
 
-
 	v2f AsteroidAccel = {};
 	for(u32 entity_index = 1; entity_index < GameState->entity_count; entity_index++)
 	{
@@ -1787,8 +1827,17 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 
 				push_piece(&PieceGroup, &GameState->Ship, ScreenPos, Alignment);
 
-#if 0
-				player_draw_collision_box(BackBuffer, GameState, BottomLeft, Entity);
+#if 1
+				player_polygon_draw(BackBuffer, GameState, BottomLeft, Entity);
+				if(Entity->is_shielded)
+				{
+					circle Circle = circle_init(Entity->Pos, Entity->height);
+
+					Circle.Center = v2f_world_to_screen(GameState, BottomLeft, Circle.Center);
+					Circle.radius *= GameState->pixels_per_meter;
+					circle_draw(BackBuffer, &Circle, White);
+
+				}
 #endif
 			} break;
 			case ENTITY_ASTEROID:
@@ -1799,12 +1848,10 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 
 				push_piece(&PieceGroup, &GameState->AsteroidSprite, ScreenPos, Alignment);
 
+#if 0
 				v2f temp = v2f_normalize(Entity->dPos);
 				debug_vector_draw_at_point(BackBuffer, ScreenPos, temp, White);
-
-				circle Circle = circle_init(ScreenPos, 10.0f);
-				circle_draw(BackBuffer, &Circle, White);
-
+#endif
 			} break;
 			case ENTITY_FAMILIAR:
 			{
@@ -1821,14 +1868,16 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 			} break;
 			case ENTITY_PROJECTILE:
 			{
+				// NOTE(Justin): This is a hack.
 				projectile_update(GameState, Entity, dt);
+				if(Entity->exists)
+				{
+					v2f LaserPos = Entity->Pos;
+					v2f ScreenPos = v2f_world_to_screen(GameState, BottomLeft, LaserPos);
+					v2f Alignment = {(f32)GameState->LaserBlue.width / 2.0f, (f32)GameState->LaserBlue.height / 2.0f};
 
-				v2f LaserPos = Entity->Pos;
-				v2f ScreenPos = v2f_world_to_screen(GameState, BottomLeft, LaserPos);
-				v2f Alignment = {(f32)GameState->LaserBlue.width / 2.0f, (f32)GameState->LaserBlue.height / 2.0f};
-
-				push_piece(&PieceGroup, &GameState->LaserBlue, ScreenPos, Alignment);
-
+					push_piece(&PieceGroup, &GameState->LaserBlue, ScreenPos, Alignment);
+				}
 			} break;
 			case ENTITY_TRIANGLE:
 			{
@@ -1880,8 +1929,6 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 			}
 		}
 	}
-
-
 
 #if 0
 	if(GameInput->MouseButtons[0].ended_down)
