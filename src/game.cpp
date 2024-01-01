@@ -779,9 +779,12 @@ circles_collision(circle *CircleA, circle *CircleB)
 {
 	b32 Colliding = false;
 
-	f32 distance_between_centers = v2f_length(CircleA->Center - CircleB->Center);
-	f32 radii_sum = CircleA->radius + CircleB->radius;
-	if(distance_between_centers < radii_sum)
+	v2f CenterBToCenterA = CircleA->Center - CircleB->Center;
+
+	f32 distance_squared = v2f_dot(CenterBToCenterA, CenterBToCenterA);
+	f32 radii_squared_sum = SQUARE(CircleA->radius + CircleB->radius);
+
+	if(distance_squared < radii_squared_sum)
 	{
 		Colliding = true;
 	}
@@ -1039,6 +1042,7 @@ collision_handle(entity *EntityA, entity *EntityB)
 {
 }
 
+
 internal void
 entity_move(game_state *GameState, entity *Entity, v2f ddPos, f32 dt)
 { 
@@ -1179,9 +1183,9 @@ entity_move(game_state *GameState, entity *Entity, v2f ddPos, f32 dt)
 				(HitEntity->type == ENTITY_PLAYER))
 		{
 
-			Entity->dPos = Entity->speed * Normal;
+			//Entity->dPos = Entity->speed * Normal;
 			//Entity->dPos = Entity->dPos - 2.0f * v2f_dot(Entity->dPos, Normal) * Normal;
-			//Entity->dPos = Entity->dPos - 2.0f * v2f_dot(Entity->dPos, Normal) * Normal;
+			Entity->dPos = Entity->dPos - 2.0f * v2f_dot(Entity->dPos, Normal) * Normal;
 			Entity->Pos = EntityNewPos;
 		}
 	}
@@ -1670,6 +1674,15 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 		asteroid_add(GameState, ASTEROID_SMALL);
 
 
+		m3x3 *M = &GameState->MapToScreenSpace;
+		m3x3 *T = &GameState->InverseScreenOffset;
+
+		m3x3 InverseWorldTranslate = m3x3_translation_create(V2F(World->Dim.x, World->Dim.y));
+		m3x3 Scale = m3x3_scale_create(GameState->pixels_per_meter / 2.0f);
+		m3x3 InverseScreenOffset = m3x3_translation_create(V2F(5.0f, 5.0f));
+
+		*M = Scale * InverseWorldTranslate;
+		*T = InverseScreenOffset;
 
 		GameMemory->is_initialized = true;
 	}
@@ -1751,6 +1764,8 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 	// NOTE(Justin): Render
 	//
 
+	m3x3 MapToScreenSpace = GameState->MapToScreenSpace;
+	m3x3 InverseScreenOffset = GameState->InverseScreenOffset;
 	entity_visible_piece_group PieceGroup;
 	for(u32 entity_index = 1; entity_index < GameState->entity_count; entity_index++)
 	{
@@ -1761,12 +1776,13 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 			case ENTITY_PLAYER:
 			{
 				v2f PlayerPos = Entity->Pos;
-				v2f ScreenPos = v2f_world_to_screen(GameState, BottomLeft, PlayerPos);
+
+				v2f ScreenPos = MapToScreenSpace * PlayerPos;
+				ScreenPos = InverseScreenOffset * ScreenPos;
 
 				push_bitmap(&PieceGroup, &GameState->Ship, ScreenPos, GameState->Ship.Align);
-#if 1
 				player_polygon_draw(BackBuffer, GameState, BottomLeft, Entity);
-#if 0
+
 				if(Entity->is_shielded)
 				{
 					circle Circle = circle_init(Entity->Pos, Entity->height);
@@ -1776,13 +1792,12 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 					circle_draw(BackBuffer, &Circle, White);
 
 				}
-#endif
-#endif
 			} break;
 			case ENTITY_ASTEROID:
 			{
 				v2f AsteroidPos = Entity->Pos;
-				v2f ScreenPos = v2f_world_to_screen(GameState, BottomLeft, AsteroidPos);
+				v2f ScreenPos = MapToScreenSpace * AsteroidPos;
+				ScreenPos = InverseScreenOffset * ScreenPos;
 
 				push_bitmap(&PieceGroup, &GameState->AsteroidBitmap, ScreenPos, GameState->AsteroidBitmap.Align);
 
@@ -1810,7 +1825,9 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 				if(!entity_flag_is_set(Entity, ENTITY_FLAG_NON_SPATIAL))
 				{
 					v2f LaserPos = Entity->Pos;
-					v2f ScreenPos = v2f_world_to_screen(GameState, BottomLeft, LaserPos);
+
+					v2f ScreenPos = MapToScreenSpace * LaserPos;
+					ScreenPos = InverseScreenOffset * ScreenPos;
 
 					push_bitmap(&PieceGroup, &GameState->LaserBlueBitmap, ScreenPos, GameState->LaserBlueBitmap.Align);
 				}
@@ -1864,97 +1881,7 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 			}
 			else
 			{
-				//v2f HalfDim = 0.5f * GameState->pixels_per_meter * Piece->Dim;
-				//rectangle_draw(BackBuffer, Min , v2f Max, Piece->r, Piece->g, Piece->b, Piece->alpha);
 			}
 		}
 	}
-
-#if 0
-	if(GameInput->MouseButtons[0].ended_down)
-	{
-		f32 x = (f32)GameInput->mouse_x;
-		f32 y = (f32)GameInput->mouse_y;
-
-
-		v2f WorldPos = v2f_screen_to_world(GameState, V2F(x, y));
-		asteroid_add(GameState, ASTEROID_SMALL, WorldPos);
-	}
-#endif
-#if 0
-	if(GameInput->MouseButtons[0].ended_down)
-	{
-		square *Square = GameState->Squares + GameState->square_count++;
-		Square->Center = V2F((f32)GameInput->mouse_x, (f32)GameInput->mouse_y);
-		if(GameState->square_count >= ARRAY_COUNT(GameState->Squares))
-		{
-			GameState->square_count = 0;
-		}
-	}
-
-	for(u32 i = 0; i < GameState->square_count; i++)
-	{
-		square *Square = GameState->Squares + i;
-		v2f Min = Square->Center;
-		v2f Offset = V2F(Square->half_width, Square->half_width);
-		rectangle_draw(BackBuffer, Min - Offset, Min + Offset, White);
-	}
-#endif
-
-#if 0
-	v2f Delta = {};
-	if(GameInput->Controller.ArrowLeft.ended_down) {
-		Delta += V2F(-1.0f, 0.0f);
-	}
-	if(GameInput->Controller.ArrowRight.ended_down) {
-		Delta += V2F(1.0f, 0.0f);
-	}
-	if(GameInput->Controller.ArrowUp.ended_down) {
-		Delta += V2F(0.0f, 1.0f);
-	}
-	if(GameInput->Controller.ArrowDown.ended_down) {
-		Delta += V2F(0.0f, -1.0f);
-	}
-
-	// NOTE(Justin): The argument to the function is a v2f but the matrix
-	// returned has a final column of (0,0,1)^T 
-
-	m3x3 M = m3x3_translation_create(Delta);
-
-
-
-	triangle *T = &GameState->Triangle;
-	triangle Test = *T;
-
-	for(u32 i = 0; i < 3; i++) {
-		Test.Vertices[i] = M * Test.Vertices[i];
-	}
-
-#if 0
-	if(triangle_circle_collision(&Test, &Circle)) {
-		triangle_draw(BackBuffer, T, 1.0f, 0.0f, 0.0f);
-	} else {
-		*T = Test;
-		triangle_draw(BackBuffer, T, 1.0f, 1.0f, 1.0f);
-	}
-#endif
-#if 1
-	circle *CircleA = &GameState->CircleA;
-	circle *CircleB = &GameState->CircleB;
-
-	CircleA->Center = M * CircleA->Center;
-	if(circles_collision(CircleA, CircleB)) {
-		circle_draw(BackBuffer, CircleA, Red);
-		circle_draw(BackBuffer, CircleB, Red);
-	} else {
-		circle_draw(BackBuffer, CircleA, White);
-		circle_draw(BackBuffer, CircleB, White);
-		line_dda_draw(BackBuffer, CircleA->Center, CircleB->Center, Red);
-	}
-#endif
-
-#endif
-
-	//sound_buffer_fill(GameState, SoundBuffer);
-
 }
