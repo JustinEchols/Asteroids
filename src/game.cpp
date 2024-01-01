@@ -773,7 +773,6 @@ closest_point_to_circle(v2f *Vertices, u32 vertex_count, circle *Circle)
 	return(Result);
 }
 
-
 internal b32
 circles_collision(circle *CircleA, circle *CircleB)
 {
@@ -791,15 +790,6 @@ circles_collision(circle *CircleA, circle *CircleB)
 
 	return(Colliding);
 }
-
-// TODO(Justin): Need to figure the shapes associated with the entities. ATM they
-// this only works in a special case and was implemented in this way as a step
-// towards the final game.
-
-// TODO(Jusitn): I do not like the idea of testing circles in the sat_collision
-// algorithm. The sat collision detection is for convex polygons. Now we can
-// test against a polygon and another shape but different work is involved and
-// is the current implementation
 
 internal b32
 sat_collision(entity *EntityA, entity *EntityB)
@@ -868,70 +858,7 @@ sat_collision(entity *EntityA, entity *EntityB)
 	return(GapExists);
 }
 
-#if 0
-internal b32
-triangle_circle_collision(triangle *Triangle, circle *Circle)
-{
-	// NOTE(Justin): The collision detection algorithim is an implementation of the Separated Axis
-	// Algorithm.
 
-	b32 GapExists = false;
-
-	for(u32 vertex_i = 0; vertex_i < ARRAY_COUNT(Triangle->Vertices); vertex_i++)
-	{
-
-		// Define edges s.t. a normal to the edge, the projection axis,
-		// can be used as the interval for the intersection test.
-
-		v2f P0 = Triangle->Vertices[vertex_i];
-		v2f P1 = Triangle->Vertices[(vertex_i + 1) % ARRAY_COUNT(Triangle->Vertices)];
-		v2f D = P1 - P0;
-
-		// NOTE(Justin): The triangle's vertices are sorted into CCW order.
-		// The perpendicular vector of an edge (x, y) -> (-y, x) is the perpendicular
-		// pointing INTO the triangle. Why? The perp operation is a CCW
-		// operation. Meaning that the result is a vector from rotating the
-		// input 90 degrees CCW. 
-		// Therefore use (y, -x) as the perpendicualr to the edge, which points
-		// outside.
-
-		v2f ProjectedAxis = v2f_normalize(-1.0f * v2f_perp(D));
-
-		projected_interval TriangleInterval = triangle_project_onto_axis(Triangle, ProjectedAxis);
-		projected_interval CircleInterval = circle_project_onto_axis(Circle, ProjectedAxis);
-
-		// TODO(Justin): Why is there uncertainty of the order of the points of
-		// the interval?
-
-		if(CircleInterval.min > CircleInterval.max)
-		{
-			f32 temp = CircleInterval.min;
-			CircleInterval.min = CircleInterval.max;
-			CircleInterval.max = temp;
-		}
-
-		if(!((CircleInterval.max >= TriangleInterval.min) &&
-					(TriangleInterval.max >= CircleInterval.min)))
-		{
-
-			return(GapExists);
-		}
-	}
-
-	v2f ClosestPoint = triangle_closest_point_to_circle(Triangle, Circle);
-	v2f ProjectedAxis = v2f_normalize(ClosestPoint - Circle->Center);
-
-	projected_interval TriangleInterval = triangle_project_onto_axis(Triangle, ProjectedAxis);
-	projected_interval CircleInterval = circle_project_onto_axis(Circle, ProjectedAxis);
-
-	if(!((CircleInterval.max >= TriangleInterval.min) &&
-				(TriangleInterval.max >= CircleInterval.min)))
-	{
-		return(GapExists);
-	}
-	return(!GapExists);
-}
-#endif
 
 
 inline entity *
