@@ -15,6 +15,8 @@ typedef struct
 	u32 bytes_per_pixel;
 	u32 stride;
 
+	v2f Align;
+
 } loaded_bitmap;
 
 

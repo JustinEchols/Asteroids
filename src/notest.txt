@@ -1,0 +1,18 @@
+On using git diff
+
+To view all changes in all files use
+
+git diff
+
+this looks at every file recursively
+
+To view changes of a specific file use
+
+git diff file
+
+When using git diff a program is run. To exit type q.
+To output the diff to a file, just pipe it using >
+
+git diff file > filediffresults.txt
+
+Then open the file in vim.

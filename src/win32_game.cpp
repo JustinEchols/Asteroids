@@ -461,6 +461,10 @@ win32_process_pending_messgaes(game_controller_input *KeyboardController)
 						{
 							win32_process_keyboard_messages(&KeyboardController->Space, key_is_down);
 						} break;
+						case VK_RETURN:
+						{
+							win32_process_keyboard_messages(&KeyboardController->Enter, key_is_down);
+						} break;
 						case 'W':
 						{
 							win32_process_keyboard_messages(&KeyboardController->Up, key_is_down);
@@ -722,10 +726,6 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR CmdLine, int nCmdSho
 													GetKeyState(VK_XBUTTON1) & (1 << 15));
 					win32_process_keyboard_messages(&NewInput->MouseButtons[4],
 													GetKeyState(VK_XBUTTON2) & (1 << 15));
-
-
-
-
 
 					DWORD play_cursor;
 					DWORD write_cursor;

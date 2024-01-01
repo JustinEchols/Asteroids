@@ -1,0 +1,110 @@
+#if DEBUG_TILE_MAP
+	v2f MinScreenXY = {};
+	v2f MaxScreenXY = V2F((f32)BackBuffer->width, (f32)BackBuffer->height);
+	rectangle_draw(BackBuffer, MinScreenXY, MaxScreenXY, 0.0f, 0.0f, 0.0f);
+
+	for (s32 row = 0; row < TileMap->tile_count_y; row++) {
+		for (s32 col = 0; col < TileMap->tile_count_x ; col++) {
+			u32 tile_value = TileMap->tiles[row * TileMap->tile_count_x + col];
+			f32 gray = 0.5f;
+			if (tile_value == 1) {
+				gray = 1.0f;
+			} 
+			v2f Min, Max;
+
+			Min.x = BottomLeft.x + (f32)col * tile_side_in_pixels;
+			Min.y = BottomLeft.y + (f32)row * tile_side_in_pixels;
+			Max.x = Min.x + tile_side_in_pixels;
+			Max.y = Min.y + tile_side_in_pixels;
+			rectangle_draw(BackBuffer, Min, Max, gray, gray, gray);
+		}
+	}
+
+	MinScreenXY.x = BottomLeft.x + (f32)EntityPlayer->TileMapPos.Tile.x * tile_side_in_pixels;
+	MinScreenXY.y = BottomLeft.y + (f32)EntityPlayer->TileMapPos.Tile.y * tile_side_in_pixels;
+	MaxScreenXY.x = MinScreenXY.x + tile_side_in_pixels;
+	MaxScreenXY.y = MinScreenXY.y + tile_side_in_pixels;
+	rectangle_draw(BackBuffer, MinScreenXY, MaxScreenXY, 1.0f, 1.0f, 0.0f);
+
+#else
+#endif
+
+internal b32
+test_tile_side(f32 max_corner_x, f32 rel_x, f32 rel_y, f32 *t_min,
+		  f32 player_delta_x, f32 player_delta_y, f32 min_corner_y, f32 max_corner_y)
+{
+	// NOTE(Justin): Using epsilons is not ideal..
+	b32 hit = false;
+	f32 epsilon = 0.001f;
+	f32 wall_x = max_corner_x;
+	if (player_delta_x != 0) {
+		f32 t_result = (wall_x - rel_x) / player_delta_x;
+		f32 y = rel_y + t_result * player_delta_y;
+		if ((t_result >= 0.0f) && (*t_min > t_result)) {
+			if ((y >= min_corner_y) && (y <= max_corner_y)) {
+				*t_min = MAX(0.0f, t_result - epsilon);
+				hit = true;
+			}
+		}
+	}
+	return(hit);
+}
+
+#if 0
+internal b32
+circles_collision(circle *CircleA, circle *CircleB)
+{
+	b32 GapExists = false;
+
+	v2f ProjectedAxis = v2f_normalize(CircleB->Center - CircleA->Center);
+
+	interval CircleAInterval = circle_project_onto_axis(CircleA, ProjectedAxis);
+	interval CircleBInterval = circle_project_onto_axis(CircleB, ProjectedAxis);
+
+	if(!((CircleAInterval.max >= CircleBInterval.min) &&
+		 (CircleBInterval.max >= CircleAInterval.min)))
+	{
+		return(GapExists);
+	}
+
+	ProjectedAxis = v2f_normalize(CircleA->Center - CircleB->Center);
+
+	CircleAInterval = circle_project_onto_axis(CircleA, ProjectedAxis);
+	CircleBInterval = circle_project_onto_axis(CircleB, ProjectedAxis);
+
+	if(!((CircleAInterval.max >= CircleBInterval.min) &&
+		 (CircleBInterval.max >= CircleAInterval.min)))
+	{
+		return(GapExists);
+	}
+	return(!GapExists);
+}
+#endif
+
+#if 0
+internal projected_interval 
+triangle_project_onto_axis(triangle *Triangle, v2f ProjectedAxis)
+{
+	projected_interval Result = {};
+
+	f32 min = f32_infinity();
+	f32 max = f32_neg_infinity();
+	for(u32 vertex_i = 0; vertex_i < ARRAY_COUNT(Triangle->Vertices); vertex_i++)
+	{
+		v2f Vertex = Triangle->Vertices[vertex_i];
+
+		// NOTE(Justin): The scalar we get from the dot product is how far along
+		// the projected vector is along the projected axis. In other words, it
+		// is the scalar that when multiplied with the projected axis, gives us
+		// the projected vector.
+
+		f32 c = v2f_dot(Vertex, ProjectedAxis);
+		min = MIN(c, min);
+		max = MAX(c, max);
+	}
+	Result.min = min;
+	Result.max = max;
+
+	return(Result);
+}
+#endif

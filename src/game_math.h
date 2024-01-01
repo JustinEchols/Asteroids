@@ -14,11 +14,6 @@ struct v2u
 	u32 x, y;
 };
 
-struct m2x2
-{
-	f32 e[2][2];
-};
-
 union v2f
 {
 	struct
@@ -77,6 +72,11 @@ union v4f
 	f32 e[4];
 };
 
+struct m2x2
+{
+	f32 e[2][2];
+};
+
 struct m3x3
 {
 	f32 e[3][3];
@@ -86,9 +86,11 @@ struct m3x3
 inline v2i
 V2I(s32 x, s32 y)
 {
-	v2i Result = {0};
+	v2i Result;
+
 	Result.x = x;
 	Result.y = y;
+
 	return(Result);
 
 }
@@ -97,11 +99,51 @@ inline v2f
 V2F(f32 x, f32 y)
 {
 	v2f Result;
+
 	Result.x = x;
 	Result.y = y;
 
 	return(Result);
 }
+
+inline v3f
+V3F(f32 x, f32 y, f32 z)
+{
+	v3f Result;
+
+	Result.x = x;
+	Result.y = y;
+	Result.z = z;
+
+	return(Result);
+}
+
+inline v4f
+V4F(f32 x, f32 y, f32 z, f32 w)
+{
+	v4f Result;
+
+	Result.x = x;
+	Result.y = y;
+	Result.z = z;
+	Result.w = w;
+
+	return(Result);
+}
+
+//
+// NOTE(Justin): Scalar operations
+//
+
+inline f32
+lerp(f32 a, f32 t, f32 b)
+{
+	f32 Result = (1.0f - t) * a + t * b;
+	
+	return(Result);
+}
+
+
 
 //
 // NOTE(Justin): v2 operations
@@ -272,19 +314,6 @@ m2x2_rotation_create(f32 angle)
 	return(R);
 }
 
-
-inline v3f
-V3F(f32 x, f32 y, f32 z)
-{
-	v3f Result = {0};
-
-	Result.x = x;
-	Result.y = y;
-	Result.z = z;
-
-	return(Result);
-}
-
 inline v3f
 operator *(f32 c, v3f V)
 {
@@ -296,6 +325,10 @@ operator *(f32 c, v3f V)
 
 	return(Result);
 }
+
+//
+// NOTE(Justin): v4f operations
+//
 
 //
 // NOTE(Justin): Matrix operations

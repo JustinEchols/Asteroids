@@ -3,8 +3,9 @@
 struct entity_visible_piece
 {
 	loaded_bitmap *Bitmap;
-	v2f Offset;
+	v2f Pos;
 	f32 r, g, b, alpha;
+	v2f Dim;
 };
 
 struct entity_visible_piece_group

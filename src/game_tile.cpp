@@ -1,4 +1,5 @@
 
+/*
 #define TILE_NOT_USED INT32_MAX
 
 inline tile_map_position
@@ -140,7 +141,7 @@ tile_map_get_absolute_pos(tile_map *TileMap, tile_map_position TileMapPos)
 	return(Result);
 }
 
-/*
+
 inline u32
 tile_map_get_tile_value_unchecked(tile_map *TileMap, v2i Tile)
 {

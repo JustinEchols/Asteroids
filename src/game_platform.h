@@ -89,7 +89,7 @@ typedef struct
 {
 	union
 	{
-		game_button_state Buttons[10];
+		game_button_state Buttons[11];
 		struct
 		{
 			game_button_state Up;
@@ -97,6 +97,7 @@ typedef struct
 			game_button_state Left;
 			game_button_state Right;
 			game_button_state Space;
+			game_button_state Enter;
 			game_button_state Shift;
 			game_button_state ArrowUp;
 			game_button_state ArrowDown;
