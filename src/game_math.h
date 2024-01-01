@@ -395,6 +395,18 @@ operator *(m3x3 M, v2f V)
 }
 
 inline m3x3
+m3x3_scale_create(f32 c)
+{
+	m3x3 Result =
+	{
+		{{c, 0.0f, 0.0f},
+		{0.0f, c, 0.0f},
+		{0.0f, 0.0f, c}},
+	};
+	return(Result);
+}
+
+inline m3x3
 m3x3_translation_create(v2f V)
 {
 	m3x3 Result =
@@ -437,9 +449,12 @@ m3x3_matrix_mult(m3x3 A, m3x3 B)
 {
 	m3x3 Result = {};
 
-	for (u32 row = 0; row <= 2; row++) {
-		for (u32 col = 0; col <= 2; col++) {
-			for (u32 k = 0; k <= 2; k++) {
+	for(u32 row = 0; row <= 2; row++)
+	{
+		for(u32 col = 0; col <= 2; col++)
+		{
+			for(u32 k = 0; k <= 2; k++)
+			{
 				Result.e[row][col] += A.e[row][k] * B.e[k][col];
 			}
 		}
