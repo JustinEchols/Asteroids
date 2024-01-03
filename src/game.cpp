@@ -906,19 +906,6 @@ entity_add(game_state *GameState, entity_type type)
 	return(Entity);
 }
 
-inline b32
-entities_are_same(entity *EntityA, entity *EntityB)
-{
-	b32 Result = false;
-
-	if(EntityA->index == EntityB->index)
-	{
-		Result = true;
-	}
-
-	return(Result);
-}
-
 internal triangle
 player_triangle(game_state *GameState, entity *EntityPlayer)
 {
