@@ -46,9 +46,9 @@ typedef float		f32;
 #define TRUE 1
 #define FALSE 0
 
-#define ABS(x) (((x) > 0) ? (x) : -(x))
-#define MIN(a, b) ((a < b) ? (a) : (b))
-#define MAX(a, b) ((a < b) ? (b) : (a))
+#define ABS(x) ((x) > 0) ? (x) : -(x)
+#define MIN(a, b) ((a) < (b)) ? (a) : (b)
+#define MAX(a, b) ((a) < (b)) ? (b) : (a)
 #define SQUARE(x) ((x) * (x))
 #define CUBE(x) ((x) * (x) * (x))
 
