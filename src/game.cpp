@@ -1071,13 +1071,13 @@ entity_move(game_state *GameState, entity *Entity, v2f ddPos, f32 dt)
 						if((Entity->shape == SHAPE_CIRCLE) &&
 						   (TestEntity->shape == SHAPE_CIRCLE))
 						{
-
 							v2f DeltaBetweenCenters = TestEntity->Pos - Entity->Pos;
 
 							// NOTE(Justin): Asteroids have no acceleration ATM
 							v2f TestEntityDelta = dt * TestEntity->dPos;
+
 							if(circles_collide(Entity->Pos, EntityDelta, Entity->radius,
-										TestEntity->Pos, TestEntityDelta, TestEntity->radius, &t_min))
+										   TestEntity->Pos, TestEntityDelta, TestEntity->radius, &t_min))
 							{
 								Normal = v2f_normalize(-1.0f * DeltaBetweenCenters);
 								HitEntity = TestEntity;
@@ -1143,14 +1143,10 @@ entity_move(game_state *GameState, entity *Entity, v2f ddPos, f32 dt)
 				Entity->Direction = v2f_normalize(Entity->dPos);
 				EntityDelta = DesiredPosition - Entity->Pos;
 				EntityDelta = EntityDelta - v2f_dot(EntityDelta, Normal) * Normal;
-				//Entity->Pos += t_min * EntityDelta;
 			}
 			else if((Entity->type == ENTITY_ASTEROID) &&
 					(HitEntity->type == ENTITY_PLAYER))
 			{
-
-				//Entity->dPos = Entity->speed * Normal;
-				//Entity->dPos = Entity->dPos - 2.0f * v2f_dot(Entity->dPos, Normal) * Normal;
 				Entity->dPos = Entity->dPos - 2.0f * v2f_dot(Entity->dPos, Normal) * Normal;
 				Entity->Pos = EntityNewPos;
 			}
@@ -1696,8 +1692,7 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 		m3x3 Scale = m3x3_scale_create(GameState->pixels_per_meter / 2.0f);
 		m3x3 InverseScreenOffset = m3x3_translation_create(V2F(5.0f, 5.0f));
 
-		*M = Scale * InverseWorldTranslate;
-		*T = InverseScreenOffset;
+		*M = InverseScreenOffset * Scale * InverseWorldTranslate;
 
 		GameMemory->is_initialized = true;
 	}
@@ -1779,8 +1774,13 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 	// NOTE(Justin): Render
 	//
 
-	m3x3 MapToScreenSpace = GameState->MapToScreenSpace;
-	m3x3 InverseScreenOffset = GameState->InverseScreenOffset;
+	// TODO(Justin): Any computations reqiured to simulate the game should be
+	// done in world units. The renderer should hand transforming coordinates
+	// into the screen space. The screen space transform is stored in the
+	// game_state struct, so either the render needs to access the game_state
+	// struct or a new data structure that contains the transform.
+	
+	m3x3 M = GameState->MapToScreenSpace;
 	entity_visible_piece_group PieceGroup;
 	for(u32 entity_index = 1; entity_index < GameState->entity_count; entity_index++)
 	{
@@ -1791,7 +1791,7 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 			case ENTITY_PLAYER:
 			{
 				v2f PlayerPos = Entity->Pos;
-				v2f ScreenPos = InverseScreenOffset * MapToScreenSpace * PlayerPos;
+				v2f ScreenPos = M * PlayerPos;
 
 				push_bitmap(&PieceGroup, &GameState->Ship, ScreenPos, GameState->Ship.Align);
 				player_polygon_draw(BackBuffer, GameState, BottomLeft, Entity);
@@ -1800,7 +1800,8 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 				{
 					circle Circle = circle_init(Entity->Pos, Entity->height);
 
-					Circle.Center = v2f_world_to_screen(GameState, BottomLeft, Circle.Center);
+					//Circle.Center = v2f_world_to_screen(GameState, BottomLeft, Circle.Center);
+					Circle.Center = M * Circle.Center;
 					Circle.radius *= 0.5f * GameState->pixels_per_meter;
 					circle_draw(BackBuffer, &Circle, White);
 
@@ -1809,7 +1810,7 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 			case ENTITY_ASTEROID:
 			{
 				v2f AsteroidPos = Entity->Pos;
-				v2f ScreenPos = InverseScreenOffset * MapToScreenSpace * AsteroidPos;
+				v2f ScreenPos = M * AsteroidPos;
 
 				circle Circle = circle_init(Entity->Pos, Entity->radius);
 
@@ -1852,8 +1853,8 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 				{
 					v2f LaserPos = Entity->Pos;
 
-					v2f ScreenPos = MapToScreenSpace * LaserPos;
-					ScreenPos = InverseScreenOffset * ScreenPos;
+					v2f ScreenPos = M * LaserPos;
+					//ScreenPos = InverseScreenOffset * ScreenPos;
 
 					push_bitmap(&PieceGroup, &GameState->LaserBlueBitmap, ScreenPos, GameState->LaserBlueBitmap.Align);
 				}
