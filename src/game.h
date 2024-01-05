@@ -215,9 +215,8 @@ struct game_state
 	u32 player_entity_index;
 
 	m3x3 MapToScreenSpace;
-	m3x3 InverseScreenOffset;
-	b32 is_initialized;
 
+	b32 is_initialized;
 };
 
 #define GAME_H
