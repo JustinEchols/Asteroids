@@ -55,6 +55,7 @@
 // NOTE(Justin): Collisions have been colesced into the sat_collision
 // function. Not sure if this was a good idea.
 
+
 #include "game.h"
 #include "game_random.h"
 #include "game_render_group.h"
@@ -674,10 +675,6 @@ debug_vector_draw_at_point(back_buffer * BackBuffer, v2f Point, v2f Direction, v
 	line_dda_draw(BackBuffer, Point, Point + c * Direction, Color.r, Color.g, Color.b);
 }
 
-
-// NOTE(Jusitn): Confirmed that this works with not only triangles but with
-// the convex polygon of the player spacesphip bounding polygon.
-
 internal interval 
 sat_projected_interval(v2f *Vertices, u32 vertex_count, v2f ProjectedAxis)
 {
@@ -746,9 +743,6 @@ triangle_closest_point_to_circle(triangle *Triangle, circle *Circle)
 
 	return(Result);
 }
-
-// TODO(Justin): Could Pass two entities in if the sat_collision does in fact handle all
-// convex polygons
 
 internal v2f 
 closest_point_to_circle(v2f *Vertices, u32 vertex_count, circle *Circle)
@@ -1085,26 +1079,42 @@ entity_move(game_state *GameState, entity *Entity, v2f ddPos, f32 dt)
 						else if((Entity->shape == SHAPE_CIRCLE) &&
 								(TestEntity->shape == SHAPE_POLY))
 						{
-							if(sat_collision(TestEntity, Entity))
-							{ 
-								v2f Delta = TestEntity->Pos - Entity->Pos;
-								for(u32 vertex_i = 0; vertex_i < ARRAY_COUNT(TestEntity->Poly.Vertices); vertex_i++)
+							if(TestEntity->is_shielded)
+							{
+								v2f DeltaBetweenCenters = TestEntity->Pos - Entity->Pos;
+								v2f TestEntityDelta = dt * TestEntity->dPos;
+
+								if(circles_collide(Entity->Pos, EntityDelta, Entity->radius,
+											TestEntity->Pos, TestEntityDelta, TestEntity->radius, &t_min))
 								{
-									v2f P0 = TestEntity->Poly.Vertices[vertex_i];
-									v2f P1 = TestEntity->Poly.Vertices[(vertex_i + 1)  % ARRAY_COUNT(TestEntity->Poly.Vertices)];
-
-									v2f Edge = P1 - P0;
-									v2f Perp = -1.0f * v2f_perp(Edge);
-
-									if(v2f_dot(Perp, Delta) < 0.0f)
-									{
-										Normal = v2f_normalize(Perp);
-										break;
-									}
+									Normal = v2f_normalize(-1.0f * DeltaBetweenCenters);
+									HitEntity = TestEntity;
 								}
-								HitEntity = TestEntity;
+							}
+							else
+							{
+								if(sat_collision(TestEntity, Entity))
+								{ 
+									v2f Delta = TestEntity->Pos - Entity->Pos;
+									for(u32 vertex_i = 0; vertex_i < ARRAY_COUNT(TestEntity->Poly.Vertices); vertex_i++)
+									{
+										v2f P0 = TestEntity->Poly.Vertices[vertex_i];
+										v2f P1 = TestEntity->Poly.Vertices[(vertex_i + 1)  % ARRAY_COUNT(TestEntity->Poly.Vertices)];
+
+										v2f Edge = P1 - P0;
+										v2f Perp = -1.0f * v2f_perp(Edge);
+
+										if(v2f_dot(Perp, Delta) < 0.0f)
+										{
+											Normal = v2f_normalize(Perp);
+											break;
+										}
+									}
+									HitEntity = TestEntity;
+								}
 							}
 						}
+
 					}
 				}
 			}
@@ -1147,8 +1157,19 @@ entity_move(game_state *GameState, entity *Entity, v2f ddPos, f32 dt)
 			else if((Entity->type == ENTITY_ASTEROID) &&
 					(HitEntity->type == ENTITY_PLAYER))
 			{
-				Entity->dPos = Entity->dPos - 2.0f * v2f_dot(Entity->dPos, Normal) * Normal;
-				Entity->Pos = EntityNewPos;
+				if(HitEntity->is_shielded)
+				{
+					Entity->dPos = Entity->speed * Normal;
+					Entity->Direction = v2f_normalize(Entity->dPos);
+					EntityDelta = DesiredPosition - Entity->Pos;
+					EntityDelta = EntityDelta - v2f_dot(EntityDelta, Normal) * Normal;
+				}
+				else
+				{
+					Entity->dPos = Entity->dPos - 2.0f * v2f_dot(Entity->dPos, Normal) * Normal;
+					Entity->Pos = EntityNewPos;
+				}
+
 			}
 		}
 		else
@@ -1683,9 +1704,7 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 			asteroid_add(GameState, ASTEROID_SMALL);
 		}
 #endif
-
 		m3x3 *M = &GameState->MapToScreenSpace;
-		m3x3 *T = &GameState->InverseScreenOffset;
 
 		m3x3 InverseWorldTranslate = m3x3_translation_create(V2F(World->Dim.x, World->Dim.y));
 		m3x3 Scale = m3x3_scale_create(GameState->pixels_per_meter / 2.0f);
@@ -1704,11 +1723,10 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 
 	bitmap_draw(BackBuffer, &GameState->Background, 0.0f, 0.0f);
 
-	f32 dt = GameInput->dt_for_frame;
-
 	v2f PlayerNewRight = EntityPlayer->Right;
 	v2f PlayerNewDirection = EntityPlayer->Direction;
 
+	f32 dt = GameInput->dt_for_frame;
 	game_controller_input *KeyboardController = &GameInput->Controller;
 	if(KeyboardController->Left.ended_down)
 	{
