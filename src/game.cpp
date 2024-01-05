@@ -948,11 +948,70 @@ player_polygon_update(entity *EntityPlayer)
 	EntityPlayer->Poly.Vertices[6] = FrontRight;
 }
 
-internal void
-collision_handle(entity *EntityA, entity *EntityB)
+internal b32
+circles_collide(v2f CircleACenter, v2f CircleADelta, f32 radius_a,
+				v2f CircleBCenter, v2f CircleBDelta, f32 radius_b, f32 *t_min)
 {
-}
+	b32 Result = false;
 
+	v2f DeltaBetweenCenters = CircleBCenter - CircleACenter;
+	f32 radii_sum = radius_b + radius_a;
+	v2f RelVel = CircleBDelta - CircleADelta;
+
+	f32 c = v2f_dot(DeltaBetweenCenters, DeltaBetweenCenters) - SQUARE(radii_sum);
+	if(c < 0.0f)
+	{
+		// NOTE(Justin): The distance squared of the vector
+		// between the centers is less than the square of
+		// the sum of the radii. This means that the circles
+		// were initially overlapping.
+	}
+	else
+	{
+		f32 a = v2f_dot(RelVel, RelVel);
+		f32 epsilon = 0.001f;
+		if(a < epsilon)
+		{
+			// NOTE(Justin): Circles are not moving relative to
+			// each other. So they will not intersect.
+		}
+		else
+		{
+			f32 b = v2f_dot(DeltaBetweenCenters, RelVel);
+			if(b >= 0.0f)
+			{
+				// NOTE(Justin): Circles are not moving towards each
+				// other
+			}
+			else
+			{
+				f32 d = SQUARE(b) - a * c;
+				if(d < 0.0f)
+				{
+					// NOTE(Justin): Circles do not intersect
+				}
+				else
+				{
+					f32 t = (-b - f32_sqrt(d)) / a;
+					if(*t_min > t)
+					{
+						*t_min = MAX(0.0f, t - epsilon);
+						Result = true;
+					}
+					else
+					{
+						// NTOE(Justin): It is possible
+						// that we find a t value far
+						// into the future which we do
+						// not care about
+					}
+				}
+			}
+		}
+	}
+
+	return(Result);
+}
 
 internal void
 entity_move(game_state *GameState, entity *Entity, v2f ddPos, f32 dt)
@@ -1012,69 +1071,16 @@ entity_move(game_state *GameState, entity *Entity, v2f ddPos, f32 dt)
 						if((Entity->shape == SHAPE_CIRCLE) &&
 						   (TestEntity->shape == SHAPE_CIRCLE))
 						{
-							circle CircleA = circle_init(Entity->Pos, Entity->radius);
-							circle CircleB = circle_init(TestEntity->Pos, TestEntity->radius);
 
-							v2f Delta = CircleB.Center - CircleA.Center;
+							v2f DeltaBetweenCenters = TestEntity->Pos - Entity->Pos;
 
 							// NOTE(Justin): Asteroids have no acceleration ATM
 							v2f TestEntityDelta = dt * TestEntity->dPos;
-
-							v2f RelVel = TestEntityDelta - EntityDelta;
-							//v2f RelVel = TestEntity->dPos - Entity->dPos;
-							f32 radii_sum = CircleB.radius + CircleA.radius;
-
-							f32 c = v2f_dot(Delta, Delta) - SQUARE(radii_sum);
-							if(c < 0.0f)
+							if(circles_collide(Entity->Pos, EntityDelta, Entity->radius,
+										TestEntity->Pos, TestEntityDelta, TestEntity->radius, &t_min))
 							{
-								// NOTE(Justin): The distance squared of the vector
-								// between the centers is less than the square of
-								// the sum of the radii. This means that the circles
-								// were initially overlapping.
-							}
-							else
-							{
-								f32 a = v2f_dot(RelVel, RelVel);
-								f32 epsilon = 0.001f;
-								if(a < epsilon)
-								{
-									// NOTE(Justin): Circles are not moving relative to
-									// each other. So they will not intersect.
-								}
-								else
-								{
-									f32 b = v2f_dot(Delta, RelVel);
-									if(b >= 0.0f)
-									{
-										// NOTE(Justin): Circles are not moving towards each
-										// other
-									}
-									else
-									{
-										f32 d = SQUARE(b) - a * c;
-										if(d < 0.0f)
-										{
-											// NOTE(Justin): Circles do not intersect
-										}
-										else
-										{
-											f32 t = (-b - f32_sqrt(d)) / a;
-											if(t_min > t)
-											{
-												t_min = MAX(0.0f, t - epsilon);
-												Normal = v2f_normalize(Entity->Pos - TestEntity->Pos);
-												HitEntity = TestEntity;
-											}
-											else
-											{
-												// NTOE(Justin): It is possible
-												// that we find a t value far
-												// into the future which we do
-												// not care about
-											}
-										}
-									}
-								}
+								Normal = v2f_normalize(-1.0f * DeltaBetweenCenters);
+								HitEntity = TestEntity;
 							}
 						}
 						else
@@ -1134,7 +1140,9 @@ entity_move(game_state *GameState, entity *Entity, v2f ddPos, f32 dt)
 					(HitEntity->type == ENTITY_ASTEROID))
 			{
 				Entity->dPos = Entity->speed * Normal;
+				Entity->Direction = v2f_normalize(Entity->dPos);
 				EntityDelta = DesiredPosition - Entity->Pos;
+				EntityDelta = EntityDelta - v2f_dot(EntityDelta, Normal) * Normal;
 				//Entity->Pos += t_min * EntityDelta;
 			}
 			else if((Entity->type == ENTITY_ASTEROID) &&
@@ -1295,7 +1303,7 @@ asteroid_add(game_state *GameState, asteroid_size SIZE, v2f Pos, v2f Dir)
 
 	if(SIZE == ASTEROID_SMALL)
 	{
-		Entity->radius = 4.0f;
+		Entity->radius = 8.0f;
 	}
 
 	Entity->mass = Entity->radius * 10.0f;
@@ -1667,28 +1675,18 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 		entity *EntityPlayer = player_add(GameState);
 		GameState->player_entity_index = EntityPlayer->index;
 
-
 		srand(2023);
 
 		// TODO(Justin): This size of the asteroid should be random.
 
-		asteroid_add(GameState, ASTEROID_SMALL, V2F(0.0f, 0.5f * World->Dim.y), V2F(-1.0f, 0.0f));
-		asteroid_add(GameState, ASTEROID_SMALL, V2F(10.0f, 0.5f * World->Dim.y), V2F(1.0f, 0.0f));
+		//asteroid_add(GameState, ASTEROID_SMALL, V2F(0.0f, 0.5f * World->Dim.y), V2F(-1.0f, 0.0f));
+		//asteroid_add(GameState, ASTEROID_SMALL, V2F(-100.0f, 0.5f * World->Dim.y), V2F(1.0f, 0.0f));
 
-
+#if 1
 		for(u32 i = 0; i < 50; i++)
 		{
 			asteroid_add(GameState, ASTEROID_SMALL);
 		}
-#if 0
-
-		asteroid_add(GameState, ASTEROID_SMALL);
-		asteroid_add(GameState, ASTEROID_SMALL);
-		asteroid_add(GameState, ASTEROID_SMALL);
-		asteroid_add(GameState, ASTEROID_SMALL);
-		asteroid_add(GameState, ASTEROID_SMALL);
-		asteroid_add(GameState, ASTEROID_SMALL);
-		asteroid_add(GameState, ASTEROID_SMALL);
 #endif
 
 		m3x3 *M = &GameState->MapToScreenSpace;
@@ -1803,7 +1801,7 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 					circle Circle = circle_init(Entity->Pos, Entity->height);
 
 					Circle.Center = v2f_world_to_screen(GameState, BottomLeft, Circle.Center);
-					Circle.radius *= GameState->pixels_per_meter;
+					Circle.radius *= 0.5f * GameState->pixels_per_meter;
 					circle_draw(BackBuffer, &Circle, White);
 
 				}
@@ -1816,21 +1814,18 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 				circle Circle = circle_init(Entity->Pos, Entity->radius);
 
 #if 0
-				if(Entity->index % 2 == 0)
-				{
-					Circle.Center = InverseScreenOffset * MapToScreenSpace * Circle.Center;
-					Circle.radius = Circle.radius * GameState->pixels_per_meter;
-					circle_draw(BackBuffer, &Circle, White);
+				Circle.Center = InverseScreenOffset * MapToScreenSpace * Circle.Center;
+				Circle.radius = 0.5f * Circle.radius * GameState->pixels_per_meter;
+				circle_draw(BackBuffer, &Circle, White);
 
-					line_dda_draw(BackBuffer, Circle.Center, Circle.Center + Circle.radius * Entity->Direction, White);
-				}
-				else
-				{
-					push_bitmap(&PieceGroup, &GameState->AsteroidBitmap, ScreenPos, GameState->AsteroidBitmap.Align);
-				}
+				v2f Min = Circle.Center;
+				v2f Max = Circle.Center + V2F(2.0f, 2.0f);
+				v2f Offset = V2F(2.0f, 2.0f);
+				rectangle_draw(BackBuffer, Min - Offset, Max + Offset, White);
 
+				line_dda_draw(BackBuffer, Circle.Center, Circle.Center + Circle.radius * Entity->Direction, White);
 #endif
-#endif
+
 				push_bitmap(&PieceGroup, &GameState->AsteroidBitmap, ScreenPos, GameState->AsteroidBitmap.Align);
 #if 0
 				v2f temp = v2f_normalize(Entity->dPos);
