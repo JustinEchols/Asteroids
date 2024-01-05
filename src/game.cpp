@@ -36,6 +36,7 @@
  * Physics
 	 - Angular velocity
 	 - Mass
+	 - Asteroid acceleration?
 
  * 	- Audio mixing
  * 	- Bitmap transformations (rotations, scaling, ...)
@@ -1072,8 +1073,6 @@ entity_move(game_state *GameState, entity *Entity, v2f ddPos, f32 dt)
 						   (TestEntity->shape == SHAPE_CIRCLE))
 						{
 							v2f DeltaBetweenCenters = TestEntity->Pos - Entity->Pos;
-
-							// NOTE(Justin): Asteroids have no acceleration ATM
 							v2f TestEntityDelta = dt * TestEntity->dPos;
 
 							if(circles_collide(Entity->Pos, EntityDelta, Entity->radius,
@@ -1083,7 +1082,8 @@ entity_move(game_state *GameState, entity *Entity, v2f ddPos, f32 dt)
 								HitEntity = TestEntity;
 							}
 						}
-						else
+						else if((Entity->shape == SHAPE_CIRCLE) &&
+								(TestEntity->shape == SHAPE_POLY))
 						{
 							if(sat_collision(TestEntity, Entity))
 							{ 
@@ -1592,8 +1592,7 @@ v2f_screen_to_world(game_state *GameState, v2f ScreenXY)
 internal void
 player_polygon_draw(back_buffer *BackBuffer, game_state *GameState, v2f BottomLeft, entity *EntityPlayer)
 {
-	m3x3 MapToScreenSpace = GameState->MapToScreenSpace;
-	m3x3 InverseScreenOffset = GameState->InverseScreenOffset;
+	m3x3 M = GameState->MapToScreenSpace;
 
 	v2f FrontLeft = EntityPlayer->Poly.Vertices[0];
 	v2f SideLeftEngine = EntityPlayer->Poly.Vertices[1];
@@ -1603,15 +1602,15 @@ player_polygon_draw(back_buffer *BackBuffer, game_state *GameState, v2f BottomLe
 	v2f SideRightEngine = EntityPlayer->Poly.Vertices[5];
 	v2f FrontRight = EntityPlayer->Poly.Vertices[6];
 
-	v2f ScreenPos = InverseScreenOffset * MapToScreenSpace * EntityPlayer->Pos;
+	v2f ScreenPos = M * EntityPlayer->Pos;
 	
-	v2f ScreenBackCenter =  InverseScreenOffset * MapToScreenSpace * BackCenter;
-	v2f ScreenFrontLeft = InverseScreenOffset * MapToScreenSpace * FrontLeft;
-	v2f ScreenFrontRight = InverseScreenOffset * MapToScreenSpace * FrontRight;;
-	v2f ScreenRearLeftEngine = InverseScreenOffset * MapToScreenSpace * RearLeftEngine;
-	v2f ScreenRearRightEngine = InverseScreenOffset * MapToScreenSpace * RearRightEngine;
-	v2f ScreenSideLeftEngine = InverseScreenOffset * MapToScreenSpace * SideLeftEngine; 
-	v2f ScreenSideRightEngine = InverseScreenOffset * MapToScreenSpace * SideRightEngine;
+	v2f ScreenBackCenter =  M * BackCenter;
+	v2f ScreenFrontLeft = M * FrontLeft;
+	v2f ScreenFrontRight = M * FrontRight;;
+	v2f ScreenRearLeftEngine = M * RearLeftEngine;
+	v2f ScreenRearRightEngine = M * RearRightEngine;
+	v2f ScreenSideLeftEngine = M * SideLeftEngine; 
+	v2f ScreenSideRightEngine = M * SideRightEngine;
 
 	line_dda_draw(BackBuffer, ScreenPos, ScreenBackCenter, White);
 	line_dda_draw(BackBuffer, ScreenPos, ScreenFrontLeft, White);
@@ -1799,10 +1798,9 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 				if(Entity->is_shielded)
 				{
 					circle Circle = circle_init(Entity->Pos, Entity->height);
-
-					//Circle.Center = v2f_world_to_screen(GameState, BottomLeft, Circle.Center);
 					Circle.Center = M * Circle.Center;
 					Circle.radius *= 0.5f * GameState->pixels_per_meter;
+
 					circle_draw(BackBuffer, &Circle, White);
 
 				}
@@ -1813,19 +1811,6 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 				v2f ScreenPos = M * AsteroidPos;
 
 				circle Circle = circle_init(Entity->Pos, Entity->radius);
-
-#if 0
-				Circle.Center = InverseScreenOffset * MapToScreenSpace * Circle.Center;
-				Circle.radius = 0.5f * Circle.radius * GameState->pixels_per_meter;
-				circle_draw(BackBuffer, &Circle, White);
-
-				v2f Min = Circle.Center;
-				v2f Max = Circle.Center + V2F(2.0f, 2.0f);
-				v2f Offset = V2F(2.0f, 2.0f);
-				rectangle_draw(BackBuffer, Min - Offset, Max + Offset, White);
-
-				line_dda_draw(BackBuffer, Circle.Center, Circle.Center + Circle.radius * Entity->Direction, White);
-#endif
 
 				push_bitmap(&PieceGroup, &GameState->AsteroidBitmap, ScreenPos, GameState->AsteroidBitmap.Align);
 #if 0
@@ -1852,11 +1837,9 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 				if(!entity_flag_is_set(Entity, ENTITY_FLAG_NON_SPATIAL))
 				{
 					v2f LaserPos = Entity->Pos;
-
 					v2f ScreenPos = M * LaserPos;
-					//ScreenPos = InverseScreenOffset * ScreenPos;
-
-					push_bitmap(&PieceGroup, &GameState->LaserBlueBitmap, ScreenPos, GameState->LaserBlueBitmap.Align);
+					push_bitmap(&PieceGroup, &GameState->LaserBlueBitmap,
+								ScreenPos, GameState->LaserBlueBitmap.Align);
 				}
 			} break;
 			case ENTITY_TRIANGLE:
