@@ -1008,6 +1008,20 @@ circles_collide(v2f CircleACenter, v2f CircleADelta, f32 radius_a,
 	return(Result);
 }
 
+internal b32
+entities_should_collide(entity *EntityA, entity *EntityB)
+{
+	b32 Result = false;
+
+	if(!entity_flag_is_set(EntityA, ENTITY_FLAG_NON_SPATIAL) &&
+	   !entity_flag_is_set(EntityB, ENTITY_FLAG_NON_SPATIAL))
+	  {
+		  Result = true;
+	  }
+
+	return(Result);
+}
+
 internal void
 entity_move(game_state *GameState, entity *Entity, v2f ddPos, f32 dt)
 { 
@@ -1060,8 +1074,7 @@ entity_move(game_state *GameState, entity *Entity, v2f ddPos, f32 dt)
 				entity *TestEntity = entity_get(GameState, entity_index);
 				if(Entity != TestEntity)
 				{
-					if(entity_flag_is_set(TestEntity, ENTITY_FLAG_COLLIDES) &&
-					 (!entity_flag_is_set(TestEntity, ENTITY_FLAG_NON_SPATIAL)))
+					if(entities_should_collide(Entity, TestEntity))
 					{
 						if((Entity->shape == SHAPE_CIRCLE) &&
 						   (TestEntity->shape == SHAPE_CIRCLE))
@@ -1114,7 +1127,6 @@ entity_move(game_state *GameState, entity *Entity, v2f ddPos, f32 dt)
 								}
 							}
 						}
-
 					}
 				}
 			}
