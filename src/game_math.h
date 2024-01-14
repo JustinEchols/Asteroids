@@ -143,8 +143,6 @@ lerp(f32 a, f32 t, f32 b)
 	return(Result);
 }
 
-
-
 //
 // NOTE(Justin): v2 operations
 //
@@ -329,6 +327,50 @@ operator *(f32 c, v3f V)
 //
 // NOTE(Justin): v4f operations
 //
+
+inline v4f
+operator *(f32 c, v4f V)
+{
+	v4f Result = {};
+
+	Result.x = c * V.x;
+	Result.y = c * V.y;
+	Result.z = c * V.z;
+	Result.w = c * V.w;
+
+	return(Result);
+}
+
+inline v4f
+operator *(v4f V, f32 c)
+{
+	v4f Result = c * V;
+
+	return(Result);
+}
+
+inline v4f
+operator +(v4f U, v4f V)
+{
+	v4f Result;
+
+	Result.x = U.x + V.x;
+	Result.y = U.y + V.y;
+	Result.z = U.z + V.z;
+	Result.w = U.w + V.w;
+
+	return(Result);
+}
+
+
+
+inline v4f
+lerp(v4f A, f32 t, v4f B)
+{
+	v4f Result = (1.0f - t) * A + t * B;
+	
+	return(Result);
+}
 
 //
 // NOTE(Justin): Matrix operations

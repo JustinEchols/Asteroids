@@ -110,7 +110,7 @@ struct bit_scan_result
 };
 
 inline bit_scan_result
-find_first_least_sig_bit_set_u32(u32 x)
+find_first_bit_set_u32(u32 x)
 {
 	bit_scan_result Result = {};
 #if COMPILER_MSVC

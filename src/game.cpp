@@ -56,6 +56,8 @@
 // function. Not sure if this was a good idea.
 
 #include "game.h"
+#include "game_geometry.h"
+#include "game_geometry.cpp"
 #include "game_render_group.h"
 #include "game_render_group.cpp"
 #include "game_random.h"
@@ -105,231 +107,6 @@ sound_buffer_fill(game_state *GameState, sound_buffer *SoundBuffer)
 	GameState->test_sample_index += SoundBuffer->sample_count;
 }
 
-internal void 
-rectangle_draw(back_buffer *BackBuffer, v2f Min, v2f Max, f32 r, f32 g, f32 b)
-{
-	s32 x_min = f32_round_to_s32(Min.x);
-	s32 y_min = f32_round_to_s32(Min.y);
-	s32 x_max = f32_round_to_s32(Max.x);
-	s32 y_max = f32_round_to_s32(Max.y);
-
-	if(x_min < 0)
-	{
-		x_min += BackBuffer->width;
-	}
-	if(x_max > BackBuffer->width)
-	{
-		x_max -= BackBuffer->width;
-	}
-	if(y_min < 0)
-	{
-		y_min += BackBuffer->height;
-	}
-	if(y_max > BackBuffer->height)
-	{
-		y_max -= BackBuffer->height;
-	}
-
-	u32 red = f32_round_to_u32(255.0f * r);
-	u32 green = f32_round_to_u32(255.0f * g);
-	u32 blue = f32_round_to_u32(255.0f * b);
-	u32 color = ((red << 16) | (green << 8) | (blue << 0));
-
-	u8 *pixel_row = (u8 *)BackBuffer->memory + BackBuffer->stride * y_min + BackBuffer->bytes_per_pixel * x_min ;
-	for(int row = y_min; row < y_max; row++)
-	{
-		u32 *pixel = (u32 *)pixel_row;
-		for(int col = x_min; col < x_max; col++)
-		{
-			*pixel++ = color;
-		}
-		pixel_row += BackBuffer->stride;
-	}
-}
-
-internal void 
-rectangle_draw(back_buffer *BackBuffer, v2f Min, v2f Max, v3f Color)
-{
-	rectangle_draw(BackBuffer, Min, Max, Color.r, Color.g, Color.b);
-}
-
-internal void
-pixel_set(back_buffer *BackBuffer, v2f ScreenXY, u32 color)
-{
-	s32 screen_x = f32_round_to_s32(ScreenXY.x);
-	s32 screen_y = f32_round_to_s32(ScreenXY.y);
-
-	if(screen_x >= BackBuffer->width)
-	{
-		screen_x = screen_x - BackBuffer->width;
-	}
-	if(screen_x < 0) 
-	{
-		screen_x = screen_x + BackBuffer->width;
-	}
-	if(screen_y >= BackBuffer->height)
-	{
-		screen_y = screen_y - BackBuffer->height;
-	}
-	if(screen_y < 0)
-	{
-		screen_y = screen_y + BackBuffer->height;
-	}
-	u8 *start = (u8 *)BackBuffer->memory + BackBuffer->stride * screen_y + BackBuffer->bytes_per_pixel * screen_x;
-	u32 *pixel = (u32 *)start;
-	*pixel = color;
-}
-
-internal void
-line_dda_draw(back_buffer *BackBuffer, v2f P1, v2f P2, f32 r, f32 g, f32 b)
-{
-	u32 step_count;
-
-	v2f Pos = P1;
-
-	v2f Delta = P2 - P1;
-
-	if(ABS(Delta.x) > ABS(Delta.y))
-	{
-		step_count = (u32)ABS(Delta.x);
-	}
-	else
-	{
-		step_count = (u32)ABS(Delta.y);
-	}
-
-	u32 red = f32_round_to_u32(255.0f * r);
-	u32 green = f32_round_to_u32(255.0f * g);
-	u32 blue = f32_round_to_u32(255.0f * b);
-	u32 color = ((red << 16) | (green << 8) | (blue << 0));
-
-	v2f Step = (1.0f / (f32)step_count) * Delta;
-	for(u32 k = 0; k < step_count; k++)
-	{
-		Pos += Step;
-		pixel_set(BackBuffer, Pos, color);
-	}
-}
-
-internal void
-line_dda_draw(back_buffer *BackBuffer, v2f P1, v2f P2, v3f Color)
-{
-	line_dda_draw(BackBuffer, P1, P2, Color.r, Color.g, Color.b);
-}
-
-internal bounding_box
-circle_bounding_box(circle Circle)
-{
-	bounding_box Result = {};
-
-	Result.Min.x = Circle.Center.x - Circle.radius;
-	Result.Min.y = Circle.Center.y - Circle.radius;
-
-	Result.Max.x = Circle.Center.x + Circle.radius;
-	Result.Max.y = Circle.Center.y + Circle.radius;
-
-	return(Result);
-}
-
-internal v2f
-circle_support_point(circle *Circle, v2f Dir)
-{
-	v2f Result = {};
-	Result = Circle->Center + Circle->radius * Dir;
-	return(Result);
-}
-
-internal v2f
-circle_tangent(circle *Circle, v2f Dir)
-{
-	v2f Result = v2f_perp(Circle->radius * Dir);
-
-	return(Result);
-}
-
-inline b32
-interval_contains(interval Interval, f32 x)
-{
-	b32 Result = false;
-
-	if((x >= Interval.min) && (x <= Interval.max))
-	{
-		Result = true;
-	}
-	return(Result);
-}
-
-inline f32
-interval_length(interval Interval)
-{
-	f32 Result = Interval.max - Interval.min;
-
-	return(Result);
-}
-
-internal void
-circle_draw(back_buffer *BackBuffer, circle *Circle, f32 r, f32 b, f32 g)
-{
-	bounding_box CircleBoudingBox = circle_bounding_box(*Circle);
-
-	s32 x_min = f32_round_to_s32(CircleBoudingBox.Min.x);
-	s32 y_min = f32_round_to_s32(CircleBoudingBox.Min.y);
-	s32 x_max = f32_round_to_s32(CircleBoudingBox.Max.x);
-	s32 y_max = f32_round_to_s32(CircleBoudingBox.Max.y);
-
-	u32 red = f32_round_to_u32(255.0f * r);
-	u32 green = f32_round_to_u32(255.0f * g);
-	u32 blue = f32_round_to_u32(255.0f * b);
-	u32 color = ((red << 16) | (green << 8) | (blue << 0));
-
-
-	u8 *pixel_row = (u8 *)BackBuffer->memory + BackBuffer->stride * y_min + BackBuffer->bytes_per_pixel * x_min;
-
-	v2f Center = Circle->Center;
-	f32 radius =  Circle->radius;
-	interval Interval = {};
-	for(s32 row = y_min; row < y_max; row++)
-	{
-		u32 *pixel = (u32 *)pixel_row;
-		for(s32 col = x_min; col < x_max; col++)
-		{
-			f32 dx = Center.x - col;
-			f32 dy = Center.y - row;
-
-			f32 d = (f32)sqrt((dx * dx) + (dy * dy));
-
-			Interval.min = d - 1.0f;
-			Interval.max = d + 1.0f;
-			if(interval_contains(Interval, radius))
-			{
-				*pixel++ = color;
-			}
-			else
-			{
-				pixel++;
-			}
-		}
-		pixel_row += BackBuffer->stride;
-	}
-}
-
-internal void
-circle_draw(back_buffer *BackBuffer, circle *Circle, v3f Color)
-{
-	circle_draw(BackBuffer, Circle, Color.r, Color.g, Color.b);
-}
-
-internal circle
-circle_init(v2f Center, f32 radius)
-{
-	circle Result = {};
-
-	Result.Center = Center;
-	Result.radius = radius;
-
-	return(Result);
-}
-
 internal v2f
 lerp_points(v2f P1, v2f P2, f32 t)
 {
@@ -351,499 +128,6 @@ lerp_color(v3f ColorA, v3f ColorB, f32 t)
 	Result.z = (1 - t) * ColorA.z + t * ColorB.z; 
 
 	return(Result);
-}
-
-internal void
-bezier_curve_draw(back_buffer *BackBuffer, v2f P1, v2f P2, v2f P3, f32 t)
-{
-	v2f C1 = lerp_points(P1, P2, t);
-	v2f C2 = lerp_points(P2, P3, t);
-	v2f C3 = lerp_points(C1, C2, t);
-
-	u32 color = 0xFFFFFF;
-	pixel_set(BackBuffer, C3, color);
-}
-
-internal void
-line_vertical_draw(back_buffer *BackBuffer, f32 x, f32 r, f32 g, f32 b)
-{
-	s32 x_col = f32_round_to_s32(x);
-
-	u32 red = f32_round_to_u32(255.0f * r);
-	u32 green = f32_round_to_u32(255.0f * g);
-	u32 blue = f32_round_to_u32(255.0f * b);
-	u32 color = ((red << 16) | (green << 8) | (blue << 0));
-
-	u8 *pixel_row = (u8 *)BackBuffer->memory + x_col * BackBuffer->bytes_per_pixel;
-	for(s32 y = 0; y < BackBuffer->height; y++)
-	{
-		u32 *pixel = (u32 *)pixel_row;
-		*pixel = color;
-		pixel_row += BackBuffer->stride;
-	}
-}
-
-internal void
-line_horizontal_draw(back_buffer *BackBuffer, f32 y, f32 r, f32 g, f32 b) 
-{
-	s32 y_row = f32_round_to_s32(y);
-
-	u32 red = f32_round_to_u32(255.0f * r);
-	u32 green = f32_round_to_u32(255.0f * g);
-	u32 blue = f32_round_to_u32(255.0f * b);
-	u32 color = ((red << 16) | (green << 8) | (blue << 0));
-
-	u8 *pixel_row = (u8 *)BackBuffer->memory + y_row * BackBuffer->stride;
-	u32 *pixel = (u32 *)pixel_row;
-	for(s32 x = 0; x < BackBuffer->width; x++)
-	{
-		*pixel++ = color;
-	}
-}
-
-inline u32
-colors_alpha_blend(u32 color_a, u32 color_b, f32 alpha)
-{
-	u32 Result;
-
-	u32 color_a_red = ((color_a & 0xFF0000) >> 16);
-	u32 color_a_green = ((color_a & 0xFF00) >> 8);
-	u32 color_a_blue = (color_a & 0xFF);
-
-	u32 color_b_red = ((color_b & 0xFF0000) >> 16);
-	u32 color_b_green = ((color_b & 0xFF00) >> 8);
-	u32 color_b_blue = (color_b & 0xFF);
-
-	u32 result_red = f32_round_to_u32((1.0f - alpha) * color_a_red + alpha * color_b_red);
-	u32 result_green = f32_round_to_u32((1.0f - alpha) * color_a_green + alpha * color_b_green);
-	u32 result_blue = f32_round_to_u32((1.0f - alpha) * color_a_blue + alpha * color_b_blue);
-
-	Result = ((result_red << 16) | (result_green << 8) | (result_blue << 0));
-	return(Result);
-}
-
-internal void
-rectangle_transparent_draw(back_buffer *BackBuffer, v2f Min, v2f Max, f32 r, f32 g, f32 b, f32 alpha)
-{
-	s32 x_min = f32_round_to_s32(Min.x);
-	s32 y_min = f32_round_to_s32(Min.y);
-	s32 x_max = f32_round_to_s32(Max.x);
-	s32 y_max = f32_round_to_s32(Max.y);
-
-	if(x_min < 0)
-	{
-		x_min = 0;
-	}
-	if(x_max > BackBuffer->width)
-	{
-		x_max = BackBuffer->width;
-	}
-	if(y_min < 0)
-	{
-		y_min = 0;
-	}
-	if(y_max > BackBuffer->height)
-	{
-		y_max = BackBuffer->height;
-	}
-
-	u32 red = f32_round_to_u32(255.0f * r);
-	u32 green = f32_round_to_u32(255.0f * g);
-	u32 blue = f32_round_to_u32(255.0f * b);
-	u32 color = ((red << 16) | (green << 8) | (blue << 0));
-
-	u8 *pixel_row = (u8 *)BackBuffer->memory + BackBuffer->stride * y_min + BackBuffer->bytes_per_pixel * x_min;
-	for(int row = y_min; row < y_max; row++)
-	{
-		u32 *pixel = (u32 *)pixel_row;
-		for(int col = x_min; col < x_max; col++)
-		{
-			*pixel++ = colors_alpha_blend(*pixel, color, alpha);
-		}
-		pixel_row += BackBuffer->stride;
-	}
-}
-
-internal void
-bitmap_draw(back_buffer *BackBuffer, loaded_bitmap *Bitmap, f32 x, f32 y, f32 c_alpha = 1.0f)
-{
-	s32 x_min = f32_round_to_s32(x);
-	s32 y_min = f32_round_to_s32(y);
-	s32 x_max = f32_round_to_s32(x + (f32)Bitmap->width);
-	s32 y_max = f32_round_to_s32(y + (f32)Bitmap->height);
-
-	s32 region_1_x_min = 0;
-	s32 region_1_x_max = 0;
-	s32 region_2_x_min = 0;
-	s32 region_2_x_max = 0;
-
-	s32 region_1_y_min = 0;
-	s32 region_1_y_max = 0;
-	s32 region_2_y_min = 0;
-	s32 region_2_y_max = 0;
-
-	b32 bitmap_across_x_boundary = false;
-	b32 bitmap_across_y_boundary = false;
-	if(x_min < 0)
-	{
-		region_1_x_min = x_min + BackBuffer->width;
-		region_1_x_max = BackBuffer->width;
-		region_2_x_min = 0;
-		region_2_x_max = x_max;
-		bitmap_across_x_boundary = true;
-	}
-
-	if(y_min < 0)
-	{
-		region_1_y_min = y_min + BackBuffer->height;;
-		region_1_y_max = BackBuffer->height;
-		region_2_y_min = 0;
-		region_2_y_max = y_max;
-		bitmap_across_y_boundary = true;
-	}
-
-	if(x_max > BackBuffer->width)
-	{
-		region_1_x_min = x_min;
-		region_1_x_max = BackBuffer->width;
-		region_2_x_min = 0;
-		region_2_x_max = x_max - BackBuffer->width; 
-		bitmap_across_x_boundary = true;
-	}
-
-	if(y_max > BackBuffer->height)
-	{
-		region_1_y_min = y_min;
-		region_1_y_max = BackBuffer->height;
-		region_2_y_min = 0;
-		region_2_y_max = y_max - BackBuffer->height;
-		bitmap_across_y_boundary = true;
-	}
-
-	if(!(bitmap_across_x_boundary || bitmap_across_y_boundary))
-	{
-		u8 *dest_row = (u8 *)BackBuffer->memory + y_min * BackBuffer->stride + x_min * BackBuffer->bytes_per_pixel;
-		u8 *src_row = (u8 *)Bitmap->memory;
-		for(s32 y = y_min; y < y_max; y++)
-		{
-			u32 *src = (u32 *)src_row;
-			u32 *dest = (u32 *)dest_row;
-			for(s32 x = x_min; x < x_max; x++)
-			{
-
-				f32 alpha = (f32)((*src >> 24) & 0xFF) / 255.0f;
-				alpha *= c_alpha;
-
-				f32 src_r = (f32)((*src >> 16) & 0xFF);
-				f32 src_g = (f32)((*src >> 8) & 0xFF);
-				f32 src_b = (f32)((*src >> 0) & 0xFF);
-
-				f32 dest_r = (f32)((*dest >> 16) & 0xFF);
-				f32 dest_g = (f32)((*dest >> 8) & 0xFF);
-				f32 dest_b = (f32)((*dest >> 0) & 0xFF);
-
-				f32 r = (1.0f - alpha) * dest_r + alpha * src_r;
-				f32 g = (1.0f - alpha) * dest_g + alpha * src_g; 
-				f32 b = (1.0f - alpha) * dest_b + alpha * src_b;
-
-				*dest = (((u32)(r + 0.5f) << 16) | ((u32)(g + 0.5f) << 8) | ((u32)(b + 0.5f) << 0));
-
-				dest++;
-				src++;
-			}
-			dest_row += BackBuffer->stride;
-			src_row += Bitmap->stride;
-		}
-	}
-	else
-	{
-		if(!bitmap_across_y_boundary)
-		{
-			region_1_y_min = y_min;
-			region_1_y_max = y_max;
-
-			region_2_y_min = region_1_y_min;
-			region_2_y_max = region_1_y_max;
-		}
-		else if(!bitmap_across_x_boundary)
-		{
-			region_1_x_min = x_min;
-			region_1_x_max = x_max;
-
-			region_2_x_min = region_1_x_min;
-			region_2_x_max = region_1_x_max;
-		}
-
-		u8 *dest_row = (u8 *)BackBuffer->memory + region_1_y_min * BackBuffer->stride + region_1_x_min * BackBuffer->bytes_per_pixel;
-		u8 *src_row = (u8 *)Bitmap->memory;
-		for(s32 y = region_1_y_min; y < region_1_y_max; y++)
-		{
-			u32 *src = (u32 *)src_row;
-			u32 *dest = (u32 *)dest_row;
-			for(s32 x = region_1_x_min; x < region_1_x_max; x++)
-			{
-
-				f32 alpha = (f32)((*src >> 24) & 0xFF) / 255.0f;
-				alpha *= c_alpha;
-				f32 src_r = (f32)((*src >> 16) & 0xFF);
-				f32 src_g = (f32)((*src >> 8) & 0xFF);
-				f32 src_b = (f32)((*src >> 0) & 0xFF);
-
-				f32 dest_r = (f32)((*dest >> 16) & 0xFF);
-				f32 dest_g = (f32)((*dest >> 8) & 0xFF);
-				f32 dest_b = (f32)((*dest >> 0) & 0xFF);
-
-				f32 r = (1.0f - alpha) * dest_r + alpha * src_r;
-				f32 g = (1.0f - alpha) * dest_g + alpha * src_g; 
-				f32 b = (1.0f - alpha) * dest_b + alpha * src_b;
-
-				*dest = (((u32)(r + 0.5f) << 16) | ((u32)(g + 0.5f) << 8) | ((u32)(b + 0.5f) << 0));
-
-				dest++;
-				src++;
-			}
-			dest_row += BackBuffer->stride;
-			src_row += Bitmap->stride;
-		}
-
-		s32 bitmap_offset_x = 0; 
-		if(x_min < 0)
-		{
-			bitmap_offset_x = -1 * x_min;
-		}
-		if(x_max > BackBuffer->width)
-		{
-			bitmap_offset_x = BackBuffer->width - x_min;
-		}
-
-		s32 bitmap_offset_y = 0;
-		if(y_min < 0)
-		{
-			bitmap_offset_y = -1 * y_min;
-		}
-		if(y_max > BackBuffer->height)
-		{
-			bitmap_offset_y = BackBuffer->height - y_min;
-		}
-
-		dest_row = (u8 *)BackBuffer->memory + region_2_y_min * BackBuffer->stride + region_2_x_min * BackBuffer->bytes_per_pixel;
-		src_row = (u8 *)Bitmap->memory + bitmap_offset_y * Bitmap->stride + bitmap_offset_x * Bitmap->bytes_per_pixel;
-		for(s32 y = region_2_y_min; y < region_2_y_max; y++)
-		{
-			u32 *src = (u32 *)src_row;
-			u32 *dest = (u32 *)dest_row;
-			for(s32 x = region_2_x_min; x < region_2_x_max; x++)
-			{
-
-				f32 alpha = (f32)((*src >> 24) & 0xFF) / 255.0f;
-				alpha *= c_alpha;
-
-				f32 src_r = (f32)((*src >> 16) & 0xFF);
-				f32 src_g = (f32)((*src >> 8) & 0xFF);
-				f32 src_b = (f32)((*src >> 0) & 0xFF);
-
-				f32 dest_r = (f32)((*dest >> 16) & 0xFF);
-				f32 dest_g = (f32)((*dest >> 8) & 0xFF);
-				f32 dest_b = (f32)((*dest >> 0) & 0xFF);
-
-				f32 r = (1.0f - alpha) * dest_r + alpha * src_r;
-				f32 g = (1.0f - alpha) * dest_g + alpha * src_g; 
-				f32 b = (1.0f - alpha) * dest_b + alpha * src_b;
-
-				*dest = (((u32)(r + 0.5f) << 16) | ((u32)(g + 0.5f) << 8) | ((u32)(b + 0.5f) << 0));
-
-				dest++;
-				src++;
-			}
-			dest_row += BackBuffer->stride;
-			src_row += Bitmap->stride;
-		}
-	}
-}
-
-internal void
-debug_vector_draw_at_point(back_buffer * BackBuffer, v2f Point, v2f Direction, v3f Color)
-{
-	f32 c = 60.0f;
-	line_dda_draw(BackBuffer, Point, Point + c * Direction, Color.r, Color.g, Color.b);
-}
-
-internal interval 
-sat_projected_interval(v2f *Vertices, u32 vertex_count, v2f ProjectedAxis)
-{
-	interval Result = {};
-
-	f32 min = f32_infinity();
-	f32 max = f32_neg_infinity();
-	for(u32 vertex_i = 0; vertex_i < vertex_count; vertex_i++)
-	{
-		v2f Vertex = Vertices[vertex_i];
-
-		f32 c = v2f_dot(Vertex, ProjectedAxis);
-		min = MIN(c, min);
-		max = MAX(c, max);
-	}
-
-	Result.min = min;
-	Result.max = max;
-
-	return(Result);
-}
-
-internal interval
-circle_project_onto_axis(circle *Circle, v2f ProjectedAxis)
-{
-	interval Result = {};
-
-	f32 min = f32_infinity();
-	f32 max = f32_neg_infinity();
-
-	v2f CircleMin = circle_support_point(Circle, -1.0f * ProjectedAxis);
-	v2f CircleMax = circle_support_point(Circle, ProjectedAxis);
-
-	f32 projected_min = v2f_dot(CircleMin, ProjectedAxis);
-	f32 projected_max = v2f_dot(CircleMax, ProjectedAxis);
-
-	min = MIN(projected_min, min);
-	max = MAX(projected_max, max);
-
-	Result.min = min;
-	Result.max = max;
-
-	return(Result);
-}
-
-internal v2f
-triangle_closest_point_to_circle(triangle *Triangle, circle *Circle)
-{
-	v2f Result = {};
-
-	v2f ClosestPoint = Triangle->Vertices[0];
-	v2f CenterToVertex = ClosestPoint - Circle->Center;
-	f32 min_sq_distance = v2f_dot(CenterToVertex, CenterToVertex);
-	for(u32 vertex_i = 1; vertex_i < ARRAY_COUNT(Triangle->Vertices); vertex_i++)
-	{
-		v2f Vertex = Triangle->Vertices[vertex_i];
-		CenterToVertex = Vertex - Circle->Center;
-		f32 sq_distance = v2f_dot(CenterToVertex, CenterToVertex);
-		if(sq_distance < min_sq_distance)
-		{
-			ClosestPoint = Vertex;
-			min_sq_distance = sq_distance;
-		}
-	}
-	Result = ClosestPoint;
-
-	return(Result);
-}
-
-internal v2f 
-closest_point_to_circle(v2f *Vertices, u32 vertex_count, circle *Circle)
-{
-	v2f Result = {};
-
-	v2f ClosestPoint = Vertices[0];
-	v2f CenterToVertex = ClosestPoint - Circle->Center;
-	f32 min_sq_distance = v2f_dot(CenterToVertex, CenterToVertex);
-	for(u32 vertex_i = 1; vertex_i < vertex_count; vertex_i++)
-	{
-		v2f Vertex = Vertices[vertex_i];
-		CenterToVertex = Vertex - Circle->Center;
-		f32 sq_distance = v2f_dot(CenterToVertex, CenterToVertex);
-		if(sq_distance < min_sq_distance)
-		{
-			ClosestPoint = Vertex;
-			min_sq_distance = sq_distance;
-		}
-	}
-	Result = ClosestPoint;
-
-	return(Result);
-}
-
-internal b32
-circles_collision(circle *CircleA, circle *CircleB)
-{
-	b32 Colliding = false;
-
-	v2f CenterBToCenterA = CircleA->Center - CircleB->Center;
-
-	f32 distance_squared = v2f_dot(CenterBToCenterA, CenterBToCenterA);
-	f32 radii_squared_sum = SQUARE(CircleA->radius + CircleB->radius);
-
-	if(distance_squared < radii_squared_sum)
-	{
-		Colliding = true;
-	}
-
-	return(Colliding);
-}
-
-internal b32
-sat_collision(entity *EntityA, entity *EntityB)
-{
-	b32 GapExists = true;
-
-	entity *EntityWithPoly;
-	entity *EntityWithOutPoly;
-
-	if(EntityA->shape == SHAPE_POLY)
-	{
-		EntityWithPoly = EntityA;
-		EntityWithOutPoly = EntityB;
-	}
-	else
-	{
-		EntityWithPoly = EntityB;
-		EntityWithOutPoly = EntityA;
-	}
-
-	circle Circle = circle_init(EntityWithOutPoly->Pos, EntityWithOutPoly->radius);
-	for(u32 vertex_i = 0; vertex_i < ARRAY_COUNT(EntityWithPoly->Poly.Vertices); vertex_i++)
-	{
-		v2f P0 = EntityWithPoly->Poly.Vertices[vertex_i];
-		v2f P1 = EntityWithPoly->Poly.Vertices[(vertex_i + 1) % ARRAY_COUNT(EntityWithPoly->Poly.Vertices)];
-		v2f D = P1 - P0;
-
-		v2f ProjectedAxis = v2f_normalize(-1.0f * v2f_perp(D));
-
-		interval PolyInterval = sat_projected_interval(EntityWithPoly->Poly.Vertices,
-				ARRAY_COUNT(EntityWithPoly->Poly.Vertices), ProjectedAxis);
-
-		interval CircleInterval = circle_project_onto_axis(&Circle, ProjectedAxis);
-
-		if(CircleInterval.min > CircleInterval.max)
-		{
-			f32 temp = CircleInterval.min;
-			CircleInterval.min = CircleInterval.max;
-			CircleInterval.max = temp;
-		}
-
-		if(!((CircleInterval.max >= PolyInterval.min) &&
-					(PolyInterval.max >= CircleInterval.min)))
-		{
-
-			GapExists = false;
-		}
-	}
-
-	v2f ClosestPoint = closest_point_to_circle(EntityWithPoly->Poly.Vertices,
-			ARRAY_COUNT(EntityWithPoly->Poly.Vertices), &Circle);
-
-	v2f ProjectedAxis = v2f_normalize(ClosestPoint - Circle.Center);
-
-	interval PolyInterval = sat_projected_interval(EntityWithPoly->Poly.Vertices,
-			ARRAY_COUNT(EntityWithPoly->Poly.Vertices), ProjectedAxis);
-
-	interval CircleInterval = circle_project_onto_axis(&Circle, ProjectedAxis);
-
-	if(!((CircleInterval.max >= PolyInterval.min) &&
-				(PolyInterval.max >= CircleInterval.min)))
-	{
-		GapExists = false;
-	}
-
-	return(GapExists);
 }
 
 inline entity *
@@ -918,70 +202,6 @@ player_polygon_update(entity *EntityPlayer)
 	EntityPlayer->Poly.Vertices[4] = RearRightEngine;
 	EntityPlayer->Poly.Vertices[5] = SideRightEngine;
 	EntityPlayer->Poly.Vertices[6] = FrontRight;
-}
-
-internal b32
-circles_collide(v2f CircleACenter, v2f CircleADelta, f32 radius_a,
-				v2f CircleBCenter, v2f CircleBDelta, f32 radius_b, f32 *t_min)
-{
-	b32 Result = false;
-
-	v2f DeltaBetweenCenters = CircleBCenter - CircleACenter;
-	f32 radii_sum = radius_b + radius_a;
-	v2f RelVel = CircleBDelta - CircleADelta;
-
-	f32 c = v2f_dot(DeltaBetweenCenters, DeltaBetweenCenters) - SQUARE(radii_sum);
-	if(c < 0.0f)
-	{
-		// NOTE(Justin): The distance squared of the vector
-		// between the centers is less than the square of
-		// the sum of the radii. This means that the circles
-		// were initially overlapping.
-	}
-	else
-	{
-		f32 a = v2f_dot(RelVel, RelVel);
-		f32 epsilon = 0.001f;
-		if(a < epsilon)
-		{
-			// NOTE(Justin): Circles are not moving relative to
-			// each other. So they will not intersect.
-		}
-		else
-		{
-			f32 b = v2f_dot(DeltaBetweenCenters, RelVel);
-			if(b >= 0.0f)
-			{
-				// NOTE(Justin): Circles are not moving towards each
-				// other
-			}
-			else
-			{
-				f32 d = SQUARE(b) - a * c;
-				if(d < 0.0f)
-				{
-					// NOTE(Justin): Circles do not intersect
-				}
-				else
-				{
-					f32 t = (-b - f32_sqrt(d)) / a;
-					if(*t_min > t)
-					{
-						*t_min = MAX(0.0f, t - epsilon);
-						Result = true;
-					}
-					else
-					{
-						// NTOE(Justin): It is possible
-						// that we find a t value far
-						// into the future which we do
-						// not care about
-					}
-				}
-			}
-		}
-	}
-	return(Result);
 }
 
 internal void
@@ -1273,49 +493,6 @@ entity_move(game_state *GameState, entity *Entity, v2f ddPos, f32 dt)
 	}
 }
 
-
-internal triangle
-triangle_init(v2f *Vertices, u32 vertex_count)
-{
-	// NOTE(Justin): Vertices are sorted into CCW order.
-
-	ASSERT(vertex_count == 3);
-
-	triangle Result = {};
-
-	v2f *Right = Vertices;
-	v2f *Middle = Vertices + 1;
-	v2f *Left = Vertices + 2;
-
-	if(Right->x < Middle->x)
-	{
-		v2f *Temp = Right;
-		Right = Middle;
-		Middle = Temp;
-	}
-	if(Right->x < Left->x)
-	{
-		v2f *Temp = Right;
-		Right = Left;
-		Left = Temp;
-	}
-	if(Middle->x < Left->x)
-	{
-		v2f *Temp = Middle;
-		Middle = Left;
-		Left = Temp;
-	}
-
-	Result.Centroid.x = ((Right->x + Middle->x + Left->x) / 3);
-	Result.Centroid.y = ((Right->y + Middle->y + Left->y) / 3);
-
-	Result.Vertices[0] = *Right;
-	Result.Vertices[1] = *Middle;
-	Result.Vertices[2] = *Left;
-
-	return(Result);
-}
-
 internal entity *
 player_add(game_state *GameState)
 {
@@ -1517,40 +694,7 @@ square_add(game_state *GameState, v2f Pos, v2f Dir)
 	return(Entity);
 }
 
-internal void
-square_draw(back_buffer *BackBuffer, v2f Pos, f32 half_width, v3f Color)
-{
-	v2f HalfDim = V2F(half_width, half_width);
 
-	v2f UpperRight = Pos + HalfDim;
-	v2f UpperLeft = UpperRight - 2.0f * V2F(half_width, 0.0f);
-	v2f LowerLeft = Pos - HalfDim; 
-	v2f LowerRight = LowerLeft + 2.0f * V2F(half_width, 0.0f);
-
-	line_dda_draw(BackBuffer, UpperRight, UpperLeft, Color.r, Color.g, Color.b);
-	line_dda_draw(BackBuffer, UpperLeft, LowerLeft, Color.r, Color.g, Color.b);
-	line_dda_draw(BackBuffer, LowerLeft, LowerRight, Color.r, Color.g, Color.b);
-	line_dda_draw(BackBuffer, LowerRight, UpperRight, Color.r, Color.g, Color.b);
-}
-
-
-internal void
-triangle_draw(back_buffer *BackBuffer, triangle *Triangle, f32 r, f32 g, f32 b)
-{
-	v2f Right = Triangle->Vertices[0];
-	v2f Middle = Triangle->Vertices[1];
-	v2f Left = Triangle->Vertices[2];
-
-	line_dda_draw(BackBuffer, Right, Middle, r, g, b);
-	line_dda_draw(BackBuffer, Middle, Left, r, g, b); 
-	line_dda_draw(BackBuffer, Left, Right, r, g, b);
-}
-
-internal void
-triangle_draw(back_buffer *BackBuffer, triangle *Triangle, v3f Color)
-{
-	triangle_draw(BackBuffer, Triangle, Color.r, Color.g, Color.b);
-}
 
 internal void
 familiar_update(game_state *GameState, entity *Entity, f32 dt)
@@ -1605,37 +749,6 @@ projectile_update(game_state *GameState, entity *Entity, f32 dt)
 	{
 		entity_flag_set(Entity, ENTITY_FLAG_NON_SPATIAL);
 	}
-}
-
-inline void
-push_piece(entity_visible_piece_group *PieceGroup, loaded_bitmap *Bitmap,
-		v2f Pos, v2f Align, v2f Dim, v4f Color)
-{
-
-	ASSERT(PieceGroup->piece_count < ARRAY_COUNT(PieceGroup->Pieces));
-	entity_visible_piece *Piece = PieceGroup->Pieces + PieceGroup->piece_count++;
-	m3x3 M = PieceGroup->MapToScreenSpace;
-
-	Piece->Bitmap = Bitmap;
-	Piece->Pos = M * Pos - Align;
-	Piece->r = Color.r;
-	Piece->g = Color.g;
-	Piece->b = Color.b;
-	Piece->alpha = Color.a;
-	Piece->Dim = Dim;
-}
-
-inline void
-push_bitmap(entity_visible_piece_group *PieceGroup, loaded_bitmap *Bitmap,
-		v2f Pos, v2f Align, f32 alpha = 1.0f)
-{
-	push_piece(PieceGroup, Bitmap, Pos, Align, V2F(0, 0), V4F(1.0f, 1.0f, 1.0f, alpha));
-}
-
-inline void
-push_rectangle(entity_visible_piece_group *PieceGroup, v2f Pos, v2f Dim, v4f Color)
-{
-	push_piece(PieceGroup, 0, Pos, V2F(0, 0), Dim, Color);
 }
 
 internal void
@@ -1825,9 +938,9 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 	m3x3 M = GameState->MapToScreenSpace;
 	f32 pixels_per_meter = GameState->pixels_per_meter;
 
-	entity_visible_piece_group PieceGroup = {};
-	PieceGroup.pixels_per_meter = pixels_per_meter;
-	PieceGroup.MapToScreenSpace = M;
+	render_group RenderGroup = {};
+	RenderGroup.pixels_per_meter = pixels_per_meter;
+	RenderGroup.MapToScreenSpace = M;
 	for(u32 entity_index = 1; entity_index < GameState->entity_count; entity_index++)
 	{
 		entity *Entity = GameState->Entities + entity_index;
@@ -1837,8 +950,8 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 			case ENTITY_PLAYER:
 			{
 				v2f PlayerPos = Entity->Pos;
-				push_bitmap(&PieceGroup, &GameState->Ship, PlayerPos, GameState->Ship.Align);
-				push_rectangle(&PieceGroup, PlayerPos, V2F(2.0f, 2.0f), V4F(1.0f, 0.0f, 0.0f, 1.0f));
+				push_bitmap(&RenderGroup, &GameState->Ship, PlayerPos, Entity->Right, Entity->Direction,
+						GameState->Ship.Align);
 
 				player_polygon_draw(BackBuffer, GameState, BottomLeft, Entity);
 
@@ -1857,7 +970,9 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 				v2f AsteroidPos = Entity->Pos;
 				if(!entity_flag_is_set(Entity, ENTITY_FLAG_NON_SPATIAL))
 				{
-					push_bitmap(&PieceGroup, &GameState->AsteroidBitmap, AsteroidPos, GameState->AsteroidBitmap.Align);
+					push_bitmap(&RenderGroup, &GameState->AsteroidBitmap,
+							AsteroidPos, -1.0f * v2f_perp(Entity->Direction), Entity->Direction,
+							GameState->AsteroidBitmap.Align);
 				}
 
 			} break;
@@ -1871,7 +986,7 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 				//v2f Alignment = {(f32)GameState->AsteroidBitmap.width / 2.0f,
 				//				 (f32)GameState->AsteroidBitmap.height / 2.0f};
 
-				//push_piece(&PieceGroup, &GameState->AsteroidBitmap, AsteroidScreenPos, Alignment);
+				//push_piece(&RenderGroup, &GameState->AsteroidBitmap, AsteroidScreenPos, Alignment);
 
 			} break;
 			case ENTITY_PROJECTILE:
@@ -1880,8 +995,9 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 				if(!entity_flag_is_set(Entity, ENTITY_FLAG_NON_SPATIAL))
 				{
 					v2f LaserPos = Entity->Pos;
-					push_bitmap(&PieceGroup, &GameState->LaserBlueBitmap,
-							LaserPos, GameState->LaserBlueBitmap.Align);
+					push_bitmap(&RenderGroup, &GameState->LaserBlueBitmap, LaserPos,
+							-1.0f * v2f_perp(Entity->Direction), Entity->Direction,
+							GameState->LaserBlueBitmap.Align);
 				}
 			} break;
 			default:
@@ -1891,19 +1007,31 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 		}
 	}
 
-	for(u32 piece_index = 0; piece_index < PieceGroup.piece_count; piece_index++)
+	for(u32 index = 0; index < RenderGroup.element_count; index++)
 	{
-		entity_visible_piece *Piece = PieceGroup.Pieces + piece_index;
+		render_entry *Element = RenderGroup.Elements + index;
 
-		f32 x = Piece->Pos.x;
-		f32 y = Piece->Pos.y;
-		if(Piece->Bitmap)
+		f32 x = Element->Origin.x;
+		f32 y = Element->Origin.y;
+		if(Element->Texture)
 		{
-			bitmap_draw(BackBuffer, Piece->Bitmap, x, y, Piece->alpha);
+			bitmap_draw(BackBuffer, Element->Texture, x, y, Element->Color.a);
 		}
 		else
 		{
-			rectangle_draw(BackBuffer, Piece->Pos - Piece->Dim, Piece->Pos + Piece->Dim, Piece->r, Piece->g, Piece->b);
+			rectangle_draw(BackBuffer, Element->Origin - Element->Dim, Element->Origin + Element->Dim,
+																								Element->Color);
 		}
 	}
+
+	f32 *time = &GameState->time;
+	*time += dt;
+
+	v2f D = 30.0f * V2F(cosf(*time), 0.0f);
+	v2f O = D + V2F(220.0f, 220.0f);
+	v2f X = (f32)GameState->Ship.width * V2F(1.0f, 0.0f);
+	//v2f X = (f32)GameState->Ship.width * V2F(cosf(*time), sinf(*time));
+	v2f Y = (f32)GameState->Ship.height * V2F(0.0f, 1.0f);
+
+	rectangle_draw_slowly(BackBuffer, &GameState->Ship, V2F(0.0f, 0.0f), O - 0.5f * X - 0.5f * Y, X, Y, V4F(1.0f, 1.0f, 1.0f, 1.0f));
 }

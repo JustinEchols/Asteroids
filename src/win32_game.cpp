@@ -661,11 +661,15 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR CmdLine, int nCmdSho
 
 
 			game_memory GameMemory = {0};
-			GameMemory.total_size = MEGABYTES(32);
-			GameMemory.permanent_storage = VirtualAlloc((LPVOID)0, GameMemory.total_size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+			GameMemory.permanent_storage_size = MEGABYTES(32);
+			GameMemory.transient_storage_size = MEGABYTES(4);
+			GameMemory.total_size = GameMemory.permanent_storage_size + GameMemory.transient_storage_size;
+
+			GameMemory.permanent_storage = VirtualAlloc((LPVOID)0, GameMemory.permanent_storage_size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
+			GameMemory.transient_storage = VirtualAlloc((LPVOID)0, GameMemory.transient_storage_size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
 
 
-			if(GameMemory.permanent_storage && samples)
+			if((GameMemory.permanent_storage) && (GameMemory.transient_storage) && samples)
 			{
 
 				win32_dsound_init(WindowHandle, Win32SoundBuffer.secondary_buffer_size);
@@ -673,9 +677,6 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR CmdLine, int nCmdSho
 				win32_sound_buffer_clear(&Win32SoundBuffer);
 
 				Win32GlobalSecondaryBuffer->Play(0, 0, DSBPLAY_LOOPING);
-
-
-				//ShowWindow(WindowHandle, nCmdShow);
 
 				game_input GameInput[2] = {0};
 				game_input *NewInput = &GameInput[0];
@@ -691,6 +692,7 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR CmdLine, int nCmdSho
 				//
 				// NOTE(Justin): Game loop.
 				//
+
 				f32 seconds_per_frame_actual = 0.0f;
 				while(Win32GlobalRunning)
 				{

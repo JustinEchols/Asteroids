@@ -110,20 +110,20 @@ bitmap_file_read_entire(char *filename)
 		u32 blue_mask = BitmapHeader->blue_mask;
 		u32 alpha_mask = ~(red_mask | green_mask | blue_mask);
 
-		bit_scan_result red_scan = find_first_bit_set_u32(red_mask);
-		bit_scan_result green_scan = find_first_bit_set_u32(green_mask);
-		bit_scan_result blue_scan = find_first_bit_set_u32(blue_mask);
-		bit_scan_result alpha_scan = find_first_bit_set_u32(alpha_mask);
+		bit_scan_result red_scan = find_first_least_sig_bit_set_u32(red_mask);
+		bit_scan_result green_scan = find_first_least_sig_bit_set_u32(green_mask);
+		bit_scan_result blue_scan = find_first_least_sig_bit_set_u32(blue_mask);
+		bit_scan_result alpha_scan = find_first_least_sig_bit_set_u32(alpha_mask);
 
 		ASSERT(red_scan.found);
 		ASSERT(green_scan.found);
 		ASSERT(blue_scan.found);
 		ASSERT(alpha_scan.found);
 
-		s32 red_shift = 16 - (s32)red_scan.index;
-		s32 green_shift = 8 - (s32)green_scan.index;
-		s32 blue_shift = 0 - (s32)blue_scan.index;
-		s32 alpha_shift = 24 - (s32)alpha_scan.index;
+		s32 red_shift_down = (s32)red_scan.index;
+		s32 green_shift_down = (s32)green_scan.index;
+		s32 blue_shift_down = (s32)blue_scan.index;
+		s32 alpha_shift_down = (s32)alpha_scan.index;
 
 		u32 *pixel = pixels;
 		for(s32 y = 0; y < BitmapHeader->height; y++)
@@ -132,19 +132,20 @@ bitmap_file_read_entire(char *filename)
 			{
 				u32 c = *pixel;
 
-#if 0
-				u32 red = ((c >> red_shift_amount.index) & 0xFF);
-				u32 green = ((c >> green_shift_amount.index) & 0xFF);
-				u32 blue = ((c >> blue_shift_amount.index) & 0xFF);
-				u32 alpha = ((c >> alpha_shift_amount.index) & 0xFF);
+				f32 r = (f32)((c & red_mask) >> red_shift_down);
+				f32 g = (f32)((c & green_mask) >> green_shift_down);
+				f32 b = (f32)((c & blue_mask) >> blue_shift_down);
+				f32 a = (f32)((c & alpha_mask) >> alpha_shift_down);
+				f32 an = (a / 255.0f);
 
-				*pixel++ = ((alpha << 24) | (red << 16) | (green << 8) | (blue << 0));
-#else
-				*pixel++ = (rotate_left(c & red_mask, red_shift) |
-						   rotate_left(c & green_mask, green_shift) |
-						   rotate_left(c & blue_mask, blue_shift) |
-						   rotate_left(c & alpha_mask, alpha_shift));
-#endif
+				r = r * an;
+				g = g * an;
+				b = b * an;
+
+				*pixel++ = (((u32)(a + 0.5f) << 24) |
+							((u32)(r + 0.5f) << 16) |
+							((u32)(g + 0.5f) << 8) |
+							((u32)(b + 0.5f) << 0));
 			}
 		}
 	}

@@ -14,6 +14,14 @@ struct memory_arena
 	memory_index size;
 	u8 *base;
 	memory_index used;
+
+	s32 temp_count;
+};
+
+struct temporary_memory
+{
+	memory_arena *MemoryArena;
+	memory_index used;
 };
 
 internal void
@@ -22,10 +30,12 @@ memory_arena_initialize(memory_arena *MemoryArena, memory_index arena_size, u8 *
 	MemoryArena->size = arena_size;
 	MemoryArena->base = base;
 	MemoryArena->used = 0;
+	MemoryArena->temp_count = 0;
 }
 
-#define push_size(MemoryArena, type) (type *)push_size_(MemoryArena, sizeof(type))
+#define push_struct(MemoryArena, type) (type *)push_size_(MemoryArena, sizeof(type))
 #define push_array(MemoryArena, count, type) (type *)push_size_(MemoryArena, (count) * sizeof(type))
+#define push_size(MemoryArena, size) push_size_(MemoryArena, size)
 void *
 push_size_(memory_arena *MemoryArena, memory_index size)
 {
@@ -35,54 +45,36 @@ push_size_(memory_arena *MemoryArena, memory_index size)
 	return(Result);
 }
 
+inline temporary_memory
+temporary_memory_begin(memory_arena *MemoryArena)
+{
+	temporary_memory Result;
+
+	Result.MemoryArena = MemoryArena;
+	Result.used = MemoryArena->used;
+
+	MemoryArena->temp_count++;
+
+	return(Result);
+}
+
+inline void
+temporary_memory_end(temporary_memory TempMemory)
+{
+	memory_arena *MemoryArena = TempMemory.MemoryArena;
+	ASSERT(MemoryArena->used >= TempMemory.used);
+	MemoryArena->used = TempMemory.used;
+	ASSERT(MemoryArena->temp_count > 0);
+	MemoryArena->temp_count--;
+}
+
 
 #include "game_string.h"
 #include "game_intrinsics.h"
 #include "game_math.h"
-#include "game_tile.h"
+#include "game_geometry.h"
 
 #include "game_asset.h"
-
-struct rectangle
-{
-	v2f Min;
-	v2f Max;
-};
-
-struct player_polygon
-{
-	v2f Vertices[7];
-};
-
-struct projected_interval
-{
-	f32 min;
-	f32 max;
-};
-
-struct bounding_box
-{
-	v2f Min;
-	v2f Max;
-};
-
-struct square
-{
-	v2f Center;
-	f32 half_width;
-};
-
-struct circle
-{
-	v2f Center;
-	f32 radius;
-};
-
-struct triangle
-{
-	v2f Vertices[3];
-	v2f Centroid;
-};
 
 enum asteroid_size
 {
@@ -126,24 +118,6 @@ struct hit_point
 	u8 count;
 };
 
-enum shape_type
-{
-	SHAPE_TRIANGLE,
-	SHAPE_CIRCLE,
-	SHAPE_POLY,
-
-	SHAPE_COUNT
-};
-
-struct move_spec
-{
-	b32 use_normalized_accel;
-	f32 speed;
-	f32 angular_speed;
-	f32 mass;
-};
-
-
 struct entity
 {
 	u32 index;
@@ -152,8 +126,6 @@ struct entity
 	shape_type shape;
 	u32 flags;
 
-	b32 exists;
-	//b32 collides;
 	b32 is_shooting;
 	b32 is_warping;
 	b32 is_shielded;
@@ -161,16 +133,19 @@ struct entity
 	f32 height;
 	f32 base_half_width;
 
+	b32 use_normalized_accel;
+	f32 speed;
+	f32 max_speed;
+	f32 angular_speed;
+	f32 mass;
+	f32 radius;
+
+	f32 distance_remaining;
+
 	v2f Pos;
 	v2f dPos;
 	v2f Right;
 	v2f Direction;
-
-
-	f32 speed;
-	f32 mass;
-	f32 radius;
-	f32 distance_remaining;
 
 	u8 hit_point_max;
 	hit_point HitPoints;
@@ -181,6 +156,15 @@ struct entity
 struct world
 {
 	v2f Dim;
+};
+
+struct pairwise_collision_rule
+{
+	b32 should_collide;
+	u32 index_a;
+	u32 index_b;
+
+	pairwise_collision_rule *NextInHash;
 };
 
 struct game_state
@@ -216,7 +200,18 @@ struct game_state
 
 	m3x3 MapToScreenSpace;
 
+	// NOTE(Justin): Muse be power of two.
+	pairwise_collision_rule *CollisionRuleHash[256];
+
+	f32 time;
+
 	b32 is_initialized;
+};
+
+struct transient_state
+{
+	b32 is_initialized;
+	memory_arena TransientArena;
 };
 
 #define GAME_H

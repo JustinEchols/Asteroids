@@ -46,9 +46,9 @@ typedef float		f32;
 #define TRUE 1
 #define FALSE 0
 
-#define ABS(x) ((x) > 0) ? (x) : -(x)
-#define MIN(a, b) ((a) < (b)) ? (a) : (b)
-#define MAX(a, b) ((a) < (b)) ? (b) : (a)
+#define ABS(x) (((x) > 0) ? (x) : -(x))
+#define MIN(a, b) (((a) < (b)) ? (a) : (b))
+#define MAX(a, b) (((a) < (b)) ? (b) : (a))
 #define SQUARE(x) ((x) * (x))
 #define CUBE(x) ((x) * (x) * (x))
 
@@ -120,8 +120,11 @@ typedef struct
 typedef struct
 {
 	u64 total_size;
+	u64 permanent_storage_size;
+	u64 transient_storage_size;
 	b32 is_initialized;
 	void *permanent_storage;
+	void *transient_storage;
 
 } game_memory;
 
