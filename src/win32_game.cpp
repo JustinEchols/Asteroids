@@ -61,17 +61,17 @@ global_variable WINDOWPLACEMENT		GlobalWindowPosition = {sizeof(GlobalWindowPosi
 typedef DIRECT_SOUND_CREATE(direct_sound_create);
 
 internal void
-win32_toggle_full_screen(HWND WindowHandle)
+win32_toggle_full_screen(HWND Window)
 {
-	DWORD window_style = GetWindowLong(WindowHandle, GWL_STYLE);
+	DWORD window_style = GetWindowLong(Window, GWL_STYLE);
 	if(window_style & WS_OVERLAPPEDWINDOW)
 	{
 		MONITORINFO MonitorInfo = {sizeof(MonitorInfo)};
-		if(GetWindowPlacement(WindowHandle, &GlobalWindowPosition) && GetMonitorInfo(MonitorFromWindow(WindowHandle, MONITOR_DEFAULTTOPRIMARY), &MonitorInfo))
+		if(GetWindowPlacement(Window, &GlobalWindowPosition) && GetMonitorInfo(MonitorFromWindow(Window, MONITOR_DEFAULTTOPRIMARY), &MonitorInfo))
 		{
-			SetWindowLong(WindowHandle, GWL_STYLE, window_style & ~WS_OVERLAPPEDWINDOW);
+			SetWindowLong(Window, GWL_STYLE, window_style & ~WS_OVERLAPPEDWINDOW);
 
-			SetWindowPos(WindowHandle, HWND_TOP,
+			SetWindowPos(Window, HWND_TOP,
 					MonitorInfo.rcMonitor.left, MonitorInfo.rcMonitor.top,
 					MonitorInfo.rcMonitor.right - MonitorInfo.rcMonitor.left,
 					MonitorInfo.rcMonitor.bottom - MonitorInfo.rcMonitor.top,
@@ -80,13 +80,14 @@ win32_toggle_full_screen(HWND WindowHandle)
 	}
 	else
 	{
-		SetWindowLong(WindowHandle, GWL_STYLE, window_style | WS_OVERLAPPEDWINDOW);
-		SetWindowPlacement(WindowHandle, &GlobalWindowPosition);
-		SetWindowPos(WindowHandle, NULL, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+		SetWindowLong(Window, GWL_STYLE, window_style | WS_OVERLAPPEDWINDOW);
+		SetWindowPlacement(Window, &GlobalWindowPosition);
+		SetWindowPos(Window, NULL, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
 	}	
 }
+
 internal void
-win32_dsound_init(HWND WindowHandle, s32 secondary_buffer_size)
+win32_dsound_init(HWND Window, s32 secondary_buffer_size)
 {
 	HMODULE dsound_dll = LoadLibraryA("dsound.dll");
 	if(dsound_dll)
@@ -108,12 +109,12 @@ win32_dsound_init(HWND WindowHandle, s32 secondary_buffer_size)
 				WaveFormat.nAvgBytesPerSec = WaveFormat.nSamplesPerSec * WaveFormat.nBlockAlign;
 				WaveFormat.cbSize = 0;
 
-				if(SUCCEEDED(DSound->SetCooperativeLevel(WindowHandle, DSSCL_PRIORITY)))
+				if(SUCCEEDED(DSound->SetCooperativeLevel(Window, DSSCL_PRIORITY)))
 				{
 					DSBUFFERDESC BufferDesc;
 					BufferDesc.dwSize = sizeof(BufferDesc);
 					BufferDesc.dwFlags = DSBCAPS_PRIMARYBUFFER;
-					BufferDesc.dwBufferBytes = 0;//required for primary buffer
+					BufferDesc.dwBufferBytes = 0;
 					BufferDesc.dwReserved = 0;
 					BufferDesc.lpwfxFormat = NULL;
 					BufferDesc.guid3DAlgorithm = GUID_NULL;
@@ -302,6 +303,7 @@ win32_opengl_init(HWND Window)
 	HGLRC OpenGLRC = wglCreateContext(WindowDC);
 	if(wglMakeCurrent(WindowDC, OpenGLRC))
 	{
+		// NOTE(Justin): Success
 	}
 	else
 	{
@@ -324,19 +326,12 @@ win32_back_buffer_resize(win32_back_buffer *Win32GlobalBackBuffer, int width, in
 	Win32GlobalBackBuffer->bytes_per_pixel = 4;
 	Win32GlobalBackBuffer->stride = Win32GlobalBackBuffer->width * Win32GlobalBackBuffer->bytes_per_pixel;
 
-	Win32GlobalBackBuffer->Info.bmiHeader.biSize = sizeof(Win32GlobalBackBuffer->Info.bmiHeader); // Necessary?
+	Win32GlobalBackBuffer->Info.bmiHeader.biSize = sizeof(Win32GlobalBackBuffer->Info.bmiHeader);
 	Win32GlobalBackBuffer->Info.bmiHeader.biWidth = Win32GlobalBackBuffer->width;
 	Win32GlobalBackBuffer->Info.bmiHeader.biHeight = Win32GlobalBackBuffer->height;
- 
 	Win32GlobalBackBuffer->Info.bmiHeader.biPlanes = 1;
 	Win32GlobalBackBuffer->Info.bmiHeader.biBitCount = 32;
 	Win32GlobalBackBuffer->Info.bmiHeader.biCompression = BI_RGB;
-
-	Win32GlobalBackBuffer->Info.bmiHeader.biSizeImage = 0;
-	Win32GlobalBackBuffer->Info.bmiHeader.biXPelsPerMeter = 0;
-	Win32GlobalBackBuffer->Info.bmiHeader.biYPelsPerMeter = 0;
-	Win32GlobalBackBuffer->Info.bmiHeader.biClrUsed = 0;
-	Win32GlobalBackBuffer->Info.bmiHeader.biClrImportant = 0;
 
 	int bitmap_memory_size =  
 		Win32GlobalBackBuffer->width * Win32GlobalBackBuffer->height * Win32GlobalBackBuffer->bytes_per_pixel;
@@ -354,7 +349,6 @@ win32_get_window_dimension(HWND Window)
 	GetClientRect(Window, &ClientRect);
 	Result.width = ClientRect.right - ClientRect.left;
 	Result.height = ClientRect.top - ClientRect.bottom;
-	//Result.height = ClientRect.bottom - ClientRect.top;
 
 	return(Result);
 }
@@ -441,7 +435,7 @@ win32_display_buffer_to_window(win32_back_buffer *Win32BackBuffer, HDC DeviceCon
 
 
 LRESULT CALLBACK
-WndProc(HWND WindowHandle, UINT Message, WPARAM wParam, LPARAM lParam)
+WndProc(HWND Window, UINT Message, WPARAM wParam, LPARAM lParam)
 {
 	LRESULT result = 0;
 	switch (Message)
@@ -460,7 +454,7 @@ WndProc(HWND WindowHandle, UINT Message, WPARAM wParam, LPARAM lParam)
 		case WM_SIZE:
 		{
 			RECT ClientRect;
-			GetClientRect(WindowHandle, &ClientRect);
+			GetClientRect(Window, &ClientRect);
 			int client_width = ClientRect.right - ClientRect.left;
 			int client_height = ClientRect.bottom - ClientRect.top;
 			win32_back_buffer_resize(&Win32GlobalBackBuffer, client_width, client_height);
@@ -475,17 +469,17 @@ WndProc(HWND WindowHandle, UINT Message, WPARAM wParam, LPARAM lParam)
 		case WM_PAINT:
 		{
 			PAINTSTRUCT PaintStruct;
-			HDC DeviceContext = BeginPaint(WindowHandle, &PaintStruct);
+			HDC DeviceContext = BeginPaint(Window, &PaintStruct);
 
-			win32_client_dimensions WindowDimensions = win32_get_window_dimension(WindowHandle);
+			win32_client_dimensions WindowDimensions = win32_get_window_dimension(Window);
 
 			win32_display_buffer_to_window(&Win32GlobalBackBuffer, DeviceContext, WindowDimensions.width, WindowDimensions.height);
 
-			EndPaint(WindowHandle, &PaintStruct);
+			EndPaint(Window, &PaintStruct);
 		} break;
 		default:
 		{
-			result = DefWindowProc(WindowHandle, Message, wParam, lParam);
+			result = DefWindowProc(Window, Message, wParam, lParam);
 		} break;
 	}
 	return(result);
@@ -585,6 +579,10 @@ win32_process_pending_messgaes(game_controller_input *KeyboardController)
 					if(key_is_down)
 					{
 						b32 alt_key_was_down = (Message.lParam & (1 << 29));
+						if((vk_code == VK_F4) && (alt_key_was_down))
+						{
+							Win32GlobalRunning = false;
+						}
 						if((vk_code == VK_RETURN) && (alt_key_was_down))
 						{
 							if(Message.hwnd)
@@ -684,7 +682,7 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR CmdLine, int nCmdSho
 	const char window_title[]		= "Asteroids";
 
 	WNDCLASSEX WindowClass;
-	HWND WindowHandle;
+	HWND Window;
 
 
 	WindowClass.cbSize			= sizeof(WindowClass);
@@ -716,7 +714,7 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR CmdLine, int nCmdSho
 
 	if(RegisterClassEx(&WindowClass))
 	{
-		WindowHandle = CreateWindowEx(0,
+		Window = CreateWindowEx(0,
 				window_class_name,
 				window_title,
 				WS_OVERLAPPEDWINDOW | WS_VISIBLE,
@@ -728,13 +726,13 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR CmdLine, int nCmdSho
 				0,
 				hInstance,
 				0);
-		if(WindowHandle)
+		if(Window)
 		{
-			HDC DeviceContext = GetDC(WindowHandle);
+			HDC DeviceContext = GetDC(Window);
 
-			win32_opengl_init(WindowHandle);
-			//win32_back_buffer_resize(&Win32GlobalBackBuffer, 960, 540);
-			win32_back_buffer_resize(&Win32GlobalBackBuffer, 1920, 1080);
+			win32_opengl_init(Window);
+			win32_back_buffer_resize(&Win32GlobalBackBuffer, 960, 540);
+			//win32_back_buffer_resize(&Win32GlobalBackBuffer, 1920, 1080);
 
 			win32_sound_buffer Win32SoundBuffer = {0};
 
@@ -764,7 +762,7 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR CmdLine, int nCmdSho
 			if((GameMemory.permanent_storage) && (GameMemory.transient_storage) && samples)
 			{
 
-				win32_dsound_init(WindowHandle, Win32SoundBuffer.secondary_buffer_size);
+				win32_dsound_init(Window, Win32SoundBuffer.secondary_buffer_size);
 
 				win32_sound_buffer_clear(&Win32SoundBuffer);
 
@@ -805,7 +803,7 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR CmdLine, int nCmdSho
 
 					POINT MousePos;
 					GetCursorPos(&MousePos);
-					ScreenToClient(WindowHandle, &MousePos);
+					ScreenToClient(Window, &MousePos);
 
 					NewInput->mouse_x = MousePos.x;
 					NewInput->mouse_y = Win32GlobalBackBuffer.height - MousePos.y;
@@ -908,11 +906,11 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR CmdLine, int nCmdSho
 						// Missed frame
 					}
 
-					win32_client_dimensions WindowDimensions = win32_get_window_dimension(WindowHandle);
-					HDC DeviceContext = GetDC(WindowHandle);
+					win32_client_dimensions WindowDimensions = win32_get_window_dimension(Window);
+					HDC DeviceContext = GetDC(Window);
 					win32_display_buffer_to_window(&Win32GlobalBackBuffer, DeviceContext,
 							WindowDimensions.width, WindowDimensions.height);
-					ReleaseDC(WindowHandle, DeviceContext);
+					ReleaseDC(Window, DeviceContext);
 
 					f32 fps = (f32)ticks_per_second / (f32)ticks_elapsed;
 					f32 miliseconds_elapsed = (((1000 * (f32)ticks_elapsed) * time_for_each_tick));
