@@ -102,6 +102,13 @@ circle_project_onto_axis(circle *Circle, v2f ProjectedAxis)
 	Result.min = min;
 	Result.max = max;
 
+	if(Result.min > Result.max)
+	{
+		f32 temp = Result.min;
+		Result.min = Result.max;
+		Result.max = temp;
+	}
+
 	return(Result);
 }
 
@@ -154,11 +161,10 @@ closest_point_to_circle(v2f *Vertices, u32 vertex_count, circle *Circle)
 }
 
 
-internal v2f
-poly_and_circle_collides(v2f *Vertices, u32 vertex_count, circle Circle)
+internal b32
+poly_and_circle_collides(v2f *Vertices, u32 vertex_count, circle Circle, v2f *Normal)
 {
-	//b32 GapExists = false;
-	v2f Normal = {};
+	b32 GapExists = false;
 
 	f32 min_length = f32_infinity();
 	f32 overlap = 0.0f;
@@ -174,31 +180,23 @@ poly_and_circle_collides(v2f *Vertices, u32 vertex_count, circle Circle)
 		interval PolyInterval = sat_projected_interval(Vertices, vertex_count, ProjectedAxis);
 		interval CircleInterval = circle_project_onto_axis(&Circle, ProjectedAxis);
 
-		if(CircleInterval.min > CircleInterval.max)
-		{
-			f32 temp = CircleInterval.min;
-			CircleInterval.min = CircleInterval.max;
-			CircleInterval.max = temp;
-		}
-
 		if(!((CircleInterval.max >= PolyInterval.min) &&
 			(PolyInterval.max >= CircleInterval.min)))
 		{
 
-			return(Normal);
+			return(GapExists);
 		}
 
-		overlap = ABS(interval_length(PolyInterval) - interval_length(CircleInterval));
+		overlap = MIN(CircleInterval.max - PolyInterval.min, PolyInterval.max - CircleInterval.min);
 		if(overlap < min_length)
 		{
 			min_length = overlap;
-			Normal = ProjectedAxis;
+			*Normal = ProjectedAxis;
 		}
 
 	}
 
 	v2f ClosestPoint = closest_point_to_circle(Vertices, vertex_count, &Circle);
-
 	v2f ProjectedAxis = v2f_normalize(ClosestPoint - Circle.Center);
 
 	interval PolyInterval = sat_projected_interval(Vertices, vertex_count, ProjectedAxis);
@@ -207,17 +205,16 @@ poly_and_circle_collides(v2f *Vertices, u32 vertex_count, circle Circle)
 	if(!((CircleInterval.max >= PolyInterval.min) &&
 		(PolyInterval.max >= CircleInterval.min)))
 	{
-		return(Normal);
+		return(GapExists);
 	}
 
-	overlap = ABS(interval_length(PolyInterval) - interval_length(CircleInterval));
+	overlap = MIN(CircleInterval.max - PolyInterval.min, PolyInterval.max - CircleInterval.min);
 	if(overlap < min_length)
 	{
 		min_length = overlap;
-		Normal = ProjectedAxis;
+		*Normal = ProjectedAxis;
 	}
-
-	return(Normal);
+	return(!GapExists);
 }
 
 internal b32
