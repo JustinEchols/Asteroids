@@ -185,6 +185,7 @@ struct game_state
 	// into different bitmaps for animation, visual effects purposes. Left
 	// engine, right engine, etc..
 	loaded_bitmap Ship;
+	loaded_bitmap ShipNormalMap;
 
 	loaded_bitmap WarpFrames[8];
 	u32 warp_frame_index;

@@ -1,7 +1,7 @@
 @echo off
 
-set common_compiler_flags= -MTd -nologo -Gm- -GR- -EHa- -Od -Oi -WX -W4 -FC -Z7 -wd4201 -wd4100 -wd4189 -wd4505 -DGAME_SLOW=1 -DDEBUG_BOUNDING_BOX=1 -DDEBUG_VERTICES=1 -DDEBUG_DRAW_PLAYER_POS=0
-set common_linker_flags= -incremental:no -opt:ref user32.lib gdi32.lib winmm.lib
+set common_compiler_flags= -MTd -nologo -Gm- -GR- -EHa- -O2 -Oi -WX -W4 -FC -Z7 -wd4201 -wd4100 -wd4189 -wd4505 -DGAME_SLOW=1 -DDEBUG_BOUNDING_BOX=1 -DDEBUG_VERTICES=1 -DDEBUG_DRAW_PLAYER_POS=0
+set common_linker_flags= -incremental:no -opt:ref user32.lib gdi32.lib winmm.lib opengl32.lib
 
 IF NOT EXIST ..\build mkdir ..\build
 pushd ..\build

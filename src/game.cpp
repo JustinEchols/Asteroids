@@ -387,26 +387,40 @@ entity_move(game_state *GameState, entity *Entity, v2f ddPos, f32 dt)
 							}
 							else
 							{
-								if(sat_collision(TestEntity, Entity))
+								// NOTE(Justin): The bbox of the player is a
+								// concave polygon. The collision test is split
+								// into two parts so that the testing involves a
+								// convex polygon which is half of the player
+								// bbox
+								//
+
+#if 0
+								player_half_polygon Poly;
+								Poly.Vertices[0] = TestEntity->Poly.Vertices[0];
+								Poly.Vertices[1] = TestEntity->Poly.Vertices[1];
+								Poly.Vertices[2] = TestEntity->Poly.Vertices[2];
+								Poly.Vertices[3] = TestEntity->Poly.Vertices[3];
+
+								circle Circle = circle_init(Entity->Pos, Entity->radius);
+								Normal = poly_and_circle_collides(Poly.Vertices, ARRAY_COUNT(Poly.Vertices), Circle);
+								if((Normal.x != 0.0f) || (Normal.y != 0.0f))
 								{ 
-									// TODO(Justin): The normal is incorrect.
-									v2f Delta = TestEntity->Pos - Entity->Pos;
-									for(u32 vertex_i = 0; vertex_i < ARRAY_COUNT(TestEntity->Poly.Vertices); vertex_i++)
-									{
-										v2f P0 = TestEntity->Poly.Vertices[vertex_i];
-										v2f P1 = TestEntity->Poly.Vertices[(vertex_i + 1)  % ARRAY_COUNT(TestEntity->Poly.Vertices)];
-
-										v2f Edge = P1 - P0;
-										v2f Perp = -1.0f * v2f_perp(Edge);
-
-										if(v2f_dot(Perp, Delta) < 0.0f)
-										{
-											Normal = v2f_normalize(Perp);
-											break;
-										}
-									}
 									HitEntity = TestEntity;
 								}
+								else
+								{
+									Poly.Vertices[0] = TestEntity->Poly.Vertices[3];
+									Poly.Vertices[1] = TestEntity->Poly.Vertices[4];
+									Poly.Vertices[2] = TestEntity->Poly.Vertices[5];
+									Poly.Vertices[3] = TestEntity->Poly.Vertices[6];
+
+									Normal = poly_and_circle_collides(Poly.Vertices, ARRAY_COUNT(Poly.Vertices), Circle);
+									if((Normal.x != 0.0f) || (Normal.y != 0.0f))
+									{ 
+										HitEntity = TestEntity;
+									}
+								}
+#endif
 							}
 						}
 					}
@@ -430,13 +444,13 @@ entity_move(game_state *GameState, entity *Entity, v2f ddPos, f32 dt)
 				if((Entity->type == ENTITY_PLAYER) &&
 				   (HitEntity->type == ENTITY_ASTEROID))
 				{
-					player_collision_handle(Entity);
+					//player_collision_handle(Entity);
 				}
 
 				if((Entity->type == ENTITY_ASTEROID) &&
 					(HitEntity->type == ENTITY_PLAYER))
 				{
-					player_collision_handle(HitEntity);
+					//player_collision_handle(HitEntity);
 
 					if(HitEntity->is_shielded)
 					{
@@ -445,9 +459,10 @@ entity_move(game_state *GameState, entity *Entity, v2f ddPos, f32 dt)
 					}
 					else
 					{
-						Entity->dPos = Entity->dPos - 2.0f * v2f_dot(Entity->dPos, Normal) * Normal;
+						Entity->dPos = Entity->speed * Normal;
+						//Entity->dPos = Entity->dPos - 2.0f * v2f_dot(Entity->dPos, Normal) * Normal;
 						Entity->Direction = v2f_normalize(Entity->dPos);
-						Entity->Pos = EntityNewPos;
+						//Entity->Pos = EntityNewPos;
 					}
 				}
 
@@ -503,7 +518,7 @@ player_add(game_state *GameState)
 
 	Entity->is_shooting = false;
 	Entity->is_warping = false;
-	Entity->is_shielded = true;
+	Entity->is_shielded = false;
 
 	Entity->height = 18.0f;
 	Entity->base_half_width = 15.0f;
@@ -800,6 +815,7 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 		GameState->Background = bitmap_file_read_entire("space_background.bmp");
 
 		GameState->Ship = bitmap_file_read_entire("ship/blueships1_up.bmp");
+		GameState->ShipNormalMap = bitmap_file_read_entire("ship/blueships1normal.bmp");
 
 		loaded_bitmap *ShipBitmap = &GameState->Ship;
 		ShipBitmap->Align = V2F((f32)ShipBitmap->width / 2.0f, (f32)ShipBitmap->height / 2.0f);
@@ -832,7 +848,7 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 		asteroid_add(GameState, ASTEROID_SMALL, V2F(0.0f, 0.5f * World->Dim.y), V2F(-1.0f, 0.0f));
 		asteroid_add(GameState, ASTEROID_SMALL, V2F(-100.0f, 0.5f * World->Dim.y), V2F(1.0f, 0.0f));
 
-#if 1
+#if 0
 		for(u32 i = 0; i < 20; i++)
 		{
 			asteroid_add(GameState, ASTEROID_SMALL);
@@ -849,6 +865,7 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 		GameMemory->is_initialized = true;
 	}
 
+#if 0
 	ASSERT(sizeof(transient_state) <= GameMemory->transient_storage_size);
 	transient_state *TransientState = (transient_state *)GameMemory->transient_storage;
 	if(!TransientState->is_initialized)
@@ -858,6 +875,7 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 				(u8 *)GameMemory->transient_storage + sizeof(transient_state));
 		TransientState->is_initialized = true;
 	}
+#endif
 
 	v2f BottomLeft = {5.0f, 5.0f};
 
@@ -950,7 +968,7 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 			case ENTITY_PLAYER:
 			{
 				v2f PlayerPos = Entity->Pos;
-				push_bitmap(&RenderGroup, &GameState->Ship, PlayerPos, Entity->Right, Entity->Direction,
+				push_bitmap(&RenderGroup, &GameState->Ship, 0, PlayerPos, Entity->Right, Entity->Direction,
 						GameState->Ship.Align);
 
 				player_polygon_draw(BackBuffer, GameState, BottomLeft, Entity);
@@ -970,7 +988,7 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 				v2f AsteroidPos = Entity->Pos;
 				if(!entity_flag_is_set(Entity, ENTITY_FLAG_NON_SPATIAL))
 				{
-					push_bitmap(&RenderGroup, &GameState->AsteroidBitmap,
+					push_bitmap(&RenderGroup, &GameState->AsteroidBitmap, 0,
 							AsteroidPos, -1.0f * v2f_perp(Entity->Direction), Entity->Direction,
 							GameState->AsteroidBitmap.Align);
 				}
@@ -995,7 +1013,7 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 				if(!entity_flag_is_set(Entity, ENTITY_FLAG_NON_SPATIAL))
 				{
 					v2f LaserPos = Entity->Pos;
-					push_bitmap(&RenderGroup, &GameState->LaserBlueBitmap, LaserPos,
+					push_bitmap(&RenderGroup, &GameState->LaserBlueBitmap, 0, LaserPos,
 							-1.0f * v2f_perp(Entity->Direction), Entity->Direction,
 							GameState->LaserBlueBitmap.Align);
 				}
@@ -1023,15 +1041,4 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 																								Element->Color);
 		}
 	}
-
-	f32 *time = &GameState->time;
-	*time += dt;
-
-	v2f D = 30.0f * V2F(cosf(*time), 0.0f);
-	v2f O = D + V2F(220.0f, 220.0f);
-	v2f X = (f32)GameState->Ship.width * V2F(1.0f, 0.0f);
-	//v2f X = (f32)GameState->Ship.width * V2F(cosf(*time), sinf(*time));
-	v2f Y = (f32)GameState->Ship.height * V2F(0.0f, 1.0f);
-
-	rectangle_draw_slowly(BackBuffer, &GameState->Ship, V2F(0.0f, 0.0f), O - 0.5f * X - 0.5f * Y, X, Y, V4F(1.0f, 1.0f, 1.0f, 1.0f));
 }

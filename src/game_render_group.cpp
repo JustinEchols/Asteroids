@@ -1,4 +1,46 @@
 
+inline v4f
+srgb_255_to_linear1(v4f C)
+{
+	v4f Result;
+
+	f32 inv_255 = 1.0f / 255.0f;
+
+	Result.r = SQUARE(inv_255 * C.r);
+	Result.g = SQUARE(inv_255 * C.g);
+	Result.b = SQUARE(inv_255 * C.b);
+	Result.a = inv_255 * C.a;
+
+	return(Result);
+}
+
+inline v4f
+linear1_to_srgb_255(v4f C)
+{
+	v4f Result;
+
+	f32 one_255 = 255.0f;
+
+	Result.r = one_255 * f32_sqrt(C.r);
+	Result.g = one_255 * f32_sqrt(C.g);
+	Result.b = one_255 * f32_sqrt(C.b);
+	Result.a = one_255 * C.a;
+	
+	return(Result);
+}
+
+inline v4f
+unpack4x8(u32 packed)
+{
+	v4f Result = {(f32)((packed >> 16) & 0xFF),
+				  (f32)((packed >> 8) & 0xFF),
+				  (f32)((packed >> 0) & 0xFF),
+				  (f32)((packed >> 24) & 0xFF)};
+
+	return(Result);
+}
+
+
 internal void
 pixel_set(back_buffer *BackBuffer, v2f ScreenXY, u32 color)
 {
@@ -112,9 +154,11 @@ rectangle_draw(back_buffer *BackBuffer, v2f Min, v2f Max, v4f Color)
 }
 
 internal void 
-rectangle_draw_slowly(back_buffer *BackBuffer, loaded_bitmap *Bitmap, v2f Dim, v2f Origin, v2f XAxis, v2f YAxis,
-		v4f Color)
+rectangle_draw_slowly(back_buffer *BackBuffer, loaded_bitmap *Bitmap, loaded_bitmap *NormalMap,
+		v2f Dim, v2f Origin, v2f XAxis, v2f YAxis, v4f Color)
 {
+	Color.rgb *= Color.a;
+
 	f32 inv_x_axis_len_sq = 1.0f / v2f_dot(XAxis, XAxis);
 	f32 inv_y_axis_len_sq = 1.0f / v2f_dot(YAxis, YAxis);
 
@@ -138,6 +182,11 @@ rectangle_draw_slowly(back_buffer *BackBuffer, loaded_bitmap *Bitmap, v2f Dim, v
 		if(x_max < x_ceil) {x_max = x_ceil;}
 		if(y_max < y_ceil) {y_max = y_ceil;}
 	}
+
+	if(x_min < 0) {x_min = 0;}
+	if(y_min < 0) {y_min = 0;}
+	if(x_max > (BackBuffer->width - 1)) {x_max = BackBuffer->width - 1;}
+	if(y_max > (BackBuffer->height - 1)) {y_max = BackBuffer->height - 1;}
 
 	u8 *pixel_row = (u8 *)BackBuffer->memory + BackBuffer->stride * y_min + BackBuffer->bytes_per_pixel * x_min;
 	for(int row = y_min; row < y_max; row++)
@@ -179,51 +228,44 @@ rectangle_draw_slowly(back_buffer *BackBuffer, loaded_bitmap *Bitmap, v2f Dim, v
 				u32 texelc = *(u32 *)(texel_ptr + Bitmap->stride);
 				u32 texeld = *(u32 *)(texel_ptr + Bitmap->stride + sizeof(u32));
 
-				v4f TexelA = {(f32)((texela >> 16) & 0xFF),
-							 (f32)((texela >> 8) & 0xFF),
-							 (f32)((texela >> 0) & 0xFF),
-							 (f32)((texela >> 24) & 0xFF)};
+				v4f TexelA = unpack4x8(texela);
+				v4f TexelB = unpack4x8(texelb);
+				v4f TexelC = unpack4x8(texelc);
+				v4f TexelD = unpack4x8(texeld);
 
-				v4f TexelB = {(f32)((texelb >> 16) & 0xFF),
-							 (f32)((texelb >> 8) & 0xFF),
-							 (f32)((texelb >> 0) & 0xFF),
-							 (f32)((texelb >> 24) & 0xFF)};
+				TexelA = srgb_255_to_linear1(TexelA);
+				TexelB = srgb_255_to_linear1(TexelB);
+				TexelC = srgb_255_to_linear1(TexelC);
+				TexelD = srgb_255_to_linear1(TexelD);
 
-				v4f TexelC = {(f32)((texelc >> 16) & 0xFF),
-							 (f32)((texelc >> 8) & 0xFF),
-							 (f32)((texelc >> 0) & 0xFF),
-							 (f32)((texelc >> 24) & 0xFF)};
-
-				v4f TexelD = {(f32)((texeld >> 16) & 0xFF),
-							 (f32)((texeld >> 8) & 0xFF),
-							 (f32)((texeld >> 0) & 0xFF),
-							 (f32)((texeld >> 24) & 0xFF)};
-
+				// NOTE(Justin): Bilinear filtering
 				v4f Texel = lerp(lerp(TexelA, fx, TexelB), fy, lerp(TexelC, fx, TexelD));
 
-				f32 src_a = Texel.a;
-				f32 src_r = Texel.r;
-				f32 src_g = Texel.g;
-				f32 src_b = Texel.b;
+				u8 *normal_ptr = (u8 *)NormalMap->memory + y * NormalMap->stride + x * sizeof(u32);
+				u32 normal_a = *(u32 *)normal_ptr;
+				u32 normal_b = *(u32 *)(normal_ptr + sizeof(u32));
+				u32 normal_c = *(u32 *)(normal_ptr + NormalMap->stride);
+				u32 normal_d = *(u32 *)(normal_ptr + NormalMap->stride + sizeof(u32));
 
-				f32 src_ra = (src_a / 255.0f) * Color.a;
+				v4f NormalA = unpack4x8(normal_a);
+				v4f NormalB = unpack4x8(normal_b);
+				v4f NormalC = unpack4x8(normal_c);
+				v4f NormalD = unpack4x8(normal_d);
 
-				f32 dest_a = (f32)((*pixel >> 24) & 0xFF);
-				f32 dest_r = (f32)((*pixel >> 16) & 0xFF);
-				f32 dest_g = (f32)((*pixel >> 8) & 0xFF);
-				f32 dest_b = (f32)((*pixel >> 0) & 0xFF);
-				f32 dest_ra = dest_a / 255.0f;
+				v4f Normal = lerp(lerp(NormalA, fx, NormalB), fy, lerp(NormalC, fx, NormalD));
 
-				f32 a = 255.0f * (src_ra + dest_ra - src_ra * dest_ra);
-				f32 r = (1.0f - src_ra) * dest_r + src_r;
-				f32 g = (1.0f - src_ra) * dest_g + src_g; 
-				f32 b = (1.0f - src_ra) * dest_b + src_b;
+				//Texel = Hadamard(Texel, Color);
 
-				*pixel = (((u32)(a + 0.5f) << 24) |
-						   ((u32)(r + 0.5f) << 16) |
-						   ((u32)(g + 0.5f) << 8) |
-						   ((u32)(b + 0.5f) << 0));
+				v4f Dest = unpack4x8(*pixel);
 
+				Dest = srgb_255_to_linear1(Dest);
+
+				v4f Blended255 = (1.0f - Texel.a) * Dest + Texel;
+
+				*pixel = (((u32)(Blended255.a + 0.5f) << 24) |
+						   ((u32)(Blended255.r + 0.5f) << 16) |
+						   ((u32)(Blended255.g + 0.5f) << 8) |
+						   ((u32)(Blended255.b + 0.5f) << 0));
 			}
 			pixel++;
 		}
@@ -298,29 +340,24 @@ bitmap_draw(back_buffer *BackBuffer, loaded_bitmap *Bitmap, f32 x, f32 y, f32 c_
 			u32 *dest = (u32 *)dest_row;
 			for(s32 x = x_min; x < x_max; x++)
 			{
-				f32 sa = (f32)((*src >> 24) & 0xFF);
-				f32 sr = (f32)((*src >> 16) & 0xFF);
-				f32 sg = (f32)((*src >> 8) & 0xFF);
-				f32 sb = (f32)((*src >> 0) & 0xFF);
-				f32 rsa = (sa / 255.0f) * c_alpha;
+				v4f Texel = unpack4x8(*src);
 
-				f32 da = (f32)((*dest >> 24) & 0xFF);
-				f32 dr = (f32)((*dest >> 16) & 0xFF);
-				f32 dg = (f32)((*dest >> 8) & 0xFF);
-				f32 db = (f32)((*dest >> 0) & 0xFF);
-				f32 rda = (da / 255.0f);
+				Texel = srgb_255_to_linear1(Texel);
 
-				f32 inv_rsa = (1.0f - rsa);
+				Texel *= c_alpha;
 
-				f32 a = 255.0f * (rsa + rda - rsa * rda);
-				f32 r = inv_rsa * dr + sr;
-				f32 g = inv_rsa * dg + sg; 
-				f32 b = inv_rsa * db + sb;
+				v4f Dest = unpack4x8(*dest);
 
-				*dest = (((u32)(a + 0.5f) << 24) |
-						 ((u32)(r + 0.5f) << 16) |
-						 ((u32)(g + 0.5f) << 8) |
-						 ((u32)(b + 0.5f) << 0));
+				Dest = srgb_255_to_linear1(Dest);
+
+				v4f Result = (1.0f - Texel.a) * Dest + Texel;
+
+				Result = linear1_to_srgb_255(Result);
+
+				*dest = (((u32)(Result.a + 0.5f) << 24) |
+						 ((u32)(Result.r + 0.5f) << 16) |
+						 ((u32)(Result.g + 0.5f) << 8) |
+						 ((u32)(Result.b + 0.5f) << 0));
 
 				dest++;
 				src++;
@@ -356,21 +393,24 @@ bitmap_draw(back_buffer *BackBuffer, loaded_bitmap *Bitmap, f32 x, f32 y, f32 c_
 			for(s32 x = region_1_x_min; x < region_1_x_max; x++)
 			{
 
-				f32 alpha = (f32)((*src >> 24) & 0xFF) / 255.0f;
-				alpha *= c_alpha;
-				f32 src_r = (f32)((*src >> 16) & 0xFF);
-				f32 src_g = (f32)((*src >> 8) & 0xFF);
-				f32 src_b = (f32)((*src >> 0) & 0xFF);
+				v4f Texel = unpack4x8(*src);
 
-				f32 dest_r = (f32)((*dest >> 16) & 0xFF);
-				f32 dest_g = (f32)((*dest >> 8) & 0xFF);
-				f32 dest_b = (f32)((*dest >> 0) & 0xFF);
+				Texel = srgb_255_to_linear1(Texel);
 
-				f32 r = (1.0f - alpha) * dest_r + alpha * src_r;
-				f32 g = (1.0f - alpha) * dest_g + alpha * src_g; 
-				f32 b = (1.0f - alpha) * dest_b + alpha * src_b;
+				Texel *= c_alpha;
 
-				*dest = (((u32)(r + 0.5f) << 16) | ((u32)(g + 0.5f) << 8) | ((u32)(b + 0.5f) << 0));
+				v4f Dest = unpack4x8(*dest);
+
+				Dest = srgb_255_to_linear1(Dest);
+
+				v4f Result = (1.0f - Texel.a) * Dest + Texel;
+
+				Result = linear1_to_srgb_255(Result);
+
+				*dest = (((u32)(Result.a + 0.5f) << 24) |
+						 ((u32)(Result.r + 0.5f) << 16) |
+						 ((u32)(Result.g + 0.5f) << 8) |
+						 ((u32)(Result.b + 0.5f) << 0));
 
 				dest++;
 				src++;
@@ -409,22 +449,24 @@ bitmap_draw(back_buffer *BackBuffer, loaded_bitmap *Bitmap, f32 x, f32 y, f32 c_
 			for(s32 x = region_2_x_min; x < region_2_x_max; x++)
 			{
 
-				f32 alpha = (f32)((*src >> 24) & 0xFF) / 255.0f;
-				alpha *= c_alpha;
+				v4f Texel = unpack4x8(*src);
 
-				f32 src_r = (f32)((*src >> 16) & 0xFF);
-				f32 src_g = (f32)((*src >> 8) & 0xFF);
-				f32 src_b = (f32)((*src >> 0) & 0xFF);
+				Texel = srgb_255_to_linear1(Texel);
 
-				f32 dest_r = (f32)((*dest >> 16) & 0xFF);
-				f32 dest_g = (f32)((*dest >> 8) & 0xFF);
-				f32 dest_b = (f32)((*dest >> 0) & 0xFF);
+				Texel *= c_alpha;
 
-				f32 r = (1.0f - alpha) * dest_r + alpha * src_r;
-				f32 g = (1.0f - alpha) * dest_g + alpha * src_g; 
-				f32 b = (1.0f - alpha) * dest_b + alpha * src_b;
+				v4f Dest = unpack4x8(*dest);
 
-				*dest = (((u32)(r + 0.5f) << 16) | ((u32)(g + 0.5f) << 8) | ((u32)(b + 0.5f) << 0));
+				Dest = srgb_255_to_linear1(Dest);
+
+				v4f Result = (1.0f - Texel.a) * Dest + Texel;
+
+				Result = linear1_to_srgb_255(Result);
+
+				*dest = (((u32)(Result.a + 0.5f) << 24) |
+						 ((u32)(Result.r + 0.5f) << 16) |
+						 ((u32)(Result.g + 0.5f) << 8) |
+						 ((u32)(Result.b + 0.5f) << 0));
 
 				dest++;
 				src++;
@@ -441,11 +483,6 @@ debug_vector_draw_at_point(back_buffer * BackBuffer, v2f Point, v2f Direction, v
 	f32 c = 60.0f;
 	line_dda_draw(BackBuffer, Point, Point + c * Direction, Color.r, Color.g, Color.b);
 }
-
-
-
-
-
 
 internal void
 circle_draw(back_buffer *BackBuffer, circle *Circle, f32 r, f32 b, f32 g)
@@ -537,7 +574,7 @@ line_horizontal_draw(back_buffer *BackBuffer, f32 y, f32 r, f32 g, f32 b)
 }
 
 inline void
-push_piece(render_group *RenderGroup, loaded_bitmap *Texture,
+push_piece(render_group *RenderGroup, loaded_bitmap *Texture, loaded_bitmap *NormalMap,
 		v2f Origin, v2f XAxis, v2f YAxis, v2f Align, v2f Dim, v4f Color)
 {
 
@@ -546,6 +583,7 @@ push_piece(render_group *RenderGroup, loaded_bitmap *Texture,
 	m3x3 M = RenderGroup->MapToScreenSpace;
 
 	Element->Texture = Texture;
+	Element->NormalMap = NormalMap;
 	Element->Origin = M * Origin - Align;
 	Element->XAxis = XAxis;
 	Element->YAxis = YAxis;
@@ -554,16 +592,15 @@ push_piece(render_group *RenderGroup, loaded_bitmap *Texture,
 }
 
 inline void
-push_bitmap(render_group *RenderGroup, loaded_bitmap *Bitmap,
+push_bitmap(render_group *RenderGroup, loaded_bitmap *Bitmap, loaded_bitmap *NormalMap,
 		v2f Origin, v2f XAxis, v2f YAxis, v2f Align, f32 alpha = 1.0f)
 {
-	push_piece(RenderGroup, Bitmap, Origin, XAxis, YAxis,
+	push_piece(RenderGroup, Bitmap, NormalMap, Origin, XAxis, YAxis,
 			Align, V2F(0, 0), V4F(1.0f, 1.0f, 1.0f, alpha));
 }
 
 inline void
 push_rectangle(render_group *RenderGroup, v2f Origin, v2f XAxis, v2f YAxis, v2f Dim, v4f Color)
 {
-	push_piece(RenderGroup, 0, Origin, XAxis, YAxis, V2F(0, 0), Dim, Color);
+	push_piece(RenderGroup, 0, 0, Origin, XAxis, YAxis, V2F(0, 0), Dim, Color);
 }
-

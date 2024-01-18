@@ -132,20 +132,22 @@ bitmap_file_read_entire(char *filename)
 			{
 				u32 c = *pixel;
 
-				f32 r = (f32)((c & red_mask) >> red_shift_down);
-				f32 g = (f32)((c & green_mask) >> green_shift_down);
-				f32 b = (f32)((c & blue_mask) >> blue_shift_down);
-				f32 a = (f32)((c & alpha_mask) >> alpha_shift_down);
-				f32 an = (a / 255.0f);
+				v4f Texel = {(f32)((c & red_mask) >> red_shift_down),
+							 (f32)((c & green_mask) >> green_shift_down),
+							 (f32)((c & blue_mask) >> blue_shift_down),
+							 (f32)((c & alpha_mask) >> alpha_shift_down)};
 
-				r = r * an;
-				g = g * an;
-				b = b * an;
 
-				*pixel++ = (((u32)(a + 0.5f) << 24) |
-							((u32)(r + 0.5f) << 16) |
-							((u32)(g + 0.5f) << 8) |
-							((u32)(b + 0.5f) << 0));
+				Texel = srgb_255_to_linear1(Texel);
+
+				Texel.rgb *= Texel.a;
+
+				Texel = linear1_to_srgb_255(Texel);
+
+				*pixel++ = (((u32)(Texel.a + 0.5f) << 24) |
+							((u32)(Texel.r + 0.5f) << 16) |
+							((u32)(Texel.g + 0.5f) << 8) |
+							((u32)(Texel.b + 0.5f) << 0));
 			}
 		}
 	}

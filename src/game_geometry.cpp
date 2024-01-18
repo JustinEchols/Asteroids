@@ -154,37 +154,24 @@ closest_point_to_circle(v2f *Vertices, u32 vertex_count, circle *Circle)
 }
 
 
-internal b32
-sat_collision(entity *EntityA, entity *EntityB)
+internal v2f
+poly_and_circle_collides(v2f *Vertices, u32 vertex_count, circle Circle)
 {
-	b32 GapExists = true;
+	//b32 GapExists = false;
+	v2f Normal = {};
 
-	entity *EntityWithPoly;
-	entity *EntityWithOutPoly;
+	f32 min_length = f32_infinity();
+	f32 overlap = 0.0f;
 
-	if(EntityA->shape == SHAPE_POLY)
+	for(u32 vertex_i = 0; vertex_i < vertex_count; vertex_i++)
 	{
-		EntityWithPoly = EntityA;
-		EntityWithOutPoly = EntityB;
-	}
-	else
-	{
-		EntityWithPoly = EntityB;
-		EntityWithOutPoly = EntityA;
-	}
-
-	circle Circle = circle_init(EntityWithOutPoly->Pos, EntityWithOutPoly->radius);
-	for(u32 vertex_i = 0; vertex_i < ARRAY_COUNT(EntityWithPoly->Poly.Vertices); vertex_i++)
-	{
-		v2f P0 = EntityWithPoly->Poly.Vertices[vertex_i];
-		v2f P1 = EntityWithPoly->Poly.Vertices[(vertex_i + 1) % ARRAY_COUNT(EntityWithPoly->Poly.Vertices)];
+		v2f P0 = Vertices[vertex_i];
+		v2f P1 = Vertices[(vertex_i + 1) % vertex_count];
 		v2f D = P1 - P0;
 
 		v2f ProjectedAxis = v2f_normalize(-1.0f * v2f_perp(D));
 
-		interval PolyInterval = sat_projected_interval(EntityWithPoly->Poly.Vertices,
-				ARRAY_COUNT(EntityWithPoly->Poly.Vertices), ProjectedAxis);
-
+		interval PolyInterval = sat_projected_interval(Vertices, vertex_count, ProjectedAxis);
 		interval CircleInterval = circle_project_onto_axis(&Circle, ProjectedAxis);
 
 		if(CircleInterval.min > CircleInterval.max)
@@ -195,30 +182,42 @@ sat_collision(entity *EntityA, entity *EntityB)
 		}
 
 		if(!((CircleInterval.max >= PolyInterval.min) &&
-					(PolyInterval.max >= CircleInterval.min)))
+			(PolyInterval.max >= CircleInterval.min)))
 		{
 
-			GapExists = false;
+			return(Normal);
 		}
+
+		overlap = ABS(interval_length(PolyInterval) - interval_length(CircleInterval));
+		if(overlap < min_length)
+		{
+			min_length = overlap;
+			Normal = ProjectedAxis;
+		}
+
 	}
 
-	v2f ClosestPoint = closest_point_to_circle(EntityWithPoly->Poly.Vertices,
-			ARRAY_COUNT(EntityWithPoly->Poly.Vertices), &Circle);
+	v2f ClosestPoint = closest_point_to_circle(Vertices, vertex_count, &Circle);
 
 	v2f ProjectedAxis = v2f_normalize(ClosestPoint - Circle.Center);
 
-	interval PolyInterval = sat_projected_interval(EntityWithPoly->Poly.Vertices,
-			ARRAY_COUNT(EntityWithPoly->Poly.Vertices), ProjectedAxis);
-
+	interval PolyInterval = sat_projected_interval(Vertices, vertex_count, ProjectedAxis);
 	interval CircleInterval = circle_project_onto_axis(&Circle, ProjectedAxis);
 
 	if(!((CircleInterval.max >= PolyInterval.min) &&
-				(PolyInterval.max >= CircleInterval.min)))
+		(PolyInterval.max >= CircleInterval.min)))
 	{
-		GapExists = false;
+		return(Normal);
 	}
 
-	return(GapExists);
+	overlap = ABS(interval_length(PolyInterval) - interval_length(CircleInterval));
+	if(overlap < min_length)
+	{
+		min_length = overlap;
+		Normal = ProjectedAxis;
+	}
+
+	return(Normal);
 }
 
 internal b32

@@ -67,7 +67,15 @@ union v4f
 	};
 	struct
 	{
-		f32 r, g, b, a;
+		union
+		{
+			v3f rgb;
+			struct
+			{
+				f32 r, g, b;
+			};
+		};
+		f32 a;
 	};
 	f32 e[4];
 };
@@ -324,6 +332,14 @@ operator *(f32 c, v3f V)
 	return(Result);
 }
 
+inline v3f &
+operator *=(v3f &V, f32 c)
+{
+	V = c * V;
+
+	return(V);
+}
+
 //
 // NOTE(Justin): v4f operations
 //
@@ -360,6 +376,14 @@ operator +(v4f U, v4f V)
 	Result.w = U.w + V.w;
 
 	return(Result);
+}
+
+inline v4f &
+operator *=(v4f &V, f32 c)
+{
+	V = c * V;
+
+	return(V);
 }
 
 

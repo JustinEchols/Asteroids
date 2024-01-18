@@ -15,6 +15,12 @@ struct rectangle
 	v2f Max;
 };
 
+struct player_half_polygon
+{
+	v2f Vertices[4];
+};
+
+
 struct player_polygon
 {
 	v2f Vertices[7];
