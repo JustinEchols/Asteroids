@@ -40,6 +40,7 @@ sfx
 
 
 #include <windows.h>
+#include <gl/gl.h>
 #include <stdio.h>
 #include <malloc.h>
 #include <dsound.h>
@@ -278,6 +279,39 @@ win32_sound_buffer_fill(win32_sound_buffer *Win32SoundBuffer, DWORD byte_to_lock
 }
 
 internal void
+win32_opengl_init(HWND Window)
+{
+	HDC WindowDC = GetDC(Window);
+
+	PIXELFORMATDESCRIPTOR DesiredPF = {};
+
+	DesiredPF.nSize = sizeof(PIXELFORMATDESCRIPTOR);
+	DesiredPF.nVersion = 1;
+	DesiredPF.iPixelType = PFD_TYPE_RGBA;
+	DesiredPF.dwFlags = PFD_SUPPORT_OPENGL | PFD_DRAW_TO_WINDOW | PFD_DOUBLEBUFFER;
+	DesiredPF.cColorBits = 32;
+	DesiredPF.cAlphaBits = 8;
+	DesiredPF.iLayerType = PFD_MAIN_PLANE;
+
+	int suggested_pixel_format = ChoosePixelFormat(WindowDC, &DesiredPF);
+	PIXELFORMATDESCRIPTOR SuggestedPF;
+	DescribePixelFormat(WindowDC, suggested_pixel_format, sizeof(SuggestedPF), &SuggestedPF);
+
+	SetPixelFormat(WindowDC, suggested_pixel_format, &SuggestedPF);
+
+	HGLRC OpenGLRC = wglCreateContext(WindowDC);
+	if(wglMakeCurrent(WindowDC, OpenGLRC))
+	{
+	}
+	else
+	{
+		INVALID_CODE_PATH;
+	}
+	ReleaseDC(Window, WindowDC);
+}
+
+
+internal void
 win32_back_buffer_resize(win32_back_buffer *Win32GlobalBackBuffer, int width, int height)
 {
 	if(Win32GlobalBackBuffer->memory)
@@ -329,6 +363,7 @@ internal void
 win32_display_buffer_to_window(win32_back_buffer *Win32BackBuffer, HDC DeviceContext,
 														int window_width, int window_height)
 {
+#if 0
 	if((window_width >= Win32BackBuffer->width * 2) &&
 			(window_height >= Win32BackBuffer->height * 2))
 	{
@@ -347,6 +382,30 @@ win32_display_buffer_to_window(win32_back_buffer *Win32BackBuffer, HDC DeviceCon
 				Win32BackBuffer->memory, &Win32BackBuffer->Info,
 				DIB_RGB_COLORS, SRCCOPY);
 	}
+#endif
+	glViewport(0, 0, window_width, window_height);
+	glClearColor(1.0f, 0.0f, 1.0f, 0.0f);
+	glClear(GL_COLOR_BUFFER_BIT);
+
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	
+
+	glBegin(GL_TRIANGLES);
+
+	glVertex2i(0, 0);
+	glVertex2i(window_width, 0);
+	glVertex2i(window_width, window_height);
+
+	glVertex2i(0, 0);
+	glVertex2i(window_width, window_height);
+	glVertex2i(0, window_height);
+
+	glEnd();
+	SwapBuffers(DeviceContext);
+
 }
 
 
@@ -642,7 +701,8 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR CmdLine, int nCmdSho
 		{
 			HDC DeviceContext = GetDC(WindowHandle);
 
-			win32_back_buffer_resize(&Win32GlobalBackBuffer, 960, 540);
+			win32_opengl_init(WindowHandle);
+			//win32_back_buffer_resize(&Win32GlobalBackBuffer, 960, 540);
 
 			win32_sound_buffer Win32SoundBuffer = {0};
 
