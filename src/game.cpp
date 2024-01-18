@@ -394,7 +394,6 @@ entity_move(game_state *GameState, entity *Entity, v2f ddPos, f32 dt)
 								// bbox
 								//
 
-#if 0
 								player_half_polygon Poly;
 								Poly.Vertices[0] = TestEntity->Poly.Vertices[0];
 								Poly.Vertices[1] = TestEntity->Poly.Vertices[1];
@@ -402,9 +401,9 @@ entity_move(game_state *GameState, entity *Entity, v2f ddPos, f32 dt)
 								Poly.Vertices[3] = TestEntity->Poly.Vertices[3];
 
 								circle Circle = circle_init(Entity->Pos, Entity->radius);
-								Normal = poly_and_circle_collides(Poly.Vertices, ARRAY_COUNT(Poly.Vertices), Circle);
-								if((Normal.x != 0.0f) || (Normal.y != 0.0f))
-								{ 
+								if(poly_and_circle_collides(Poly.Vertices, ARRAY_COUNT(Poly.Vertices), Circle, &Normal))
+								{
+
 									HitEntity = TestEntity;
 								}
 								else
@@ -414,13 +413,11 @@ entity_move(game_state *GameState, entity *Entity, v2f ddPos, f32 dt)
 									Poly.Vertices[2] = TestEntity->Poly.Vertices[5];
 									Poly.Vertices[3] = TestEntity->Poly.Vertices[6];
 
-									Normal = poly_and_circle_collides(Poly.Vertices, ARRAY_COUNT(Poly.Vertices), Circle);
-									if((Normal.x != 0.0f) || (Normal.y != 0.0f))
-									{ 
+									if(poly_and_circle_collides(Poly.Vertices, ARRAY_COUNT(Poly.Vertices), Circle, &Normal))
+									{
 										HitEntity = TestEntity;
 									}
 								}
-#endif
 							}
 						}
 					}
