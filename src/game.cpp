@@ -304,7 +304,19 @@ player_collision_handle(entity *Entity)
 }
 
 internal void
-entity_move(game_state *GameState, entity *Entity, v2f ddPos, f32 dt)
+collision_handle(entity *A, entity *B)
+{
+	if((A->type == ENTITY_ASTEROID) &&
+	   (B->type == ENTITY_PROJECTILE))
+	{
+		entity_make_nonspatial(A);
+		entity_make_nonspatial(B);
+	}
+}
+
+internal void
+entity_move(game_state *GameState, entity *Entity, v2f ddPos, f32 dt,
+		f32 distance_limit)
 { 
 	world *World = GameState->World;
 
@@ -340,40 +352,47 @@ entity_move(game_state *GameState, entity *Entity, v2f ddPos, f32 dt)
 	}
 	Entity->dPos = EntityNewVel;
 
+	f32 distance_remaining = Entity->distance_limit;
+	if(distance_remaining == 0.0f)
+	{
+		distance_remaining = 10000.0f;
+	}
+
 	for(u32 iteration = 0; iteration < 4; iteration++)
 	{
 		f32 t_min = 1.0f;
-		v2f Normal = {};
-		v2f DesiredPosition = Entity->Pos + EntityDelta;
-		entity *HitEntity = 0;
-		if(entity_flag_is_set(Entity, ENTITY_FLAG_COLLIDES) &&
-		 (!entity_flag_is_set(Entity, ENTITY_FLAG_NON_SPATIAL)))
-		{
-			for(u32 entity_index = 1; entity_index < GameState->entity_count; entity_index++)
-			{
-				entity *TestEntity = entity_get(GameState, entity_index);
-				if(Entity != TestEntity)
-				{
-					if(entity_flag_is_set(TestEntity, ENTITY_FLAG_COLLIDES) &&
-					  !entity_flag_is_set(TestEntity, ENTITY_FLAG_NON_SPATIAL))
-					{
-						if((Entity->shape == SHAPE_CIRCLE) &&
-						   (TestEntity->shape == SHAPE_CIRCLE))
-						{
-							v2f DeltaBetweenCenters = TestEntity->Pos - Entity->Pos;
-							v2f TestEntityDelta = dt * TestEntity->dPos;
+		f32 entity_delta_len = v2f_length(EntityDelta);
 
-							if(circles_collide(Entity->Pos, EntityDelta, Entity->radius,
-										   TestEntity->Pos, TestEntityDelta, TestEntity->radius, &t_min))
-							{
-								Normal = v2f_normalize(-1.0f * DeltaBetweenCenters);
-								HitEntity = TestEntity;
-							}
-						}
-						else if((Entity->shape == SHAPE_CIRCLE) &&
-								(TestEntity->shape == SHAPE_POLY))
+		// TODO(Justin): What to do about epsilons?
+		if(entity_delta_len > 0.0f)
+		{
+			if(entity_delta_len > distance_remaining)
+			{
+				t_min = (distance_remaining / entity_delta_len);
+			}
+
+			v2f Normal = {};
+
+			// NOTE(Justin): For SAT collision.
+			f32 penetration_depth = 0.0f;
+
+			v2f DesiredPosition = Entity->Pos + EntityDelta;
+
+			b32 stops_on_collision = entity_flag_is_set(Entity, ENTITY_FLAG_COLLIDES);
+
+			entity *HitEntity = 0;
+			if(!entity_flag_is_set(Entity, ENTITY_FLAG_NON_SPATIAL))
+			{
+				for(u32 entity_index = 1; entity_index < GameState->entity_count; entity_index++)
+				{
+					entity *TestEntity = entity_get(GameState, entity_index);
+					if(Entity != TestEntity)
+					{
+						if(entity_flag_is_set(TestEntity, ENTITY_FLAG_COLLIDES) &&
+						  !entity_flag_is_set(TestEntity, ENTITY_FLAG_NON_SPATIAL))
 						{
-							if(TestEntity->is_shielded)
+							if((Entity->shape == SHAPE_CIRCLE) &&
+									(TestEntity->shape == SHAPE_CIRCLE))
 							{
 								v2f DeltaBetweenCenters = TestEntity->Pos - Entity->Pos;
 								v2f TestEntityDelta = dt * TestEntity->dPos;
@@ -385,101 +404,152 @@ entity_move(game_state *GameState, entity *Entity, v2f ddPos, f32 dt)
 									HitEntity = TestEntity;
 								}
 							}
-							else
+							else if((Entity->shape == SHAPE_CIRCLE) &&
+									(TestEntity->shape == SHAPE_POLY))
 							{
-								// NOTE(Justin): The bbox of the player is a
-								// concave polygon. The collision test is split
-								// into two parts so that the testing involves a
-								// convex polygon which is half of the player
-								// bbox
-								//
-
-								player_half_polygon Poly;
-								Poly.Vertices[0] = TestEntity->Poly.Vertices[0];
-								Poly.Vertices[1] = TestEntity->Poly.Vertices[1];
-								Poly.Vertices[2] = TestEntity->Poly.Vertices[2];
-								Poly.Vertices[3] = TestEntity->Poly.Vertices[3];
-
-								circle Circle = circle_init(Entity->Pos, Entity->radius);
-								if(poly_and_circle_collides(Poly.Vertices, ARRAY_COUNT(Poly.Vertices), Circle, &Normal))
+								if(TestEntity->is_shielded)
 								{
+									v2f DeltaBetweenCenters = TestEntity->Pos - Entity->Pos;
+									v2f TestEntityDelta = dt * TestEntity->dPos;
 
-									HitEntity = TestEntity;
+									if(circles_collide(Entity->Pos, EntityDelta, Entity->radius,
+												TestEntity->Pos, TestEntityDelta, TestEntity->radius, &t_min))
+									{
+										Normal = v2f_normalize(-1.0f * DeltaBetweenCenters);
+										HitEntity = TestEntity;
+									}
 								}
 								else
 								{
-									Poly.Vertices[0] = TestEntity->Poly.Vertices[3];
-									Poly.Vertices[1] = TestEntity->Poly.Vertices[4];
-									Poly.Vertices[2] = TestEntity->Poly.Vertices[5];
-									Poly.Vertices[3] = TestEntity->Poly.Vertices[6];
+									// NOTE(Justin): The bbox of the player is a
+									// concave polygon. The collision test is split
+									// into two parts so that the testing involves a
+									// convex polygon which is half of the player
+									// bbox
+									//
+									// TODO(Justin): There should be a way to figure
+									// out which side the asteroid is relative to
+									// the player then after figuring that out we
+									// only have to do one test.
 
-									if(poly_and_circle_collides(Poly.Vertices, ARRAY_COUNT(Poly.Vertices), Circle, &Normal))
+									player_half_polygon Poly;
+									Poly.Vertices[0] = TestEntity->Poly.Vertices[0];
+									Poly.Vertices[1] = TestEntity->Poly.Vertices[1];
+									Poly.Vertices[2] = TestEntity->Poly.Vertices[2];
+									Poly.Vertices[3] = TestEntity->Poly.Vertices[3];
+
+									f32 penetration_depth = 0.0f;
+
+									circle Circle = circle_init(Entity->Pos, Entity->radius);
+									if(poly_and_circle_collides(Poly.Vertices, ARRAY_COUNT(Poly.Vertices), Circle, &Normal, &penetration_depth))
 									{
+
 										HitEntity = TestEntity;
+									}
+									else
+									{
+										Poly.Vertices[0] = TestEntity->Poly.Vertices[3];
+										Poly.Vertices[1] = TestEntity->Poly.Vertices[4];
+										Poly.Vertices[2] = TestEntity->Poly.Vertices[5];
+										Poly.Vertices[3] = TestEntity->Poly.Vertices[6];
+
+										if(poly_and_circle_collides(Poly.Vertices, ARRAY_COUNT(Poly.Vertices), Circle, &Normal, &penetration_depth))
+										{
+											HitEntity = TestEntity;
+										}
 									}
 								}
 							}
 						}
 					}
 				}
-			}
+				// NOTE(Justin): For the sat collision detection, we can accept
+				// the full move to the new position then offset this position
+				// by the MTV which is the edge Normal times the minimum overlap
 
-			Entity->Pos += t_min * EntityDelta;
-			if(HitEntity)
-			{
-				if((Entity->type == ENTITY_ASTEROID) &&
-				   (HitEntity->type == ENTITY_ASTEROID))
+				Entity->Pos += t_min * EntityDelta;
+				distance_remaining -= t_min * entity_delta_len;
+				if(HitEntity)
 				{
-					Entity->dPos = Entity->speed * Normal;
-					Entity->Direction = v2f_normalize(Entity->dPos);
+#if 0
 					EntityDelta = DesiredPosition - Entity->Pos;
+					if(stops_on_collision)
+					{
+						Entity->dPos = Entity->speed * Normal;
+						Entity->Direction = v2f_normalize(Entity->dPos);
 
-					HitEntity->dPos = Entity->speed * -1.0f * Normal;
-					HitEntity->Direction = v2f_normalize(Entity->dPos);
-				}
+						EntityDelta = DesiredPosition - Entity->Pos;
+						EntityDelta = EntityDelta - Entity->speed * Normal;
+					}
 
-				if((Entity->type == ENTITY_PLAYER) &&
-				   (HitEntity->type == ENTITY_ASTEROID))
-				{
-					//player_collision_handle(Entity);
-				}
+					collision_handle(Entity, HitEntity);
+#endif
 
-				if((Entity->type == ENTITY_ASTEROID) &&
+#if 1
+					if((Entity->type == ENTITY_ASTEROID) &&
+					(HitEntity->type == ENTITY_ASTEROID))
+					{
+						Entity->dPos = Entity->speed * Normal;
+						Entity->Direction = v2f_normalize(Entity->dPos);
+
+						EntityDelta = DesiredPosition - Entity->Pos;
+						EntityDelta = EntityDelta - Entity->speed * Normal;
+
+						HitEntity->dPos = Entity->speed * -1.0f * Normal;
+						HitEntity->Direction = v2f_normalize(Entity->dPos);
+					}
+
+					if((Entity->type == ENTITY_PLAYER) &&
+					(HitEntity->type == ENTITY_ASTEROID))
+					{
+						//player_collision_handle(Entity);
+					}
+
+					if((Entity->type == ENTITY_ASTEROID) &&
 					(HitEntity->type == ENTITY_PLAYER))
-				{
-					//player_collision_handle(HitEntity);
-
-					if(HitEntity->is_shielded)
 					{
-						Entity->dPos = Entity->speed * Normal;
-						Entity->Direction = v2f_normalize(Entity->dPos);
+						//player_collision_handle(HitEntity);
+
+						if(HitEntity->is_shielded)
+						{
+							Entity->dPos = Entity->speed * Normal;
+							Entity->Direction = v2f_normalize(Entity->dPos);
+						}
+						else
+						{
+							Entity->Pos = Entity->Pos - penetration_depth * Normal;
+
+							Entity->dPos = Entity->speed * Normal;
+							//Entity->dPos = Entity->dPos - 2.0f * v2f_dot(Entity->dPos, Normal) * Normal;
+							Entity->Direction = v2f_normalize(Entity->dPos);
+							//Entity->Pos = EntityNewPos;
+						}
 					}
-					else
+
+					if((Entity->type == ENTITY_ASTEROID) &&
+							(HitEntity->type == ENTITY_PROJECTILE))
 					{
-						Entity->dPos = Entity->speed * Normal;
-						//Entity->dPos = Entity->dPos - 2.0f * v2f_dot(Entity->dPos, Normal) * Normal;
-						Entity->Direction = v2f_normalize(Entity->dPos);
-						//Entity->Pos = EntityNewPos;
+						entity_flag_set(Entity, ENTITY_FLAG_NON_SPATIAL);
+						entity_flag_set(HitEntity, ENTITY_FLAG_NON_SPATIAL);
 					}
-				}
+#endif
 
-				if((Entity->type == ENTITY_ASTEROID) &&
-				   (HitEntity->type == ENTITY_PROJECTILE))
+				}
+				else
 				{
-					entity_flag_set(Entity, ENTITY_FLAG_NON_SPATIAL);
-					entity_flag_set(HitEntity, ENTITY_FLAG_NON_SPATIAL);
+					break;
 				}
-
-			}
-			else
-			{
-				break;
 			}
 		}
 		else
 		{
 			break;
 		}
+	}
+
+	if(Entity->distance_limit != 0.0f)
+	{
+		Entity->distance_limit = distance_remaining;
 	}
 
 	if(Entity->Pos.x > World->Dim.x)
@@ -595,6 +665,8 @@ asteroid_add(game_state *GameState, asteroid_size SIZE, v2f Pos, v2f Dir)
 	return(Entity);
 }
 
+// TODO(Jusitn): The size should be random
+
 internal entity *
 asteroid_add(game_state *GameState, asteroid_size SIZE)
 {
@@ -602,18 +674,16 @@ asteroid_add(game_state *GameState, asteroid_size SIZE)
 
 	entity_flag_set(Entity, ENTITY_FLAG_COLLIDES);
 
-	f32 speed_scale = f32_rand_percent();
+	Entity->speed = f32_rand_percent() * 19.0f;
 
 	Entity->Direction = v2f_normalize(V2F(f32_rand_between(-1.0f, 1.0f), f32_rand_between(-1.0f, 1.0f)));
-	Entity->speed = 19.0f;
 
-	f32 asteroid_speed = speed_scale * Entity->speed;
 
 	// TODO(Justin): Make sure that asteroids cannot spwan on top of the player
 	world *World = GameState->World;
 	Entity->Pos = V2F(f32_rand_between(-World->Dim.x, World->Dim.x), f32_rand_between(-World->Dim.y, World->Dim.y));
 
-	Entity->dPos = asteroid_speed * Entity->Direction;
+	Entity->dPos = Entity->speed * Entity->Direction;
 
 	// TODO(Jusitn): Rand scaling, orientation, size, and mass.
 
@@ -636,7 +706,15 @@ familiar_add(game_state *GameState)
 
 	entity_flag_set(Entity, ENTITY_FLAG_COLLIDES);
 
-	Entity->speed = 1.0f;
+	Entity->speed = f32_rand_percent() * 19.0f;
+
+	// TODO(Justin): Make sure that asteroids cannot spwan on top of the player
+	world *World = GameState->World;
+	Entity->Pos = V2F(f32_rand_between(-World->Dim.x, World->Dim.x), f32_rand_between(-World->Dim.y, World->Dim.y));
+
+	Entity->shape = SHAPE_CIRCLE;
+	Entity->radius = 8.0f;
+	Entity->mass = Entity->radius * 10.0f;
 
 	return(Entity);
 }
@@ -650,12 +728,12 @@ projectile_add(game_state *GameState)
 
 	entity *EntityPlayer = GameState->Entities + GameState->player_entity_index;
 
-	Entity->distance_remaining = 200.0f;
+	Entity->distance_limit = 200.0f;
 	Entity->Direction = EntityPlayer->Direction;
 	Entity->Pos = EntityPlayer->Pos + EntityPlayer->height * Entity->Direction;
 
 	Entity->speed = 100.0f;
-	Entity->dPos = Entity->speed * Entity->Direction;
+	Entity->dPos = Entity->speed * Entity->Direction + EntityPlayer->dPos;
 
 	Entity->shape = SHAPE_CIRCLE;
 	Entity->radius = 3.0f;
@@ -708,6 +786,7 @@ square_add(game_state *GameState, v2f Pos, v2f Dir)
 
 
 
+#if 0
 internal void
 familiar_update(game_state *GameState, entity *Entity, f32 dt)
 {
@@ -744,7 +823,9 @@ familiar_update(game_state *GameState, entity *Entity, f32 dt)
 	}
 	entity_move(GameState, Entity, ddPos, dt);
 }
+#endif
 
+#if 0
 internal void
 projectile_update(game_state *GameState, entity *Entity, f32 dt)
 {
@@ -762,6 +843,7 @@ projectile_update(game_state *GameState, entity *Entity, f32 dt)
 		entity_flag_set(Entity, ENTITY_FLAG_NON_SPATIAL);
 	}
 }
+#endif
 
 internal void
 player_polygon_draw(back_buffer *BackBuffer, game_state *GameState, v2f BottomLeft, entity *EntityPlayer)
@@ -845,7 +927,8 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 		asteroid_add(GameState, ASTEROID_SMALL, V2F(0.0f, 0.5f * World->Dim.y), V2F(-1.0f, 0.0f));
 		asteroid_add(GameState, ASTEROID_SMALL, V2F(-100.0f, 0.5f * World->Dim.y), V2F(1.0f, 0.0f));
 
-#if 0
+		//familiar_add(GameState);
+#if 1
 		for(u32 i = 0; i < 20; i++)
 		{
 			asteroid_add(GameState, ASTEROID_SMALL);
@@ -853,9 +936,9 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 #endif
 		m3x3 *M = &GameState->MapToScreenSpace;
 
-		m3x3 InverseWorldTranslate = m3x3_translation_create(V2F(World->Dim.x, World->Dim.y));
-		m3x3 Scale = m3x3_scale_create(GameState->pixels_per_meter / 2.0f);
-		m3x3 InverseScreenOffset = m3x3_translation_create(V2F(5.0f, 5.0f));
+		m3x3 InverseWorldTranslate = m3x3_translation(V2F(World->Dim.x, World->Dim.y));
+		m3x3 Scale = m3x3_scale(GameState->pixels_per_meter / 2.0f);
+		m3x3 InverseScreenOffset = m3x3_translation(V2F(5.0f, 5.0f));
 
 		*M = InverseScreenOffset * Scale * InverseWorldTranslate;
 
@@ -878,73 +961,25 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 
 	world *World = GameState->World;
 
-	entity *EntityPlayer = entity_get(GameState, GameState->player_entity_index);
-
 	bitmap_draw(BackBuffer, &GameState->Background, 0.0f, 0.0f);
 
-	v2f PlayerNewRight = EntityPlayer->Right;
-	v2f PlayerNewDirection = EntityPlayer->Direction;
+	entity *EntityPlayer = entity_get(GameState, GameState->player_entity_index);
 
 	f32 dt = GameInput->dt_for_frame;
 	game_controller_input *KeyboardController = &GameInput->Controller;
+
+	m3x3 R = m3x3_identity();
 	if(KeyboardController->Left.ended_down)
 	{
-		m3x3 Rotation = m3x3_rotate_about_origin(5.0f * dt);
-		PlayerNewRight = Rotation * PlayerNewRight;
-		PlayerNewDirection = Rotation * PlayerNewDirection;
+		R = R * m3x3_rotate_about_origin(5.0f * dt);
 	}
 	if(KeyboardController->Right.ended_down)
 	{
-		m3x3 Rotation = m3x3_rotate_about_origin(-5.0f * dt);
-		PlayerNewRight = Rotation * PlayerNewRight;
-		PlayerNewDirection = Rotation * PlayerNewDirection;
-	}
-	EntityPlayer->Right = PlayerNewRight;
-	EntityPlayer->Direction = PlayerNewDirection;
-
-	//
-	// NOTE(Justin): Player projectiles
-	//
-
-	if(KeyboardController->Space.ended_down)
-	{
-		if(!EntityPlayer->is_shooting)
-		{
-			projectile_add(GameState);
-			EntityPlayer->is_shooting = true;
-		}
-		else
-		{
-			GameState->time_between_new_projectiles += dt;
-			if(GameState->time_between_new_projectiles > 0.6f)
-			{
-				projectile_add(GameState);
-				EntityPlayer->is_shooting = true;
-				GameState->time_between_new_projectiles = 0.0f;
-			}
-		}
-	}
-	else
-	{
-		EntityPlayer->is_shooting = false;
+		R =  R * m3x3_rotate_about_origin(-5.0f * dt);
 	}
 
-	v2f PlayerAccel = {};
-	if(KeyboardController->Up.ended_down)
-	{
-		PlayerAccel = V2F(PlayerNewDirection.x, PlayerNewDirection.y);
-	}
-	entity_move(GameState, GameState->Entities + GameState->player_entity_index, PlayerAccel, dt);
-
-	v2f AsteroidAccel = {};
-	for(u32 entity_index = 1; entity_index < ARRAY_COUNT(GameState->Entities); entity_index++)
-	{
-		entity *Entity = GameState->Entities + entity_index;
-		if(Entity->type == ENTITY_ASTEROID)
-		{
-			entity_move(GameState, Entity, AsteroidAccel, dt);
-		}
-	}
+	EntityPlayer->Right = R * EntityPlayer->Right;
+	EntityPlayer->Direction = R * EntityPlayer->Direction;
 
 	// 
 	// NOTE(Justin): Render
@@ -964,9 +999,36 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 		{
 			case ENTITY_PLAYER:
 			{
-				v2f PlayerPos = Entity->Pos;
-				push_bitmap(&RenderGroup, &GameState->Ship, 0, PlayerPos, Entity->Right, Entity->Direction,
-						GameState->Ship.Align);
+				if(KeyboardController->Space.ended_down)
+				{
+					if(!EntityPlayer->is_shooting)
+					{
+						projectile_add(GameState);
+						EntityPlayer->is_shooting = true;
+					}
+					else
+					{
+						GameState->time_between_new_projectiles += dt;
+						if(GameState->time_between_new_projectiles > 0.6f)
+						{
+							projectile_add(GameState);
+							EntityPlayer->is_shooting = true;
+							GameState->time_between_new_projectiles = 0.0f;
+						}
+					}
+				}
+				else
+				{
+					EntityPlayer->is_shooting = false;
+				}
+
+				if(KeyboardController->Up.ended_down)
+				{
+					Accel = Entity->Direction;
+				}
+
+				push_bitmap(&RenderGroup, &GameState->Ship, 0,
+							Entity->Pos, Entity->Right, Entity->Direction, GameState->Ship.Align);
 
 				player_polygon_draw(BackBuffer, GameState, BottomLeft, Entity);
 
@@ -982,11 +1044,10 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 			} break;
 			case ENTITY_ASTEROID:
 			{
-				v2f AsteroidPos = Entity->Pos;
 				if(!entity_flag_is_set(Entity, ENTITY_FLAG_NON_SPATIAL))
 				{
 					push_bitmap(&RenderGroup, &GameState->AsteroidBitmap, 0,
-							AsteroidPos, -1.0f * v2f_perp(Entity->Direction), Entity->Direction,
+							Entity->Pos, -1.0f * v2f_perp(Entity->Direction), Entity->Direction,
 							GameState->AsteroidBitmap.Align);
 				}
 
@@ -995,8 +1056,9 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 			{
 				//familiar_update(GameState, Entity, dt);
 
-				//v2f AsteroidScreenPos = tile_map_get_screen_coordinates(TileMap, &Entity->TileMapPos,
-				//		BottomLeft, tile_side_in_pixels, meters_to_pixels);
+				//push_bitmap(&RenderGroup, &GameState->AsteroidBitmap, 0, Entity->Pos,
+				//		-1.0f * v2f_perp(Entity->Direction), Entity->Direction, GameState->AsteroidBitmap.Align);
+
 				//debug_vector_draw_at_point(BackBuffer, AsteroidScreenPos, Entity->Direction);
 				//v2f Alignment = {(f32)GameState->AsteroidBitmap.width / 2.0f,
 				//				 (f32)GameState->AsteroidBitmap.height / 2.0f};
@@ -1006,6 +1068,18 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 			} break;
 			case ENTITY_PROJECTILE:
 			{
+
+				v2f OldPos = Entity->Pos;
+
+				//entity_move(GameState, Entity, ddPos, dt);
+
+				f32 distance_traveled = v2f_length(Entity->Pos - OldPos);
+				Entity->distance_limit -= distance_traveled;
+				if(Entity->distance_limit == 0.0f)
+				{
+					entity_make_nonspatial(Entity);
+				}
+#if 0
 				projectile_update(GameState, Entity, dt);
 				if(!entity_flag_is_set(Entity, ENTITY_FLAG_NON_SPATIAL))
 				{
@@ -1014,11 +1088,29 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 							-1.0f * v2f_perp(Entity->Direction), Entity->Direction,
 							GameState->LaserBlueBitmap.Align);
 				}
+#endif
+
+				if(!entity_flag_is_set(Entity, ENTITY_FLAG_NON_SPATIAL))
+				{
+					push_bitmap(&RenderGroup, &GameState->LaserBlueBitmap, 0, Entity->Pos,
+							-1.0f * v2f_perp(Entity->Direction), Entity->Direction,
+							GameState->LaserBlueBitmap.Align);
+				}
 			} break;
 			default:
 			{
 				INVALID_CODE_PATH;
 			} break;
+		}
+
+		if(!entity_flag_is_set(Entity, ENTITY_FLAG_NON_SPATIAL))
+		{
+			f32 distance_limit = Entity->distance_limit;
+			if(distance_limit == 0.0f)
+			{
+				distance_limit = 10000.0f;
+			}
+			entity_move(GameState, Entity, Accel, dt, distance_limit);
 		}
 	}
 
