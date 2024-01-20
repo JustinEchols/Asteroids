@@ -162,9 +162,9 @@ closest_point_to_circle(v2f *Vertices, u32 vertex_count, circle *Circle)
 
 
 internal b32
-poly_and_circle_collides(v2f *Vertices, u32 vertex_count, circle Circle, v2f *Normal)
+poly_and_circle_collides(v2f *Vertices, u32 vertex_count, circle Circle, v2f *Normal, f32 *penetration_depth)
 {
-	b32 GapExists = false;
+	b32 collides = false;
 
 	f32 min_length = f32_infinity();
 	f32 overlap = 0.0f;
@@ -184,7 +184,7 @@ poly_and_circle_collides(v2f *Vertices, u32 vertex_count, circle Circle, v2f *No
 			(PolyInterval.max >= CircleInterval.min)))
 		{
 
-			return(GapExists);
+			return(collides);
 		}
 
 		overlap = MIN(CircleInterval.max - PolyInterval.min, PolyInterval.max - CircleInterval.min);
@@ -205,7 +205,7 @@ poly_and_circle_collides(v2f *Vertices, u32 vertex_count, circle Circle, v2f *No
 	if(!((CircleInterval.max >= PolyInterval.min) &&
 		(PolyInterval.max >= CircleInterval.min)))
 	{
-		return(GapExists);
+		return(collides);
 	}
 
 	overlap = MIN(CircleInterval.max - PolyInterval.min, PolyInterval.max - CircleInterval.min);
@@ -214,7 +214,10 @@ poly_and_circle_collides(v2f *Vertices, u32 vertex_count, circle Circle, v2f *No
 		min_length = overlap;
 		*Normal = ProjectedAxis;
 	}
-	return(!GapExists);
+
+	*penetration_depth = min_length;
+
+	return(!collides);
 }
 
 internal b32
@@ -278,6 +281,7 @@ circles_collide(v2f CircleACenter, v2f CircleADelta, f32 radius_a,
 			}
 		}
 	}
+
 	return(Result);
 }
 
