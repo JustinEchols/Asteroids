@@ -401,7 +401,7 @@ lerp(v4f A, f32 t, v4f B)
 //
 
 inline m3x3
-m3x3_identity_create()
+m3x3_identity()
 {
 	m3x3 Result = {};
 
@@ -461,7 +461,7 @@ operator *(m3x3 M, v2f V)
 }
 
 inline m3x3
-m3x3_scale_create(f32 c)
+m3x3_scale(f32 c)
 {
 	m3x3 Result =
 	{
@@ -473,7 +473,7 @@ m3x3_scale_create(f32 c)
 }
 
 inline m3x3
-m3x3_translation_create(v2f V)
+m3x3_translation(v2f V)
 {
 	m3x3 Result =
 	{
@@ -485,7 +485,7 @@ m3x3_translation_create(v2f V)
 }
 
 inline m3x3
-m3x3_rectangle_transform_create(int width, int height)
+m3x3_rectangle_transform(int width, int height)
 {
 	f32 w = (f32)width;
 	f32 h = (f32)height;
