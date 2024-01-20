@@ -17,9 +17,24 @@ entity_flag_set(entity *Entity, u32 flag)
 }
 
 inline void
-entiy_flag_clear(entity *Entity, u32 flag)
+entity_flag_clear(entity *Entity, u32 flag)
 {
 	Entity->flags &= ~flag;
+}
+
+inline void
+entity_make_nonspatial(entity *Entity)
+{
+	entity_flag_set(Entity, ENTITY_FLAG_NON_SPATIAL);
+	Entity->Pos = INVALID_POS;
+}
+
+inline void
+entity_make_spatial(entity *Entity, v2f P, v2f dP)
+{
+	entity_flag_clear(Entity, ENTITY_FLAG_NON_SPATIAL);
+	Entity->Pos = P;
+	Entity->dPos = dP;
 }
 
 #define GAME_ENTITY_H
