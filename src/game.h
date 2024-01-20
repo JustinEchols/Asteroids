@@ -140,7 +140,7 @@ struct entity
 	f32 mass;
 	f32 radius;
 
-	f32 distance_remaining;
+	f32 distance_limit;
 
 	v2f Pos;
 	v2f dPos;
