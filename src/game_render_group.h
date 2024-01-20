@@ -5,16 +5,27 @@ struct environment_map
 	loaded_bitmap *LOD[4];
 };
 
-enum render_entry_type
+enum render_group_entry_type
 {
-	RENDER_ENTRY_BITMAP,
-	RENDER_ENTRY_RECT,
-	RENDER_ENTRY_LINE_SEG,
+	RENDER_GROUP_ENTRY_TYPE_render_entry_clear,
+	RENDER_GROUP_ENTRY_TYPE_render_entry_bitmap,
+	RENDER_GROUP_ENTRY_TYPE_render_entry_rectangle,
 };
 
-struct render_group_entry 
+struct render_group_entry_header
 {
-	render_entry_type TYPE;
+	render_group_entry_type Type;
+};
+
+struct render_entry_clear
+{
+	render_group_entry_header Header;
+	v4f Color;
+};
+
+struct render_entry_bitmap
+{
+	render_group_entry_header Header;
 
 	v2f Origin;
 	v2f XAxis;
@@ -23,6 +34,18 @@ struct render_group_entry
 	v2f Dim;
 	loaded_bitmap *Texture;
 	loaded_bitmap *NormalMap;
+
+};
+
+struct render_entry_rectangle
+{
+	render_group_entry_header Header;
+
+	v2f Origin;
+	v2f XAxis;
+	v2f YAxis;
+	v4f Color;
+	v2f Dim;
 };
 
 struct render_group 

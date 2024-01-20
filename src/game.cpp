@@ -54,13 +54,6 @@ Game Design
 // TODO(Justin) Collision based on whether or not the
 // player is shielded.
 
-// TODO(Justin): Getting the normal of the ship's side
-// that the asteroid makes contact with, I think, is
-// incorrect.
-
-// NOTE(Justin): Collisions have been colesced into the sat_collision
-// function. Not sure if this was a good idea.
-
 #include "game.h"
 #include "game_geometry.h"
 #include "game_geometry.cpp"
@@ -70,8 +63,6 @@ Game Design
 #include "game_entity.h"
 #include "game_string.cpp"
 #include "game_asset.cpp"
-
-
 
 internal void
 debug_sound_buffer_fill(sound_buffer *SoundBuffer)
@@ -773,9 +764,6 @@ square_add(game_state *GameState, v2f Pos, v2f Dir)
 	Entity->Pos = Pos;
 	Entity->Direction = Dir;
 
-	Entity->speed = 10.0f;
-	Entity->dPos = Entity->speed * Entity->Direction;
-
 	Entity->radius = 25.0f;
 
 	return(Entity);
@@ -819,26 +807,6 @@ familiar_update(game_state *GameState, entity *Entity, f32 dt)
 		Entity->Direction = ddPos;
 	}
 	entity_move(GameState, Entity, ddPos, dt);
-}
-#endif
-
-#if 0
-internal void
-projectile_update(game_state *GameState, entity *Entity, f32 dt)
-{
-	ASSERT(Entity->type == ENTITY_PROJECTILE);
-
-	v2f OldPos = Entity->Pos;
-	v2f ddPos = {};
-
-	entity_move(GameState, Entity, ddPos, dt);
-
-	f32 distance_traveled = v2f_length(Entity->Pos - OldPos);
-	Entity->distance_remaining -= distance_traveled;
-	if(Entity->distance_remaining < 0.0f)
-	{
-		entity_flag_set(Entity, ENTITY_FLAG_NON_SPATIAL);
-	}
 }
 #endif
 
@@ -1087,6 +1055,5 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 	}
 
 	render_group_to_output(BackBuffer, RenderGroup);
-
 	temporary_memory_end(RenderMemory);
 }

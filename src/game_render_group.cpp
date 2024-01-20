@@ -574,14 +574,16 @@ line_horizontal_draw(back_buffer *BackBuffer, f32 y, f32 r, f32 g, f32 b)
 	}
 }
 
-inline void *
-push_render_element(render_group *RenderGroup, u32 size)
+#define push_render_element(RenderGroup, type) (type *)push_render_element_(RenderGroup, sizeof(type), RENDER_GROUP_ENTRY_TYPE_##type)
+inline render_group_entry_header *
+push_render_element_(render_group *RenderGroup, u32 size, render_group_entry_type Type)
 {
-	void *Result = 0;
+	render_group_entry_header *Result = 0;
 
 	if((RenderGroup->push_buffer_size + size) < RenderGroup->push_buffer_size_max)
 	{
-		Result = (RenderGroup->push_buffer_base + RenderGroup->push_buffer_size);
+		Result = (render_group_entry_header *)(RenderGroup->push_buffer_base + RenderGroup->push_buffer_size);
+		Result->Type = Type;
 		RenderGroup->push_buffer_size += size;
 	}
 	else
@@ -596,17 +598,19 @@ inline void
 push_piece(render_group *RenderGroup, loaded_bitmap *Texture, loaded_bitmap *NormalMap,
 		v2f Origin, v2f XAxis, v2f YAxis, v2f Align, v2f Dim, v4f Color)
 {
-	render_group_entry *Element = (render_group_entry *)push_render_element(RenderGroup, sizeof(render_group_entry));
+	render_entry_bitmap *Entry = push_render_element(RenderGroup, render_entry_bitmap);
+	if(Entry)
+	{
+		m3x3 M = RenderGroup->MapToScreenSpace;
 
-	m3x3 M = RenderGroup->MapToScreenSpace;
-
-	Element->Texture = Texture;
-	Element->NormalMap = NormalMap;
-	Element->Origin = M * Origin - Align;
-	Element->XAxis = XAxis;
-	Element->YAxis = YAxis;
-	Element->Color = Color;
-	Element->Dim = Dim;
+		Entry->Texture = Texture;
+		Entry->NormalMap = NormalMap;
+		Entry->Origin = M * Origin - Align;
+		Entry->XAxis = XAxis;
+		Entry->YAxis = YAxis;
+		Entry->Color = Color;
+		Entry->Dim = Dim;
+	}
 }
 
 inline void
@@ -620,7 +624,20 @@ push_bitmap(render_group *RenderGroup, loaded_bitmap *Bitmap, loaded_bitmap *Nor
 inline void
 push_rectangle(render_group *RenderGroup, v2f Origin, v2f XAxis, v2f YAxis, v2f Dim, v4f Color)
 {
-	push_piece(RenderGroup, 0, 0, Origin, XAxis, YAxis, V2F(0, 0), Dim, Color);
+	render_entry_rectangle *Entry = push_render_element(RenderGroup, render_entry_rectangle);
+	if(Entry)
+	{
+		m3x3 M = RenderGroup->MapToScreenSpace;
+
+		v2f HalfDim = 0.5f * RenderGroup->pixels_per_meter * Dim;
+
+		Entry->Origin = M * Origin - HalfDim;
+		Entry->XAxis = XAxis;
+		Entry->YAxis = YAxis;
+		Entry->Color = Color;
+		Entry->Dim = RenderGroup->pixels_per_meter * Dim;
+	}
+	//push_piece(RenderGroup, 0, 0, Origin, XAxis, YAxis, V2F(0, 0), Dim, Color);
 }
 
 internal void
@@ -628,17 +645,32 @@ render_group_to_output(back_buffer *BackBuffer, render_group *RenderGroup)
 {
 	for(u32 base_address = 0; base_address < RenderGroup->push_buffer_size; )
 	{
-		render_group_entry *Element = (render_group_entry *)(RenderGroup->push_buffer_base + base_address);
-		base_address += sizeof(render_group_entry);
+		render_group_entry_header *Header = (render_group_entry_header *)(RenderGroup->push_buffer_base + base_address);
+		switch(Header->Type)
+		{
+			case RENDER_GROUP_ENTRY_TYPE_render_entry_clear:
+			{
+				render_entry_clear *Entry = (render_entry_clear *)Header;
+				base_address += sizeof(*Entry);
+			} break;
+			case RENDER_GROUP_ENTRY_TYPE_render_entry_bitmap:
+			{
+				render_entry_bitmap *Entry = (render_entry_bitmap *)Header;
+				ASSERT(Entry->Texture);  
+				bitmap_draw(BackBuffer, Entry->Texture, Entry->Origin.x, Entry->Origin.y, Entry->Color.a);
+				base_address += sizeof(*Entry);
+			} break;
+			case RENDER_GROUP_ENTRY_TYPE_render_entry_rectangle:
+			{
+				render_entry_rectangle *Entry = (render_entry_rectangle *)Header;
 
-		if(Element->Texture)
-		{
-			bitmap_draw(BackBuffer, Element->Texture, Element->Origin.x, Element->Origin.y, Element->Color.a);
-		}
-		else
-		{
-			rectangle_draw(BackBuffer, Element->Origin - Element->Dim, Element->Origin + Element->Dim,
-																								Element->Color);
+				rectangle_draw(BackBuffer, Entry->Origin, Entry->Origin + Entry->Dim,
+						Entry->Color);
+				base_address += sizeof(*Entry);
+
+			} break;
+
+			INVALID_DEFAULT_CASE;
 		}
 	}
 }
