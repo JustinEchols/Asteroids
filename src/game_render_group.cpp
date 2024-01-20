@@ -340,6 +340,7 @@ bitmap_draw(back_buffer *BackBuffer, loaded_bitmap *Bitmap, f32 x, f32 y, f32 c_
 			u32 *dest = (u32 *)dest_row;
 			for(s32 x = x_min; x < x_max; x++)
 			{
+
 				v4f Texel = unpack4x8(*src);
 
 				Texel = srgb_255_to_linear1(Texel);
@@ -573,13 +574,30 @@ line_horizontal_draw(back_buffer *BackBuffer, f32 y, f32 r, f32 g, f32 b)
 	}
 }
 
+inline void *
+push_render_element(render_group *RenderGroup, u32 size)
+{
+	void *Result = 0;
+
+	if((RenderGroup->push_buffer_size + size) < RenderGroup->push_buffer_size_max)
+	{
+		Result = (RenderGroup->push_buffer_base + RenderGroup->push_buffer_size);
+		RenderGroup->push_buffer_size += size;
+	}
+	else
+	{
+		INVALID_CODE_PATH;
+	}
+
+	return(Result);
+}
+
 inline void
 push_piece(render_group *RenderGroup, loaded_bitmap *Texture, loaded_bitmap *NormalMap,
 		v2f Origin, v2f XAxis, v2f YAxis, v2f Align, v2f Dim, v4f Color)
 {
+	render_group_entry *Element = (render_group_entry *)push_render_element(RenderGroup, sizeof(render_group_entry));
 
-	ASSERT(RenderGroup->element_count < ARRAY_COUNT(RenderGroup->Elements));
-	render_entry *Element = RenderGroup->Elements + RenderGroup->element_count++;
 	m3x3 M = RenderGroup->MapToScreenSpace;
 
 	Element->Texture = Texture;
@@ -603,4 +621,39 @@ inline void
 push_rectangle(render_group *RenderGroup, v2f Origin, v2f XAxis, v2f YAxis, v2f Dim, v4f Color)
 {
 	push_piece(RenderGroup, 0, 0, Origin, XAxis, YAxis, V2F(0, 0), Dim, Color);
+}
+
+internal void
+render_group_to_output(back_buffer *BackBuffer, render_group *RenderGroup)
+{
+	for(u32 base_address = 0; base_address < RenderGroup->push_buffer_size; )
+	{
+		render_group_entry *Element = (render_group_entry *)(RenderGroup->push_buffer_base + base_address);
+		base_address += sizeof(render_group_entry);
+
+		if(Element->Texture)
+		{
+			bitmap_draw(BackBuffer, Element->Texture, Element->Origin.x, Element->Origin.y, Element->Color.a);
+		}
+		else
+		{
+			rectangle_draw(BackBuffer, Element->Origin - Element->Dim, Element->Origin + Element->Dim,
+																								Element->Color);
+		}
+	}
+}
+
+internal render_group *
+render_group_allocate(memory_arena *Arena, u32 push_buffer_size_max, f32 pixels_per_meter, m3x3 MapToScreenSpace)
+{
+	render_group *Result = push_struct(Arena, render_group);
+
+	Result->pixels_per_meter = pixels_per_meter;
+	Result->MapToScreenSpace = MapToScreenSpace;
+
+	Result->push_buffer_size = 0;
+	Result->push_buffer_size_max = push_buffer_size_max;
+	Result->push_buffer_base = (u8 *)push_size(Arena, push_buffer_size_max);
+
+	return(Result);
 }
