@@ -69,6 +69,18 @@ union v4f
 	{
 		union
 		{
+			v3f xyz;
+			struct
+			{
+				f32 x, y, z;
+			};
+		};
+		f32 w;
+	};
+	struct
+	{
+		union
+		{
 			v3f rgb;
 			struct
 			{
@@ -151,9 +163,44 @@ lerp(f32 a, f32 t, f32 b)
 	return(Result);
 }
 
+inline f32
+clamp(f32 min, f32 x, f32 max)
+{
+	f32 Result = x;
+	if(x < min)
+	{
+		x = min;
+	}
+	else if(x > max)
+	{
+		x = max;
+	}
+
+	return(Result);
+}
+
+inline f32
+clamp01(f32 x)
+{
+	f32 Result = clamp(0.0f, x, 1.0f);
+
+	return(Result);
+}
+
 //
-// NOTE(Justin): v2 operations
+// NOTE(Justin): v2f operations
 //
+
+inline v2f
+v2f_hadamard(v2f U, v2f V)
+{
+	v2f Result;
+
+	Result.x = U.x * V.x;
+	Result.y = U.y * V.y;
+
+	return(Result);
+}
 
 inline v2f
 v2f_perp(v2f V)
@@ -286,39 +333,9 @@ v2f_length_squared(v2f V)
 }
 
 
-
-inline v2f
-m2x2_transform_v2f(m2x2 M, v2f V)
-{
-	v2f Result = {0};
-
-	Result.x = M.e[0][0] * V.x + M.e[0][1] * V.y;
-	Result.y = M.e[1][0] * V.x + M.e[1][1] * V.y;
-
-	return(Result);
-}
-
-inline m2x2
-m2x2_scale_create(f32 c)
-{
-	m2x2 R =
-	{
-		{{c, 0.0f},
-		{0.0f, c}}
-	};
-	return(R);
-}
-
-inline m2x2
-m2x2_rotation_create(f32 angle)
-{
-	m2x2 R =
-	{
-		{{cosf(angle), sinf(angle)},
-		{-sinf(angle), cosf(angle)}}
-	};
-	return(R);
-}
+//
+// NOTE(Justin) v3f operations
+//
 
 inline v3f
 operator *(f32 c, v3f V)
@@ -338,6 +355,60 @@ operator *=(v3f &V, f32 c)
 	V = c * V;
 
 	return(V);
+}
+
+inline v3f
+operator +(v3f A, v3f B)
+{
+	v3f Result = {};
+
+	Result.x = A.x + B.x;
+	Result.y = A.y + B.y;
+	Result.z = A.z + B.z;
+
+	return(Result);
+}
+
+inline v3f
+lerp(v3f A, f32 t, v3f B)
+{
+	v3f Result = (1.0f - t) * A + t * B;
+	
+	return(Result);
+}
+
+inline f32
+v3f_dot(v3f U, v3f V)
+{
+	f32 Result = 0.0f;
+
+	Result = U.x * V.x + U.y * V.y + U.z + V.z;
+
+	return(Result);
+}
+
+inline v3f
+v3f_normalize(v3f V)
+{
+	v3f Result;
+
+	f32 inv_len = 1.0f / (f32_sqrt(v3f_dot(V, V)));
+
+	Result = inv_len * V;
+
+	return(Result);
+}
+
+inline v3f
+v3f_hadamard(v3f U, v3f V)
+{
+	v3f Result;
+
+	Result.x = U.x * V.x;
+	Result.y = U.y * V.y;
+	Result.z = U.z * V.z;
+
+	return(Result);
 }
 
 //
@@ -386,7 +457,27 @@ operator *=(v4f &V, f32 c)
 	return(V);
 }
 
+inline f32
+v4f_dot(v4f U, v4f V)
+{
+	f32 Result = 0.0f;
 
+	Result = U.x + V.x + U.y * V.y + U.z * V.z + U.w * V.w;
+
+	return(Result);
+}
+
+inline v4f
+v4f_normalize(v4f V)
+{
+	v4f Result;
+
+	f32 inv_len = 1.0f / (f32_sqrt(v4f_dot(V, V)));
+
+	Result = inv_len * V;
+
+	return(Result);
+}
 
 inline v4f
 lerp(v4f A, f32 t, v4f B)
@@ -396,9 +487,55 @@ lerp(v4f A, f32 t, v4f B)
 	return(Result);
 }
 
+inline v4f
+v4f_hadamard(v4f U, v4f V)
+{
+	v4f Result;
+
+	Result.x = U.x * V.x;
+	Result.y = U.y * V.y;
+	Result.z = U.z * V.z;
+	Result.w = U.w * V.w;
+
+	return(Result);
+}
+
 //
 // NOTE(Justin): Matrix operations
 //
+
+inline v2f
+m2x2_transform_v2f(m2x2 M, v2f V)
+{
+	v2f Result = {0};
+
+	Result.x = M.e[0][0] * V.x + M.e[0][1] * V.y;
+	Result.y = M.e[1][0] * V.x + M.e[1][1] * V.y;
+
+	return(Result);
+}
+
+inline m2x2
+m2x2_scale_create(f32 c)
+{
+	m2x2 R =
+	{
+		{{c, 0.0f},
+		{0.0f, c}}
+	};
+	return(R);
+}
+
+inline m2x2
+m2x2_rotation_create(f32 angle)
+{
+	m2x2 R =
+	{
+		{{cosf(angle), sinf(angle)},
+		{-sinf(angle), cosf(angle)}}
+	};
+	return(R);
+}
 
 inline m3x3
 m3x3_identity()
@@ -424,6 +561,7 @@ m3x3_transform_v3f(m3x3 M, v3f V)
 
 	return(Result);
 }
+
 
 inline v3f
 operator *(m3x3 T, v3f V)
