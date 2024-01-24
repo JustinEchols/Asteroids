@@ -709,7 +709,6 @@ push_render_element_(render_group *RenderGroup, u32 size, render_group_entry_typ
 	{
 		render_group_entry_header *Header = (render_group_entry_header *)(RenderGroup->push_buffer_base + RenderGroup->push_buffer_size);
 		Header->Type = Type;
-		//Result = (Header + 1);
 		Result = (u8 *)Header + sizeof(*Header);
 		RenderGroup->push_buffer_size += size;
 	}
@@ -777,11 +776,7 @@ clear(render_group *RenderGroup, v4f Color)
 	}
 }
 
-/*
-
-NOTE(Justin): In what units should the axes be? Pixels or meters?
-
-*/
+//NOTE(Justin): In what units should the axes be? Pixels or meters?
 
 inline render_entry_coordinate_system * 
 coordinate_system(render_group *RenderGroup, loaded_bitmap *Texture, loaded_bitmap *NormalMap,
