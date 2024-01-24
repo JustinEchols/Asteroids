@@ -845,6 +845,79 @@ player_polygon_draw(back_buffer *BackBuffer, game_state *GameState, v2f BottomLe
 }
 
 internal void
+bitmap_clear(loaded_bitmap *Bitmap)
+{
+	if(Bitmap->memory)
+	{
+		s32 total_size = Bitmap->width * Bitmap->height * BITMAP_BYTES_PER_PIXEL;
+		zero_size(Bitmap->memory, total_size);
+	}
+}
+
+internal loaded_bitmap
+bitmap_empty(memory_arena *Arena, s32 width, s32 height, b32 clear_to_zero = true)
+{
+	loaded_bitmap Result = {};
+
+	Result.width = width;
+	Result.height = height;
+	Result.stride = Result.width * BITMAP_BYTES_PER_PIXEL;
+	s32 total_size = width * height * BITMAP_BYTES_PER_PIXEL;
+
+	Result.memory = push_size(Arena, total_size);
+	if(clear_to_zero)
+	{
+		bitmap_clear(&Result);
+	}
+
+	return(Result);
+
+}
+
+internal void 
+sphere_normal_map(loaded_bitmap *EmptyBitmap, f32 roughness)
+{
+	f32 inv_width = 1.0f / (f32)(EmptyBitmap->width - 1);
+	f32 inv_height = 1.0f / (f32)(EmptyBitmap->height - 1);
+
+	u8 *pixel_row = (u8 *)EmptyBitmap->memory;
+	for(s32 y = 0; y < EmptyBitmap->height; y++)
+	{
+		u32 *pixel = (u32 *)pixel_row;
+		for(s32 x = 0; x < EmptyBitmap->width; x++)
+		{
+			v2f BitmapUV = {inv_width * (f32)x, inv_height * (f32)y};
+			f32 Nx = 2.0f * BitmapUV.x - 1.0f;
+			f32 Ny = 2.0f * BitmapUV.y - 1.0f;
+
+			f32 root_term = 1.0f - Nx * Nx - Ny * Ny;
+			v3f Normal = {0, 0, 1};
+			f32 Nz = 0.0f;
+			if(root_term >= 0.0f)
+			{
+				Nz = f32_sqrt(root_term);
+				Normal = {Nx, Ny, Nz};
+			}
+
+			
+			//Normal = v3f_normalize(Normal);
+
+			v4f Color = {255.0f * (0.5f * (Normal.x + 1.0f)),
+						 255.0f * (0.5f * (Normal.y + 1.0f)),
+						 255.0f * (0.5f * (Normal.z + 1.0f)),
+						 255.0f * roughness};
+
+			*pixel++ = (((u32)(Color.a + 0.5f) << 24) |
+						((u32)(Color.r + 0.5f) << 16) |
+						((u32)(Color.g + 0.5f) << 8) |
+						((u32)(Color.b + 0.5f) << 0));
+		}
+		pixel_row += EmptyBitmap->stride;
+	}
+}
+
+
+internal void
 update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer *SoundBuffer, game_input *GameInput)
 {
 	ASSERT(sizeof(game_state) <= GameMemory->total_size);
@@ -860,6 +933,12 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 
 		GameState->Ship = bitmap_file_read_entire("ship/blueships1_up.bmp");
 		GameState->ShipNormalMap = bitmap_file_read_entire("ship/blueships1normal.bmp");
+
+		GameState->TestBackground= bitmap_file_read_entire("test_background.bmp");
+		GameState->TestTree = bitmap_file_read_entire("tree00.bmp");
+
+		loaded_bitmap *TestTree = &GameState->TestTree;
+
 
 		loaded_bitmap *ShipBitmap = &GameState->Ship;
 		ShipBitmap->Align = V2F((f32)ShipBitmap->width / 2.0f, (f32)ShipBitmap->height / 2.0f);
@@ -889,11 +968,11 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 
 		// TODO(Justin): This size of the asteroid should be random.
 
-		asteroid_add(GameState, ASTEROID_SMALL, V2F(0.0f, 0.5f * World->Dim.y), V2F(-1.0f, 0.0f));
-		asteroid_add(GameState, ASTEROID_SMALL, V2F(-100.0f, 0.5f * World->Dim.y), V2F(1.0f, 0.0f));
+		//asteroid_add(GameState, ASTEROID_SMALL, V2F(0.0f, 0.5f * World->Dim.y), V2F(-1.0f, 0.0f));
+		//asteroid_add(GameState, ASTEROID_SMALL, V2F(-100.0f, 0.5f * World->Dim.y), V2F(1.0f, 0.0f));
 
 		//familiar_add(GameState);
-#if 1
+#if 0
 		for(u32 i = 0; i < 20; i++)
 		{
 			asteroid_add(GameState, ASTEROID_SMALL);
@@ -918,14 +997,19 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 				GameMemory->transient_storage_size - sizeof(transient_state),
 				(u8 *)GameMemory->transient_storage + sizeof(transient_state));
 
+		GameState->TreeNormalMap = bitmap_empty(&TransientState->TransientArena, GameState->TestTree.width, GameState->TestTree.height, false);
+		sphere_normal_map(&GameState->TreeNormalMap, 0.0f);
+
 		TransientState->is_initialized = true;
 	}
+
+
 
 	v2f BottomLeft = {5.0f, 5.0f};
 
 	world *World = GameState->World;
 
-	bitmap_draw(BackBuffer, &GameState->Background, 0.0f, 0.0f);
+	bitmap_draw(BackBuffer, &GameState->TestBackground, 0.0f, 0.0f);
 
 	entity *EntityPlayer = entity_get(GameState, GameState->player_entity_index);
 
@@ -992,10 +1076,36 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 					Accel = Entity->Direction;
 				}
 
-				push_bitmap(RenderGroup, &GameState->Ship, 0,
-							Entity->Pos, Entity->Right, Entity->Direction, GameState->Ship.Align);
+
+
+
+				//push_bitmap(RenderGroup, &GameState->Ship, 0,
+				//			Entity->Pos, Entity->Right, Entity->Direction, GameState->Ship.Align);
+#if 0
+
+				v2f XAxis = Entity->base_half_width * Entity->Right;
+				v2f YAxis = Entity->height * Entity->Direction;
+				v2f Origin = Entity->Pos;
+				
+				coordinate_system(RenderGroup, &GameState->TestTree, 0,
+						Origin, XAxis, YAxis, Gray(1.0f), 0, 0, 0);
+
+
+				v2f XAxis = (f32)GameState->Ship.width * Entity->Right;
+				v2f YAxis = (f32)GameState->Ship.height * Entity->Direction;
+				v2f Origin = Entity->Pos;
+				
+				coordinate_system(RenderGroup, &GameState->Ship, 0,
+						Origin, XAxis, YAxis, Gray(1.0f), 0, 0, 0);
+
+				push_rectangle(RenderGroup, Entity->Pos, V2F(1.0f, 0.0f), V2F(0.0f, 1.0f), V2F(2.0f, 2.0f), V4F(1.0f, 1.0f, 0.0f, 1.0f));
 
 				player_polygon_draw(BackBuffer, GameState, BottomLeft, Entity);
+#endif
+
+
+
+
 
 			} break;
 			case ENTITY_ASTEROID:
@@ -1042,10 +1152,8 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 							GameState->LaserBlueBitmap.Align);
 				}
 			} break;
-			default:
-			{
-				INVALID_CODE_PATH;
-			} break;
+
+			INVALID_DEFAULT_CASE;
 		}
 
 		if(!entity_flag_is_set(Entity, ENTITY_FLAG_NON_SPATIAL))
@@ -1053,6 +1161,19 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 			entity_move(GameState, Entity, Accel, dt);
 		}
 	}
+
+	GameState->time += GameInput->dt_for_frame;
+	f32 angle = GameState->time;
+	v2f Disp = 50.0f * V2F(cosf(angle), 0.0f);
+
+	v2f ScreenCenter = 0.5f * V2F((f32)BackBuffer->width, (f32)BackBuffer->height);
+	v2f Origin = ScreenCenter;
+	v2f XAxis = 120.0f * V2F(1.0f, 0.0f);
+	v2f YAxis = v2f_perp(XAxis);
+	v4f Color = {1,1,1,1,};
+
+	coordinate_system(RenderGroup, &GameState->TestTree, &GameState->TreeNormalMap,
+			Origin, XAxis, YAxis, Color, 0, 0, 0);
 
 	render_group_to_output(BackBuffer, RenderGroup);
 	temporary_memory_end(RenderMemory);

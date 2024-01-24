@@ -10,6 +10,7 @@ enum render_group_entry_type
 	RENDER_GROUP_ENTRY_TYPE_render_entry_clear,
 	RENDER_GROUP_ENTRY_TYPE_render_entry_bitmap,
 	RENDER_GROUP_ENTRY_TYPE_render_entry_rectangle,
+	RENDER_GROUP_ENTRY_TYPE_render_entry_coordinate_system,
 };
 
 struct render_group_entry_header
@@ -19,28 +20,38 @@ struct render_group_entry_header
 
 struct render_entry_clear
 {
-	render_group_entry_header Header;
 	v4f Color;
 };
 
 struct render_entry_bitmap
 {
-	render_group_entry_header Header;
-
 	v2f Origin;
 	v2f XAxis;
 	v2f YAxis;
 	v4f Color;
 	v2f Dim;
+
+	loaded_bitmap *Texture;
+	loaded_bitmap *NormalMap;
+};
+
+struct render_entry_coordinate_system
+{
+	v2f Origin;
+	v2f XAxis;
+	v2f YAxis;
+	v4f Color;
+
 	loaded_bitmap *Texture;
 	loaded_bitmap *NormalMap;
 
+	environment_map *Top;
+	environment_map *Middle;
+	environment_map *Bottom;
 };
 
 struct render_entry_rectangle
 {
-	render_group_entry_header Header;
-
 	v2f Origin;
 	v2f XAxis;
 	v2f YAxis;
