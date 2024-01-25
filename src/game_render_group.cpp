@@ -111,7 +111,7 @@ environment_map_sample(v2f ScreenSpaceUV, environment_map *Map, v3f Normal, f32 
 	u32 lod_index = (u32)(roughness * (f32)(ARRAY_COUNT(Map->LOD) - 1) + 0.5f);
 	ASSERT(lod_index < ARRAY_COUNT(Map->LOD));
 
-	loaded_bitmap *LOD = Map->LOD[lod_index];
+	loaded_bitmap *LOD = &Map->LOD[lod_index];
 
 	//f32 tx = ((u * (f32)(Texture->width - 2)));
 	//f32 ty = ((v * (f32)(Texture->height - 2)));
@@ -138,11 +138,11 @@ environment_map_sample(v2f ScreenSpaceUV, environment_map *Map, v3f Normal, f32 
 
 
 internal void 
-rectangle_draw_slowly(back_buffer *BackBuffer, v2f Origin, v2f XAxis, v2f YAxis, v4f Color,
-		loaded_bitmap *Texture, loaded_bitmap *NormalMap,
-		environment_map *Top,
-		environment_map *Middle,
-		environment_map *Bottom)
+rectangle_draw_slowly(loaded_bitmap *Buffer, v2f Origin, v2f XAxis, v2f YAxis, v4f Color,
+					  loaded_bitmap *Texture, loaded_bitmap *NormalMap,
+					  environment_map *Top,
+					  environment_map *Middle,
+					  environment_map *Bottom)
 
 {
 	// NOTE(Justin): Pre-muiltiple color at the start
@@ -151,8 +151,8 @@ rectangle_draw_slowly(back_buffer *BackBuffer, v2f Origin, v2f XAxis, v2f YAxis,
 	f32 inv_x_axis_len_sq = 1.0f / v2f_dot(XAxis, XAxis);
 	f32 inv_y_axis_len_sq = 1.0f / v2f_dot(YAxis, YAxis);
 
-	s32 width_max = BackBuffer->width - 1;
-	s32 height_max = BackBuffer->height - 1;
+	s32 width_max = Buffer->width - 1;
+	s32 height_max = Buffer->height - 1;
 
 	f32 inv_width_max = 1.0f / (f32)width_max;
 	f32 inv_height_max = 1.0f / (f32)height_max;
@@ -182,7 +182,7 @@ rectangle_draw_slowly(back_buffer *BackBuffer, v2f Origin, v2f XAxis, v2f YAxis,
 	if(x_max > (width_max)) {x_max = width_max;}
 	if(y_max > (height_max)) {y_max = height_max;}
 
-	u8 *pixel_row = (u8 *)BackBuffer->memory + BackBuffer->stride * y_min + BITMAP_BYTES_PER_PIXEL * x_min;
+	u8 *pixel_row = (u8 *)Buffer->memory + Buffer->stride * y_min + BITMAP_BYTES_PER_PIXEL * x_min;
 	for(s32 row = y_min; row <= y_max; row++)
 	{
 		u32 *pixel = (u32 *)pixel_row;
@@ -281,7 +281,7 @@ rectangle_draw_slowly(back_buffer *BackBuffer, v2f Origin, v2f XAxis, v2f YAxis,
 			}
 			pixel++;
 		}
-		pixel_row += BackBuffer->stride;
+		pixel_row += Buffer->stride;
 	}
 }
 
@@ -350,7 +350,7 @@ line_dda_draw(back_buffer *BackBuffer, v2f P1, v2f P2, v3f Color)
 }
 
 internal void 
-rectangle_draw(back_buffer *BackBuffer, v2f Min, v2f Max, f32 r, f32 g, f32 b)
+rectangle_draw(loaded_bitmap *Buffer, v2f Min, v2f Max, f32 r, f32 g, f32 b)
 {
 	s32 x_min = f32_round_to_s32(Min.x);
 	s32 y_min = f32_round_to_s32(Min.y);
@@ -359,19 +359,19 @@ rectangle_draw(back_buffer *BackBuffer, v2f Min, v2f Max, f32 r, f32 g, f32 b)
 
 	if(x_min < 0)
 	{
-		x_min += BackBuffer->width;
+		x_min += Buffer->width;
 	}
-	if(x_max > BackBuffer->width)
+	if(x_max > Buffer->width)
 	{
-		x_max -= BackBuffer->width;
+		x_max -= Buffer->width;
 	}
 	if(y_min < 0)
 	{
-		y_min += BackBuffer->height;
+		y_min += Buffer->height;
 	}
-	if(y_max > BackBuffer->height)
+	if(y_max > Buffer->height)
 	{
-		y_max -= BackBuffer->height;
+		y_max -= Buffer->height;
 	}
 
 	u32 red = f32_round_to_u32(255.0f * r);
@@ -379,7 +379,7 @@ rectangle_draw(back_buffer *BackBuffer, v2f Min, v2f Max, f32 r, f32 g, f32 b)
 	u32 blue = f32_round_to_u32(255.0f * b);
 	u32 color = ((red << 16) | (green << 8) | (blue << 0));
 
-	u8 *pixel_row = (u8 *)BackBuffer->memory + BackBuffer->stride * y_min + BITMAP_BYTES_PER_PIXEL * x_min ;
+	u8 *pixel_row = (u8 *)Buffer->memory + Buffer->stride * y_min + BITMAP_BYTES_PER_PIXEL * x_min ;
 	for(int row = y_min; row < y_max; row++)
 	{
 		u32 *pixel = (u32 *)pixel_row;
@@ -387,18 +387,18 @@ rectangle_draw(back_buffer *BackBuffer, v2f Min, v2f Max, f32 r, f32 g, f32 b)
 		{
 			*pixel++ = color;
 		}
-		pixel_row += BackBuffer->stride;
+		pixel_row += Buffer->stride;
 	}
 }
 
 internal void 
-rectangle_draw(back_buffer *BackBuffer, v2f Min, v2f Max, v4f Color)
+rectangle_draw(loaded_bitmap *Buffer, v2f Min, v2f Max, v4f Color)
 {
-	rectangle_draw(BackBuffer, Min, Max, Color.r, Color.g, Color.b);
+	rectangle_draw(Buffer, Min, Max, Color.r, Color.g, Color.b);
 }
 
 internal void
-bitmap_draw(back_buffer *BackBuffer, loaded_bitmap *Bitmap, f32 x, f32 y, f32 c_alpha = 1.0f)
+bitmap_draw(loaded_bitmap *Buffer, loaded_bitmap *Bitmap, f32 x, f32 y, f32 c_alpha = 1.0f)
 {
 	s32 x_min = f32_round_to_s32(x);
 	s32 y_min = f32_round_to_s32(y);
@@ -420,8 +420,8 @@ bitmap_draw(back_buffer *BackBuffer, loaded_bitmap *Bitmap, f32 x, f32 y, f32 c_
 
 	if(x_min < 0)
 	{
-		region_1_x_min = x_min + BackBuffer->width;
-		region_1_x_max = BackBuffer->width;
+		region_1_x_min = x_min + Buffer->width;
+		region_1_x_max = Buffer->width;
 		region_2_x_min = 0;
 		region_2_x_max = x_max;
 		bitmap_across_x_boundary = true;
@@ -429,34 +429,34 @@ bitmap_draw(back_buffer *BackBuffer, loaded_bitmap *Bitmap, f32 x, f32 y, f32 c_
 
 	if(y_min < 0)
 	{
-		region_1_y_min = y_min + BackBuffer->height;;
-		region_1_y_max = BackBuffer->height;
+		region_1_y_min = y_min + Buffer->height;;
+		region_1_y_max = Buffer->height;
 		region_2_y_min = 0;
 		region_2_y_max = y_max;
 		bitmap_across_y_boundary = true;
 	}
 
-	if(x_max > BackBuffer->width)
+	if(x_max > Buffer->width)
 	{
 		region_1_x_min = x_min;
-		region_1_x_max = BackBuffer->width;
+		region_1_x_max = Buffer->width;
 		region_2_x_min = 0;
-		region_2_x_max = x_max - BackBuffer->width; 
+		region_2_x_max = x_max - Buffer->width; 
 		bitmap_across_x_boundary = true;
 	}
 
-	if(y_max > BackBuffer->height)
+	if(y_max > Buffer->height)
 	{
 		region_1_y_min = y_min;
-		region_1_y_max = BackBuffer->height;
+		region_1_y_max = Buffer->height;
 		region_2_y_min = 0;
-		region_2_y_max = y_max - BackBuffer->height;
+		region_2_y_max = y_max - Buffer->height;
 		bitmap_across_y_boundary = true;
 	}
 
 	if(!(bitmap_across_x_boundary || bitmap_across_y_boundary))
 	{
-		u8 *dest_row = (u8 *)BackBuffer->memory + y_min * BackBuffer->stride + x_min * BITMAP_BYTES_PER_PIXEL;
+		u8 *dest_row = (u8 *)Buffer->memory + y_min * Buffer->stride + x_min * BITMAP_BYTES_PER_PIXEL;
 		u8 *src_row = (u8 *)Bitmap->memory;
 		for(s32 y = y_min; y < y_max; y++)
 		{
@@ -486,7 +486,7 @@ bitmap_draw(back_buffer *BackBuffer, loaded_bitmap *Bitmap, f32 x, f32 y, f32 c_
 				dest++;
 				src++;
 			}
-			dest_row += BackBuffer->stride;
+			dest_row += Buffer->stride;
 			src_row += Bitmap->stride;
 		}
 	}
@@ -508,7 +508,7 @@ bitmap_draw(back_buffer *BackBuffer, loaded_bitmap *Bitmap, f32 x, f32 y, f32 c_
 			region_2_x_max = x_max;
 		}
 
-		u8 *dest_row = (u8 *)BackBuffer->memory + region_1_y_min * BackBuffer->stride + region_1_x_min * BITMAP_BYTES_PER_PIXEL;
+		u8 *dest_row = (u8 *)Buffer->memory + region_1_y_min * Buffer->stride + region_1_x_min * BITMAP_BYTES_PER_PIXEL;
 		u8 *src_row = (u8 *)Bitmap->memory;
 		for(s32 y = region_1_y_min; y < region_1_y_max; y++)
 		{
@@ -516,7 +516,6 @@ bitmap_draw(back_buffer *BackBuffer, loaded_bitmap *Bitmap, f32 x, f32 y, f32 c_
 			u32 *dest = (u32 *)dest_row;
 			for(s32 x = region_1_x_min; x < region_1_x_max; x++)
 			{
-
 				v4f Texel = unpack4x8(*src);
 
 				Texel = srgb_255_to_linear01(Texel);
@@ -539,7 +538,7 @@ bitmap_draw(back_buffer *BackBuffer, loaded_bitmap *Bitmap, f32 x, f32 y, f32 c_
 				dest++;
 				src++;
 			}
-			dest_row += BackBuffer->stride;
+			dest_row += Buffer->stride;
 			src_row += Bitmap->stride;
 		}
 
@@ -548,9 +547,9 @@ bitmap_draw(back_buffer *BackBuffer, loaded_bitmap *Bitmap, f32 x, f32 y, f32 c_
 		{
 			bitmap_offset_x = -1 * x_min;
 		}
-		if(x_max > BackBuffer->width)
+		if(x_max > Buffer->width)
 		{
-			bitmap_offset_x = BackBuffer->width - x_min;
+			bitmap_offset_x = Buffer->width - x_min;
 		}
 
 		s32 bitmap_offset_y = 0;
@@ -559,12 +558,12 @@ bitmap_draw(back_buffer *BackBuffer, loaded_bitmap *Bitmap, f32 x, f32 y, f32 c_
 			bitmap_offset_y = -1 * y_min;
 		}
 
-		if(y_max > BackBuffer->height)
+		if(y_max > Buffer->height)
 		{
-			bitmap_offset_y = BackBuffer->height - y_min;
+			bitmap_offset_y = Buffer->height - y_min;
 		}
 
-		dest_row = (u8 *)BackBuffer->memory + region_2_y_min * BackBuffer->stride + region_2_x_min * BITMAP_BYTES_PER_PIXEL;
+		dest_row = (u8 *)Buffer->memory + region_2_y_min * Buffer->stride + region_2_x_min * BITMAP_BYTES_PER_PIXEL;
 		src_row = (u8 *)Bitmap->memory + bitmap_offset_y * Bitmap->stride + bitmap_offset_x * BITMAP_BYTES_PER_PIXEL;
 		for(s32 y = region_2_y_min; y < region_2_y_max; y++)
 		{
@@ -595,7 +594,7 @@ bitmap_draw(back_buffer *BackBuffer, loaded_bitmap *Bitmap, f32 x, f32 y, f32 c_
 				dest++;
 				src++;
 			}
-			dest_row += BackBuffer->stride;
+			dest_row += Buffer->stride;
 			src_row += Bitmap->stride;
 		}
 	}
@@ -784,9 +783,12 @@ NOTE(Justin): In what units should the axes be? Pixels or meters?
 */
 
 inline render_entry_coordinate_system * 
-coordinate_system(render_group *RenderGroup, loaded_bitmap *Texture, loaded_bitmap *NormalMap,
-				 v2f Origin, v2f XAxis, v2f YAxis, v4f Color,
-				 environment_map *Top, environment_map *Middle, environment_map *Bottom)
+coordinate_system(render_group *RenderGroup, v2f Origin, v2f XAxis, v2f YAxis, v4f Color,
+				 loaded_bitmap *Texture,
+				 loaded_bitmap *NormalMap,
+				 environment_map *Top,
+				 environment_map *Middle,
+				 environment_map *Bottom)
 {
 	render_entry_coordinate_system *Entry = push_render_element(RenderGroup, render_entry_coordinate_system);
 	if(Entry)
@@ -820,7 +822,7 @@ coordinate_system(render_group *RenderGroup, loaded_bitmap *Texture, loaded_bitm
 }
 
 internal void
-render_group_to_output(back_buffer *BackBuffer, render_group *RenderGroup)
+render_group_to_output(render_group *RenderGroup, loaded_bitmap *OutputTarget)
 {
 	for(u32 base_address = 0; base_address < RenderGroup->push_buffer_size; )
 	{
@@ -833,21 +835,21 @@ render_group_to_output(back_buffer *BackBuffer, render_group *RenderGroup)
 			case RENDER_GROUP_ENTRY_TYPE_render_entry_clear:
 			{
 				render_entry_clear *Entry = (render_entry_clear *)render_data;
-				rectangle_draw(BackBuffer, V2F(0.0f, 0.0f), V2F((f32)BackBuffer->width, (f32)BackBuffer->height), Entry->Color);
+				rectangle_draw(OutputTarget, V2F(0.0f, 0.0f), V2F((f32)OutputTarget->width, (f32)OutputTarget->height), Entry->Color);
 				base_address += sizeof(*Entry);
 			} break;
 			case RENDER_GROUP_ENTRY_TYPE_render_entry_bitmap:
 			{
 				render_entry_bitmap *Entry = (render_entry_bitmap *)render_data;
 				ASSERT(Entry->Texture);  
-				bitmap_draw(BackBuffer, Entry->Texture, Entry->Origin.x, Entry->Origin.y, Entry->Color.a);
+				bitmap_draw(OutputTarget, Entry->Texture, Entry->Origin.x, Entry->Origin.y, Entry->Color.a);
 				base_address += sizeof(*Entry);
 			} break;
 			case RENDER_GROUP_ENTRY_TYPE_render_entry_rectangle:
 			{
 				render_entry_rectangle *Entry = (render_entry_rectangle *)render_data;
 
-				rectangle_draw(BackBuffer, Entry->Origin, Entry->Origin + Entry->Dim,
+				rectangle_draw(OutputTarget, Entry->Origin, Entry->Origin + Entry->Dim,
 						Entry->Color);
 				base_address += sizeof(*Entry);
 
@@ -856,23 +858,23 @@ render_group_to_output(back_buffer *BackBuffer, render_group *RenderGroup)
 			{
 				render_entry_coordinate_system *Entry = (render_entry_coordinate_system *)render_data;
 
-				rectangle_draw_slowly(BackBuffer, Entry->Origin, Entry->XAxis, Entry->YAxis, Entry->Color,
+				rectangle_draw_slowly(OutputTarget, Entry->Origin, Entry->XAxis, Entry->YAxis, Entry->Color,
 						Entry->Texture, Entry->NormalMap, Entry->Top, Entry->Middle, Entry->Bottom);
 
 				v4f Color = {1, 1, 0, 1};
 				v2f Dim = {2, 2};
 
 				v2f P = Entry->Origin;
-				rectangle_draw(BackBuffer, P - Dim, P + Dim, Color);
+				rectangle_draw(OutputTarget, P - Dim, P + Dim, Color);
 
 				P = Entry->Origin + Entry->XAxis;
-				rectangle_draw(BackBuffer, P - Dim, P + Dim, Color);
+				rectangle_draw(OutputTarget, P - Dim, P + Dim, Color);
 
 				P = Entry->Origin + Entry->YAxis;
-				rectangle_draw(BackBuffer, P - Dim, P + Dim, Color);
+				rectangle_draw(OutputTarget, P - Dim, P + Dim, Color);
 
 				P = Entry->Origin + Entry->XAxis + Entry->YAxis;
-				rectangle_draw(BackBuffer, P - Dim, P + Dim, Color);
+				rectangle_draw(OutputTarget, P - Dim, P + Dim, Color);
 				
 
 				base_address += sizeof(*Entry);

@@ -3,11 +3,6 @@
 #include "game_platform.h"
 
 
-// WAV PCM is 16 bits per sample, either one or two channels, and samples are
-// interleaved (rlrlrlrl).
-
-
-typedef size_t memory_index;
 
 struct memory_arena
 {
@@ -68,13 +63,36 @@ temporary_memory_end(temporary_memory TempMemory)
 	MemoryArena->temp_count--;
 }
 
+inline void
+memory_arena_check(memory_arena *Arena)
+{
+	ASSERT(Arena->temp_count == 0);
+}
 
-#include "game_string.h"
+#define zero_struct(instance) zero_size(&(instance), sizeof(instance))
+inline void
+zero_size(void *ptr, memory_index size)
+{
+	u8 *byte = (u8*)ptr;
+	while(size--)
+	{
+		*byte++ = 0;
+	}
+}
+
 #include "game_intrinsics.h"
 #include "game_math.h"
 #include "game_geometry.h"
-
+#include "game_render_group.h"
 #include "game_asset.h"
+#include "game_string.h"
+
+#define White V3F(1.0f, 1.0f, 1.0f)
+#define Red V3F(1.0f, 0.0f, 0.0f)
+#define Green V3F(0.0f, 1.0f, 0.0f)
+#define Blue V3F(0.0f, 0.0f, 1.0f)
+#define Black V3F(0.0f, 0.0f, 0.0f)
+#define Gray(c) V4F(c, c, c, 1.0f)
 
 enum asteroid_size
 {
@@ -170,6 +188,10 @@ struct pairwise_collision_rule
 struct game_state
 {
 	// TODO(Justin): Should we break up some bitmaps for VFX purposes?
+	
+	// TODO(Justin): Maybe use gimp to create partition of the ship bitmap 
+	// into different bitmaps for animation, visual effects purposes. Left
+	// engine, right engine, etc..
 
 	f32 pixels_per_meter;
 
@@ -181,11 +203,12 @@ struct game_state
 
 	loaded_bitmap Background;
 
-	// TODO(Justin): Maybe use gimp to create partition the ship bitmap 
-	// into different bitmaps for animation, visual effects purposes. Left
-	// engine, right engine, etc..
 	loaded_bitmap Ship;
 	loaded_bitmap ShipNormalMap;
+
+	loaded_bitmap TestTree;
+	loaded_bitmap TreeNormalMap;
+	loaded_bitmap TestBackground;
 
 	loaded_bitmap WarpFrames[8];
 	u32 warp_frame_index;
@@ -207,12 +230,20 @@ struct game_state
 	f32 time;
 
 	b32 is_initialized;
+
+	loaded_bitmap TestBuffer;
 };
 
 struct transient_state
 {
 	b32 is_initialized;
 	memory_arena TransientArena;
+
+	u32 env_map_width;
+	u32 env_map_height;
+	environment_map EnvMaps[3];
+
+
 };
 
 #define GAME_H

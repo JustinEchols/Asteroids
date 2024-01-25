@@ -57,7 +57,7 @@ Game Design
 #include "game.h"
 #include "game_geometry.h"
 #include "game_geometry.cpp"
-#include "game_render_group.h"
+
 #include "game_render_group.cpp"
 #include "game_random.h"
 #include "game_entity.h"
@@ -986,6 +986,9 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 
 		*M = InverseScreenOffset * Scale * InverseWorldTranslate;
 
+		GameState->TestBuffer = bitmap_empty(&GameState->WorldArena, GameState->Background.width, GameState->Background.height, true);
+		bitmap_draw(&GameState->TestBuffer, &GameState->Background, 0, 0);
+
 		GameMemory->is_initialized = true;
 	}
 
@@ -998,8 +1001,25 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 				(u8 *)GameMemory->transient_storage + sizeof(transient_state));
 
 		GameState->TreeNormalMap = bitmap_empty(&TransientState->TransientArena, GameState->TestTree.width, GameState->TestTree.height, false);
+		
+		// NOTE(Justin): roughness = 0 samples from top env map always
 		sphere_normal_map(&GameState->TreeNormalMap, 0.0f);
 
+		TransientState->env_map_width = 512;
+		TransientState->env_map_height = 256;
+
+		for(u32 map_index = 0; map_index < ARRAY_COUNT(TransientState->EnvMaps); map_index++)
+		{
+			environment_map *Map = TransientState->EnvMaps + map_index;
+			u32 width = TransientState->env_map_width;
+			u32 height = TransientState->env_map_height;
+			for(u32 lod_index = 0; lod_index < ARRAY_COUNT(Map->LOD); lod_index++)
+			{
+				Map->LOD[lod_index] = bitmap_empty(&TransientState->TransientArena, width, height, false);
+				width >>= 1;
+				height >>= 1;
+			}
+		}
 		TransientState->is_initialized = true;
 	}
 
@@ -1009,7 +1029,7 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 
 	world *World = GameState->World;
 
-	bitmap_draw(BackBuffer, &GameState->TestBackground, 0.0f, 0.0f);
+
 
 	entity *EntityPlayer = entity_get(GameState, GameState->player_entity_index);
 
@@ -1032,13 +1052,21 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 	// 
 	// NOTE(Justin): Render
 	//
+	
+	loaded_bitmap DrawBuffer_ = {};
+	loaded_bitmap *DrawBuffer = &DrawBuffer_;
+	DrawBuffer->width = BackBuffer->width;
+	DrawBuffer->height = BackBuffer->height;
+	DrawBuffer->stride = BackBuffer->stride;
+	DrawBuffer->memory = BackBuffer->memory;
 
 	m3x3 M = GameState->MapToScreenSpace;
 	f32 pixels_per_meter = GameState->pixels_per_meter;
-
 	temporary_memory RenderMemory = temporary_memory_begin(&TransientState->TransientArena);
 	render_group *RenderGroup = render_group_allocate(&TransientState->TransientArena, MEGABYTES(1),
 																						pixels_per_meter, M);
+
+	bitmap_draw(DrawBuffer, &GameState->TestBuffer, 0.0f, 0.0f);
 
 	for(u32 entity_index = 1; entity_index < GameState->entity_count; entity_index++)
 	{
@@ -1076,9 +1104,6 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 					Accel = Entity->Direction;
 				}
 
-
-
-
 				//push_bitmap(RenderGroup, &GameState->Ship, 0,
 				//			Entity->Pos, Entity->Right, Entity->Direction, GameState->Ship.Align);
 #if 0
@@ -1087,16 +1112,17 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 				v2f YAxis = Entity->height * Entity->Direction;
 				v2f Origin = Entity->Pos;
 				
-				coordinate_system(RenderGroup, &GameState->TestTree, 0,
-						Origin, XAxis, YAxis, Gray(1.0f), 0, 0, 0);
+				coordinate_system(RenderGroup, Origin, XAxis, YAxis,
+								 Gray(1.0f),
+								 &GameState->TestTree, 0,0, 0, 0);
 
-
+#else
 				v2f XAxis = (f32)GameState->Ship.width * Entity->Right;
 				v2f YAxis = (f32)GameState->Ship.height * Entity->Direction;
 				v2f Origin = Entity->Pos;
 				
-				coordinate_system(RenderGroup, &GameState->Ship, 0,
-						Origin, XAxis, YAxis, Gray(1.0f), 0, 0, 0);
+				coordinate_system(RenderGroup, Origin, XAxis, YAxis,
+						Gray(1.0f), &GameState->Ship, 0, 0, 0, 0);
 
 				push_rectangle(RenderGroup, Entity->Pos, V2F(1.0f, 0.0f), V2F(0.0f, 1.0f), V2F(2.0f, 2.0f), V4F(1.0f, 1.0f, 0.0f, 1.0f));
 
@@ -1162,6 +1188,11 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 		}
 	}
 
+	//rectangle_draw(back_buffer *BackBuffer, v2f Min, v2f Max, f32 r, f32 g, f32 b);
+	//rectangle_draw(back_buffer *BackBuffer, v2f Min, v2f Max, f32 r, f32 g, f32 b);
+	//rectangle_draw(back_buffer *BackBuffer, v2f Min, v2f Max, f32 r, f32 g, f32 b);
+
+#if 0
 	GameState->time += GameInput->dt_for_frame;
 	f32 angle = GameState->time;
 	v2f Disp = 50.0f * V2F(cosf(angle), 0.0f);
@@ -1175,6 +1206,27 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 	coordinate_system(RenderGroup, &GameState->TestTree, &GameState->TreeNormalMap,
 			Origin, XAxis, YAxis, Color, 0, 0, 0);
 
-	render_group_to_output(BackBuffer, RenderGroup);
+#else
+
+	v4f Color = V4F(1.0f, 1.0f, 1.0f, 1.0f);
+	v2f MapPos = {0.0f, 0.0f};
+	for(u32 map_index = 0; map_index < ARRAY_COUNT(TransientState->EnvMaps); map_index++)
+	{
+		environment_map *EnvMap = TransientState->EnvMaps + map_index;
+		loaded_bitmap *LOD = &EnvMap->LOD[0];
+
+		v2f XAxis = 0.5f * V2F((f32)LOD->width, 0.0f);
+		v2f YAxis = 0.5f * V2F(0.0f, (f32)LOD->height);
+
+		coordinate_system(RenderGroup, MapPos, XAxis, YAxis,
+				Color,
+				&TransientState->EnvMaps[0].LOD[0], 0, 0, 0, 0);
+
+		MapPos += {0.0f, LOD->height + 6.0f};
+
+
+	}
+#endif
+	render_group_to_output(RenderGroup, DrawBuffer);
 	temporary_memory_end(RenderMemory);
 }
