@@ -1,44 +1,3 @@
-/*
-TODO:
-Audio
- - Play any audio
- - Play any audio file
-	 - open wav
-	 - decode
-	 - uncompress
-	 - pan audio?
-	 - change pitch 
-
-Basics of DSound
-Setup DSound
-	- Load dsound.dll							
-	- Get function ptr to DirectSoundCreate
-	- DirectSoundCreate
-	- SetCooperativeLevel
-	- SetFormat of the PrimaryBuffer
-	- Create GlobaalSecondaryBuffer
-
-Loading a WAV file into a DSound buffer
-	- Read the header
-	- If WAV file small create a secondary buffer large enought to hold sample
-	- data. If WAV file large stream data to the buffer.
-	- Fill buffer with data using Lock
-	- If not streaming lock entire buffer otherwise
-	- After copying unlock
-
-Play DSound Buffer
-Play
-
-
-// 2-channels (stereo)
-// stereo L/R channel two channels 8 bits per channel
-// Block is a Sample which has two channels [L R]
-// the member is in units of bytes so byte_count([L R]) = 2 channels * 16 bits per channel / 8 = 4 
-// (# samples * sizeof(sample)) / seconds = bytes / second
-sfx
-*/
-
-
 #include <windows.h>
 #include <gl/gl.h>
 #include <stdio.h>
@@ -190,9 +149,6 @@ win32_sound_buffer_clear(win32_sound_buffer *Win32SoundBuffer)
 										 &region_2, &region_2_size,
 										 DSBLOCK_ENTIREBUFFER);
 
-	// If we are clearing the sound buffer can probably only clear in one loop
-	// as region 1 should probably be the entire buffer. region_2 returns NULL
-	// and the size is 0 so the second loop does not start...
 	if(SUCCEEDED(secondary_buffer_lock))
 	{
 		u8 *sample_byte = (u8 *)region_1;
@@ -228,16 +184,6 @@ internal void
 win32_sound_buffer_fill(win32_sound_buffer *Win32SoundBuffer, DWORD byte_to_lock, DWORD bytes_to_write,
 		sound_buffer *SoundBuffer)
 {
-	//NOTE: The SoundBuffer has the correct # samples b/c the sample_count of
-	// the SoundBuffer is assigned the value of bytes_to_write / bytes_per_sample.
-	// Since we also lock the sound buffer with bytes_to_write # of bytes, then
-	//
-	//	region_1_sample_count + region_2_sample_count = SoundBuffer.sample_count
-	//
-	// The access violation we had previously should be resolved. Since the
-	// total number of samples we loop throught the win32 sound buffer and game
-	// sound buffer is the same.
-	
 	VOID *region_1;
 	DWORD region_1_size;
 	VOID *region_2;
@@ -446,7 +392,8 @@ WndProc(HWND Window, UINT Message, WPARAM wParam, LPARAM lParam)
 		} break;
 		case WM_DESTROY:
 		{
-			// TODO: Handle as an error. Why?
+			// TODO(Justin): Handle as an error.
+			Win32GlobalRunning = FALSE;
 		} break;
 		case WM_QUIT:
 		{
@@ -464,7 +411,7 @@ WndProc(HWND Window, UINT Message, WPARAM wParam, LPARAM lParam)
 		case WM_KEYDOWN:
 		case WM_KEYUP:
 		{
-			// TODO(Justin): Assert macro
+			ASSERT(!"Keyboard input came in through a non-dispatch message!")
 		} break;
 		case WM_PAINT:
 		{
@@ -864,7 +811,6 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR CmdLine, int nCmdSho
 					BackBuffer.memory = Win32GlobalBackBuffer.memory;
 					BackBuffer.width = Win32GlobalBackBuffer.width;
 					BackBuffer.height = Win32GlobalBackBuffer.height;
-					BackBuffer.bytes_per_pixel = Win32GlobalBackBuffer.bytes_per_pixel;
 					BackBuffer.stride = Win32GlobalBackBuffer.stride;
 
 					update_and_render(&GameMemory, &BackBuffer, &SoundBuffer, NewInput);
