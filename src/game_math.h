@@ -89,6 +89,24 @@ union v4f
 		};
 		f32 a;
 	};
+	struct
+	{
+		v2f xy;
+		f32 ignored0_;
+		f32 ignored1_;
+	};
+	struct
+	{
+		f32 ignored2_;
+		v2f yz;
+		f32 ignored3_;
+	};
+	struct
+	{
+		f32 ignored4_;
+		f32 ignored5_;
+		v2f zw;
+	};
 	f32 e[4];
 };
 
@@ -151,6 +169,19 @@ V4F(f32 x, f32 y, f32 z, f32 w)
 	return(Result);
 }
 
+inline v4f
+V4F(f32 c)
+{
+	v4f Result;
+
+	Result.x = c;
+	Result.y = c;
+	Result.z = c;
+	Result.w = c;
+
+	return(Result);
+}
+
 //
 // NOTE(Justin): Scalar operations
 //
@@ -167,13 +198,13 @@ inline f32
 clamp(f32 min, f32 x, f32 max)
 {
 	f32 Result = x;
-	if(x < min)
+	if(Result < min)
 	{
-		x = min;
+		Result = min;
 	}
-	else if(x > max)
+	else if(Result > max)
 	{
-		x = max;
+		Result = max;
 	}
 
 	return(Result);
@@ -192,7 +223,7 @@ clamp01(f32 x)
 //
 
 inline v2f
-v2f_hadamard(v2f U, v2f V)
+hadamard(v2f U, v2f V)
 {
 	v2f Result;
 
@@ -203,7 +234,7 @@ v2f_hadamard(v2f U, v2f V)
 }
 
 inline v2f
-v2f_perp(v2f V)
+perp(v2f V)
 {
 	v2f Result = {-V.y, V.x};
 	return(Result);
@@ -297,37 +328,37 @@ operator -(v2f U, v2f V)
 }
 
 inline f32
-v2f_dot(v2f V1, v2f V2)
+dot(v2f V1, v2f V2)
 {
 	f32 Result = V1.x * V2.x + V1.y * V2.y;
 
 	return(Result);
 }
 
+inline f32
+length(v2f V)
+{
+	f32 Result = f32_sqrt(dot(V, V));
+
+	return(Result);
+}
+
 inline v2f
-v2f_normalize(v2f V)
+normalize(v2f V)
 {
 	v2f Result;
 
-	f32 c = (1.0f / f32_sqrt(v2f_dot(V, V)));
-
-	Result = c * V;
+	Result = (1.0f / length(V)) * V;
 
 	return(Result);
 }
 
-inline f32
-v2f_length(v2f V)
-{
-	f32 Result = f32_sqrt(v2f_dot(V, V));
 
-	return(Result);
-}
 
 inline f32
-v2f_length_squared(v2f V)
+length_squared(v2f V)
 {
-	f32 Result = v2f_dot(V, V);
+	f32 Result = dot(V, V);
 
 	return(Result);
 }
@@ -378,7 +409,7 @@ lerp(v3f A, f32 t, v3f B)
 }
 
 inline f32
-v3f_dot(v3f U, v3f V)
+dot(v3f U, v3f V)
 {
 	f32 Result = 0.0f;
 
@@ -387,20 +418,26 @@ v3f_dot(v3f U, v3f V)
 	return(Result);
 }
 
-inline v3f
-v3f_normalize(v3f V)
+inline f32
+length(v3f V)
 {
-	v3f Result;
-
-	f32 inv_len = 1.0f / (f32_sqrt(v3f_dot(V, V)));
-
-	Result = inv_len * V;
+	f32 Result = f32_sqrt(dot(V, V));
 
 	return(Result);
 }
 
 inline v3f
-v3f_hadamard(v3f U, v3f V)
+normalize(v3f V)
+{
+	v3f Result;
+
+	Result = (1.0f / length(V))* V;
+
+	return(Result);
+}
+
+inline v3f
+hadamard(v3f U, v3f V)
 {
 	v3f Result;
 
@@ -458,7 +495,7 @@ operator *=(v4f &V, f32 c)
 }
 
 inline f32
-v4f_dot(v4f U, v4f V)
+dot(v4f U, v4f V)
 {
 	f32 Result = 0.0f;
 
@@ -467,17 +504,26 @@ v4f_dot(v4f U, v4f V)
 	return(Result);
 }
 
-inline v4f
-v4f_normalize(v4f V)
+inline f32
+length(v4f V)
 {
-	v4f Result;
-
-	f32 inv_len = 1.0f / (f32_sqrt(v4f_dot(V, V)));
-
-	Result = inv_len * V;
+	f32 Result = f32_sqrt(dot(V, V));
 
 	return(Result);
 }
+
+inline v4f
+normalize(v4f V)
+{
+	v4f Result;
+
+	Result = (1.0f / length(V)) * V;
+
+	return(Result);
+}
+
+
+
 
 inline v4f
 lerp(v4f A, f32 t, v4f B)
@@ -488,7 +534,7 @@ lerp(v4f A, f32 t, v4f B)
 }
 
 inline v4f
-v4f_hadamard(v4f U, v4f V)
+hadamard(v4f U, v4f V)
 {
 	v4f Result;
 
