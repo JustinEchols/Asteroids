@@ -41,11 +41,11 @@ linear01_to_srgb_255(v4f C)
 }
 
 inline v4f
-normal_rescale_and_bias(v4f Normal)
+normal_scale_and_offset_01(v4f Normal)
 {
 	v4f Result;
 
-	f32 inv_255 = 1.0f/ 255.0f;
+	f32 inv_255 = 1.0f / 255.0f;
 
 	Result.x = -1.0f + 2.0f * (inv_255 * Normal.x);
 	Result.y = -1.0f + 2.0f * (inv_255 * Normal.y);
@@ -95,7 +95,7 @@ srgb_bilinear_blend(bilinear_sample Sample, f32 fx, f32 fy)
 	return(Result);
 }
 
-internal v3f
+inline v3f
 normal_map_sample(v2f ScreenSpaceUV, environment_map *Map, v3f Normal, f32 roughness)
 {
 	v3f Result = Normal;
@@ -103,8 +103,8 @@ normal_map_sample(v2f ScreenSpaceUV, environment_map *Map, v3f Normal, f32 rough
 	return(Result);
 }
 
-internal v3f
-environment_map_sample(v2f ScreenSpaceUV, environment_map *Map, v3f Normal, f32 roughness)
+inline v3f
+environment_map_sample(v2f ScreenSpaceUV, v3f SampleDir, f32 roughness, environment_map *Map, f32 z_offset_to_map)
 {
 	v3f Result;
 
@@ -113,43 +113,63 @@ environment_map_sample(v2f ScreenSpaceUV, environment_map *Map, v3f Normal, f32 
 
 	loaded_bitmap *LOD = &Map->LOD[lod_index];
 
-	//f32 tx = ((u * (f32)(Texture->width - 2)));
-	//f32 ty = ((v * (f32)(Texture->height - 2)));
-	
-	f32 tx = 0.0f;
-	f32 ty = 0.0f;
+	// NOTE(Justin): The map_distance is a fudge factor!
+	f32 uv_per_meter = 0.01;
+	f32 c = (uv_per_meter * z_offset_to_map) / SampleDir.y;
+	v2f Offset = c * V2F(SampleDir.x, SampleDir.z);
+
+	v2f UV = ScreenSpaceUV + Offset;
+
+	UV.x = clamp01(UV.x);
+	UV.y = clamp01(UV.y);
+
+
+	f32 tx = (UV.x * (f32)(LOD->width - 2));
+	f32 ty = (UV.y * (f32)(LOD->height - 2));
 
 	s32 x = (s32)tx;
 	s32 y = (s32)ty;
 
-	// t values for bilinear filtering
 	f32 fx = tx - (f32)x;
 	f32 fy = ty - (f32)y;
 
 	ASSERT((x >= 0) && (x < LOD->width));
 	ASSERT((y >= 0) && (y < LOD->height));
 
+#if 0
+	u8 *texel_ptr = (u8 *)LOD->memory + y * LOD->stride + x * BITMAP_BYTES_PER_PIXEL;
+	*(u32 *)texel_ptr = 0xFFFFFFFF;
+#endif
+
 	bilinear_sample Sample = bilinear_sample_texture(LOD, x, y);
+
 	Result = srgb_bilinear_blend(Sample, fx, fy).xyz;
 
 	return(Result);
 }
-
-
 
 internal void 
 rectangle_draw_slowly(loaded_bitmap *Buffer, v2f Origin, v2f XAxis, v2f YAxis, v4f Color,
 					  loaded_bitmap *Texture, loaded_bitmap *NormalMap,
 					  environment_map *Top,
 					  environment_map *Middle,
-					  environment_map *Bottom)
+					  environment_map *Bottom,
+					  f32 meters_per_pixel)
 
 {
-	// NOTE(Justin): Pre-muiltiple color at the start
+	// NOTE(Justin): Pre-muiltiply color at the start
 	Color.rgb *= Color.a;
 
-	f32 inv_x_axis_len_sq = 1.0f / v2f_dot(XAxis, XAxis);
-	f32 inv_y_axis_len_sq = 1.0f / v2f_dot(YAxis, YAxis);
+	f32 XAxisLen = length(XAxis);
+	f32 YAxisLen = length(YAxis);
+
+	v2f NormalXAxis = (YAxisLen / XAxisLen) * XAxis;
+	v2f NormalYAxis = (XAxisLen / YAxisLen) * YAxis;
+
+	f32 z_axis_scale = 0.5f * (XAxisLen + YAxisLen);
+
+	f32 inv_x_axis_len_sq = 1.0f / dot(XAxis, XAxis);
+	f32 inv_y_axis_len_sq = 1.0f / dot(YAxis, YAxis);
 
 	s32 width_max = Buffer->width - 1;
 	s32 height_max = Buffer->height - 1;
@@ -161,6 +181,10 @@ rectangle_draw_slowly(loaded_bitmap *Buffer, v2f Origin, v2f XAxis, v2f YAxis, v
 	s32 y_min = height_max;
 	s32 x_max = 0;
 	s32 y_max = 0;
+
+	f32 z_origin = 0.0f;
+	f32 y_origin = (Origin + 0.5f * XAxis + 0.5* YAxis).y;
+	f32 y_fixed_cast = inv_height_max * y_origin;
 
 	v2f P[4] = {Origin, Origin + XAxis, Origin + XAxis + YAxis, Origin + YAxis};
 	for(u32 p_index = 0; p_index < ARRAY_COUNT(P); p_index++)
@@ -179,8 +203,8 @@ rectangle_draw_slowly(loaded_bitmap *Buffer, v2f Origin, v2f XAxis, v2f YAxis, v
 
 	if(x_min < 0) {x_min = 0;}
 	if(y_min < 0) {y_min = 0;}
-	if(x_max > (width_max)) {x_max = width_max;}
-	if(y_max > (height_max)) {y_max = height_max;}
+	if(x_max > width_max) {x_max = width_max;}
+	if(y_max > height_max) {y_max = height_max;}
 
 	u8 *pixel_row = (u8 *)Buffer->memory + Buffer->stride * y_min + BITMAP_BYTES_PER_PIXEL * x_min;
 	for(s32 row = y_min; row <= y_max; row++)
@@ -190,24 +214,35 @@ rectangle_draw_slowly(loaded_bitmap *Buffer, v2f Origin, v2f XAxis, v2f YAxis, v
 		{
 			v2f PixelP = V2F((f32)col, (f32)row);
 			v2f D = PixelP - Origin;
-			f32 e0 = v2f_dot(D, -1.0f * v2f_perp(XAxis));
-			f32 e1 = v2f_dot(D - XAxis, -1.0f * v2f_perp(YAxis));
-			f32 e2 = v2f_dot(D - XAxis - YAxis, v2f_perp(XAxis));
-			f32 e3 = v2f_dot(D - YAxis, v2f_perp(YAxis));
+
+			f32 e0 = dot(D, -1.0f * perp(XAxis));
+			f32 e1 = dot(D - XAxis, -1.0f * perp(YAxis));
+			f32 e2 = dot(D - XAxis - YAxis, perp(XAxis));
+			f32 e3 = dot(D - YAxis, perp(YAxis));
 
 			if((e0 < 0) && (e1 < 0) && (e2 < 0) && (e3 < 0))
 			{
-				// (u, v) in [0, 1] X [0, 1]
-				f32 u = inv_x_axis_len_sq * v2f_dot(D, XAxis);
-				f32 v = inv_y_axis_len_sq * v2f_dot(D, YAxis);
 
-				// TODO(Justin): Clamp.
-				ASSERT((u >= 0.0f) && (u <= 1.0f));
-				ASSERT((v >= 0.0f) && (v <= 1.0f));
+#if 0
+				v2f ScreenSpaceUV = {inv_width_max * (f32)col, inv_height_max * (f32)row};
+				f32 z_diff = 0.0f;
+#else
+				v2f ScreenSpaceUV = {inv_width_max * (f32)col, y_fixed_cast};
+				f32 z_diff = meters_per_pixel * ((f32)row - y_origin);
+#endif
+
+				// (u, v) in [0, 1) X [0, 1)
+				f32 u = inv_x_axis_len_sq * dot(D, XAxis);
+				f32 v = inv_y_axis_len_sq * dot(D, YAxis);
+
+				// TODO(Justin): SSE clamp.
+				//ASSERT((u >= 0.0f) && (u <= 1.0f));
+				//ASSERT((v >= 0.0f) && (v <= 1.0f));
 
 				// Scale the uv coordinates to "almost" the entire dim of the bitmap
 				f32 tx = ((u * (f32)(Texture->width - 2)));
 				f32 ty = ((v * (f32)(Texture->height - 2)));
+
 				s32 x = (s32)tx;
 				s32 y = (s32)ty;
 
@@ -233,16 +268,27 @@ rectangle_draw_slowly(loaded_bitmap *Buffer, v2f Origin, v2f XAxis, v2f YAxis, v
 
 					v4f Normal = lerp(lerp(NormalA, fx, NormalB), fy, lerp(NormalC, fx, NormalD));
 
-					Normal = normal_rescale_and_bias(Normal);
+					Normal = normal_scale_and_offset_01(Normal);
+					Normal.xy = Normal.x * NormalXAxis + Normal.y * NormalYAxis;
+					Normal.z *= z_axis_scale;
+					Normal.xyz = normalize(Normal.xyz);
+
+					// NOTE(Justin): The eye vector is assumed to always be [0 0 1]
+					// The BounceDir is the simplified version of the reflection R = -E + 2(E^T N)N
+
+					v3f BounceDir = 2.0f * Normal.z * Normal.xyz;
+					BounceDir.z -= 1.0f;
+					BounceDir.z = -BounceDir.z;
 
 					environment_map *FarMap = 0;
-					//f32 t_env_map = Normal.z;
-					f32 t_env_map = Normal.y;
+					f32 zp = z_origin + z_diff;
+					f32 z_map = 2.0f;
+					f32 t_env_map = BounceDir.y;
 					f32 t_far_map = 0.0f;
 					if(t_env_map < -0.5f)
 					{
 						FarMap = Bottom;
-						t_far_map = 2.0f * (t_env_map + 1.0f);
+						t_far_map = -1.0f - 2.0f * t_env_map;
 					}
 					else if(t_env_map > 0.5f)
 					{
@@ -250,18 +296,27 @@ rectangle_draw_slowly(loaded_bitmap *Buffer, v2f Origin, v2f XAxis, v2f YAxis, v
 						t_far_map = 2.0f * (t_env_map - 0.5f);
 					}
 
-					v2f ScreenSpaceUV = {inv_width_max * (f32)x, inv_height_max * (f32)y};
-					v3f LightColor = {0,0,0};//environment_map_sample(ScreenSpaceUV, Middle, Normal.xyz, Normal.w);
+					t_far_map *= t_far_map;
+					t_far_map *= t_far_map;
+
+
+
+					// TODO(Justin): How to sample from the middle env map?
+					v3f LightColor = {0,0,0};
 					if(FarMap)
 					{
-						v3f FarMapColor = environment_map_sample(ScreenSpaceUV, FarMap, Normal.xyz, Normal.w);
+						f32 z_offset_to_map = FarMap->zp - zp;
+						v3f FarMapColor = environment_map_sample(ScreenSpaceUV, BounceDir, Normal.w, FarMap,
+								z_offset_to_map);
 						LightColor = lerp(LightColor, t_far_map, FarMapColor);
 					}
+
 					Texel.rgb = Texel.rgb + Texel.a * LightColor;
 				}
 
 				// NOTE(Justin): Texture tinting
-				Texel = v4f_hadamard(Texel, Color);
+
+				Texel = hadamard(Texel, Color);
 				Texel.r = clamp01(Texel.r);
 				Texel.g = clamp01(Texel.g);
 				Texel.b = clamp01(Texel.b);
@@ -269,10 +324,9 @@ rectangle_draw_slowly(loaded_bitmap *Buffer, v2f Origin, v2f XAxis, v2f YAxis, v
 				v4f Dest = unpack4x8(*pixel);
 				Dest = srgb_255_to_linear01(Dest);
 
-				v4f Blended255 = (1.0f - Texel.a) * Dest + Texel;
+				v4f Blended = (1.0f - Texel.a) * Dest + Texel;
 
-				Blended255 = linear01_to_srgb_255(Blended255);
-
+				v4f Blended255 = linear01_to_srgb_255(Blended);
 
 				*pixel = (((u32)(Blended255.a + 0.5f) << 24) |
 						  ((u32)(Blended255.r + 0.5f) << 16) |
@@ -350,7 +404,7 @@ line_dda_draw(back_buffer *BackBuffer, v2f P1, v2f P2, v3f Color)
 }
 
 internal void 
-rectangle_draw(loaded_bitmap *Buffer, v2f Min, v2f Max, f32 r, f32 g, f32 b)
+rectangle_draw(loaded_bitmap *Buffer, v2f Min, v2f Max, f32 r, f32 g, f32 b, f32 a = 1.0f)
 {
 	s32 x_min = f32_round_to_s32(Min.x);
 	s32 y_min = f32_round_to_s32(Min.y);
@@ -374,12 +428,12 @@ rectangle_draw(loaded_bitmap *Buffer, v2f Min, v2f Max, f32 r, f32 g, f32 b)
 		y_max -= Buffer->height;
 	}
 
-	u32 red = f32_round_to_u32(255.0f * r);
-	u32 green = f32_round_to_u32(255.0f * g);
-	u32 blue = f32_round_to_u32(255.0f * b);
-	u32 color = ((red << 16) | (green << 8) | (blue << 0));
+	u32 color = ((f32_round_to_u32(255.0f * a) << 24) |
+				 (f32_round_to_u32(255.0f * r) << 16) |
+				 (f32_round_to_u32(255.0f * g) << 8) |
+				 (f32_round_to_u32(255.0f * b) << 0));
 
-	u8 *pixel_row = (u8 *)Buffer->memory + Buffer->stride * y_min + BITMAP_BYTES_PER_PIXEL * x_min ;
+	u8 *pixel_row = (u8 *)Buffer->memory + Buffer->stride * y_min + BITMAP_BYTES_PER_PIXEL * x_min;
 	for(int row = y_min; row < y_max; row++)
 	{
 		u32 *pixel = (u32 *)pixel_row;
@@ -394,7 +448,7 @@ rectangle_draw(loaded_bitmap *Buffer, v2f Min, v2f Max, f32 r, f32 g, f32 b)
 internal void 
 rectangle_draw(loaded_bitmap *Buffer, v2f Min, v2f Max, v4f Color)
 {
-	rectangle_draw(Buffer, Min, Max, Color.r, Color.g, Color.b);
+	rectangle_draw(Buffer, Min, Max, Color.r, Color.g, Color.b, Color.a);
 }
 
 internal void
@@ -653,6 +707,201 @@ circle_draw(back_buffer *BackBuffer, circle *Circle, f32 r, f32 b, f32 g)
 	}
 }
 
+
+
+#define push_render_element(RenderGroup, type) (type *)push_render_element_(RenderGroup, sizeof(type), RENDER_GROUP_ENTRY_TYPE_##type)
+inline void *
+push_render_element_(render_group *RenderGroup, u32 size, render_group_entry_type Type)
+{
+	void *Result = 0;
+
+	size += sizeof(render_group_entry_header);
+
+	if((RenderGroup->push_buffer_size + size) < RenderGroup->push_buffer_size_max)
+	{
+		render_group_entry_header *Header = (render_group_entry_header *)(RenderGroup->push_buffer_base + RenderGroup->push_buffer_size);
+		Header->Type = Type;
+		Result = (u8 *)Header + sizeof(*Header);
+		RenderGroup->push_buffer_size += size;
+	}
+	else
+	{
+		INVALID_CODE_PATH;
+	}
+
+	return(Result);
+}
+
+inline void
+push_bitmap(render_group *RenderGroup, loaded_bitmap *Bitmap, v3f Offset, v4f Color = V4F(1.0f))
+{
+	render_entry_bitmap *Entry = push_render_element(RenderGroup, render_entry_bitmap);
+	if(Entry)
+	{
+		m3x3 M = RenderGroup->MapToScreenSpace;
+		f32 pixels_per_meter = RenderGroup->pixels_per_meter;
+
+		Entry->EntityBasis.Basis = RenderGroup->DefaultBasis;
+		Entry->EntityBasis.Offset = pixels_per_meter * Offset - V3F(Bitmap->Align, 0);
+		Entry->Bitmap = Bitmap;
+		Entry->Color = Color;
+	}
+}
+
+inline void
+push_rectangle(render_group *RenderGroup, v3f Offset, v2f Dim, v4f Color = V4F(1.0f))
+{
+	render_entry_rectangle *Entry = push_render_element(RenderGroup, render_entry_rectangle);
+	if(Entry)
+	{
+		m3x3 M = RenderGroup->MapToScreenSpace;
+		f32 pixels_per_meter = RenderGroup->pixels_per_meter;
+
+		Entry->EntityBasis.Basis = RenderGroup->DefaultBasis;
+		Entry->EntityBasis.Offset = pixels_per_meter * (Offset - V3F(0.5f * Dim, 0));
+		Entry->Color = Color;
+		Entry->Dim = pixels_per_meter * Dim;
+	}
+}
+
+inline void
+clear(render_group *RenderGroup, v4f Color)
+{
+	render_entry_clear *Entry = push_render_element(RenderGroup, render_entry_clear);
+	if(Entry)
+	{
+		Entry->Color = Color;
+	}
+}
+
+//NOTE(Justin): In what units should the axes be? Pixels or meters?
+
+inline render_entry_coordinate_system * 
+coordinate_system(render_group *RenderGroup, v2f Origin, v2f XAxis, v2f YAxis, v4f Color,
+				 loaded_bitmap *Texture,
+				 loaded_bitmap *NormalMap,
+				 environment_map *Top,
+				 environment_map *Middle,
+				 environment_map *Bottom)
+{
+	render_entry_coordinate_system *Entry = push_render_element(RenderGroup, render_entry_coordinate_system);
+	if(Entry)
+	{
+		m3x3 M = RenderGroup->MapToScreenSpace;
+		f32 pixels_per_meter = RenderGroup->pixels_per_meter;
+
+		v2f X = pixels_per_meter * XAxis;
+		v2f Y = pixels_per_meter * YAxis;
+		v2f O = M * Origin - 0.5f * XAxis - 0.5f * YAxis;
+
+		Entry->Origin = O - Texture->Align;//M * Origin;
+		Entry->XAxis = X;//pixels_per_meter * XAxis;
+		Entry->YAxis = Y;//pixels_per_meter * YAxis;
+		Entry->Color = Color;
+		Entry->Texture = Texture;
+		Entry->NormalMap = NormalMap;
+		Entry->Top = Top;
+		Entry->Middle = Middle;
+		Entry->Bottom = Bottom;
+	}
+
+	return(Entry);
+}
+
+internal void
+render_group_to_output(render_group *RenderGroup, loaded_bitmap *OutputTarget)
+{
+	for(u32 base_address = 0; base_address < RenderGroup->push_buffer_size; )
+	{
+		render_group_entry_header *Header = (render_group_entry_header *)(RenderGroup->push_buffer_base + base_address);
+		base_address += sizeof(*Header);
+
+		void *render_data = (u8 *)Header + sizeof(*Header);
+		switch(Header->Type)
+		{
+			case RENDER_GROUP_ENTRY_TYPE_render_entry_clear:
+			{
+				render_entry_clear *Entry = (render_entry_clear *)render_data;
+				rectangle_draw(OutputTarget, V2F(0.0f, 0.0f), V2F((f32)OutputTarget->width, (f32)OutputTarget->height), Entry->Color);
+				base_address += sizeof(*Entry);
+			} break;
+			case RENDER_GROUP_ENTRY_TYPE_render_entry_bitmap:
+			{
+				render_entry_bitmap *Entry = (render_entry_bitmap *)render_data;
+				ASSERT(Entry->Bitmap);  
+
+				v3f P = Entry->EntityBasis.Basis->P;
+				v2f ScreenP = RenderGroup->MapToScreenSpace * P.xy + Entry->EntityBasis.Offset.xy;
+				bitmap_draw(OutputTarget, Entry->Bitmap, ScreenP.x, ScreenP.y, Entry->Color.a);
+				base_address += sizeof(*Entry);
+			} break;
+			case RENDER_GROUP_ENTRY_TYPE_render_entry_rectangle:
+			{
+				render_entry_rectangle *Entry = (render_entry_rectangle *)render_data;
+
+
+				v3f P = Entry->EntityBasis.Basis->P;
+				v2f ScreenP = RenderGroup->MapToScreenSpace * P.xy + Entry->EntityBasis.Offset.xy;
+				rectangle_draw(OutputTarget, ScreenP, ScreenP + Entry->Dim, Entry->Color);
+				base_address += sizeof(*Entry);
+
+			} break;
+			case RENDER_GROUP_ENTRY_TYPE_render_entry_coordinate_system:
+			{
+				render_entry_coordinate_system *Entry = (render_entry_coordinate_system *)render_data;
+
+				rectangle_draw_slowly(OutputTarget,
+									  Entry->Origin,
+									  Entry->XAxis,
+									  Entry->YAxis,
+									  Entry->Color,
+									  Entry->Texture,
+									  Entry->NormalMap,
+									  Entry->Top, Entry->Middle, Entry->Bottom,
+									  1.0f / RenderGroup->pixels_per_meter);
+
+				v4f Color = {1, 1, 0, 1};
+				v2f Dim = {2, 2};
+
+				v2f P = Entry->Origin;
+				rectangle_draw(OutputTarget, P - Dim, P + Dim, Color);
+
+				P = Entry->Origin + Entry->XAxis;
+				rectangle_draw(OutputTarget, P - Dim, P + Dim, Color);
+
+				P = Entry->Origin + Entry->YAxis;
+				rectangle_draw(OutputTarget, P - Dim, P + Dim, Color);
+
+				P = Entry->Origin + Entry->XAxis + Entry->YAxis;
+				rectangle_draw(OutputTarget, P - Dim, P + Dim, Color);
+				
+
+				base_address += sizeof(*Entry);
+
+			} break;
+
+			INVALID_DEFAULT_CASE;
+		}
+	}
+}
+
+internal render_group *
+render_group_allocate(memory_arena *Arena, u32 push_buffer_size_max, f32 pixels_per_meter, m3x3 MapToScreenSpace)
+{
+	render_group *Result = push_struct(Arena, render_group);
+
+	Result->pixels_per_meter = pixels_per_meter;
+	Result->MapToScreenSpace = MapToScreenSpace;
+	Result->DefaultBasis = push_struct(Arena, render_basis);
+	Result->DefaultBasis->P = V3F(0.0f);
+
+	Result->push_buffer_size = 0;
+	Result->push_buffer_size_max = push_buffer_size_max;
+	Result->push_buffer_base = (u8 *)push_size(Arena, push_buffer_size_max);
+
+	return(Result);
+}
+
 internal void
 circle_draw(back_buffer *BackBuffer, circle *Circle, v3f Color)
 {
@@ -694,204 +943,4 @@ line_horizontal_draw(back_buffer *BackBuffer, f32 y, f32 r, f32 g, f32 b)
 	{
 		*pixel++ = color;
 	}
-}
-
-#define push_render_element(RenderGroup, type) (type *)push_render_element_(RenderGroup, sizeof(type), RENDER_GROUP_ENTRY_TYPE_##type)
-inline void *
-push_render_element_(render_group *RenderGroup, u32 size, render_group_entry_type Type)
-{
-	void *Result = 0;
-
-	size += sizeof(render_group_entry_header);
-
-	if((RenderGroup->push_buffer_size + size) < RenderGroup->push_buffer_size_max)
-	{
-		render_group_entry_header *Header = (render_group_entry_header *)(RenderGroup->push_buffer_base + RenderGroup->push_buffer_size);
-		Header->Type = Type;
-		Result = (u8 *)Header + sizeof(*Header);
-		RenderGroup->push_buffer_size += size;
-	}
-	else
-	{
-		INVALID_CODE_PATH;
-	}
-
-	return(Result);
-}
-
-inline void
-push_piece(render_group *RenderGroup, loaded_bitmap *Texture, loaded_bitmap *NormalMap,
-		v2f Origin, v2f XAxis, v2f YAxis, v2f Align, v2f Dim, v4f Color)
-{
-	render_entry_bitmap *Entry = push_render_element(RenderGroup, render_entry_bitmap);
-	if(Entry)
-	{
-		m3x3 M = RenderGroup->MapToScreenSpace;
-
-		Entry->Texture = Texture;
-		Entry->NormalMap = NormalMap;
-		Entry->Origin = M * Origin - Align;
-		Entry->XAxis = XAxis;
-		Entry->YAxis = YAxis;
-		Entry->Color = Color;
-		Entry->Dim = Dim;
-	}
-}
-
-inline void
-push_bitmap(render_group *RenderGroup, loaded_bitmap *Bitmap, loaded_bitmap *NormalMap,
-		v2f Origin, v2f XAxis, v2f YAxis, v2f Align, f32 alpha = 1.0f)
-{
-	push_piece(RenderGroup, Bitmap, NormalMap, Origin, XAxis, YAxis,
-			Align, V2F(0, 0), V4F(1.0f, 1.0f, 1.0f, alpha));
-}
-
-inline void
-push_rectangle(render_group *RenderGroup, v2f Origin, v2f XAxis, v2f YAxis, v2f Dim, v4f Color)
-{
-	render_entry_rectangle *Entry = push_render_element(RenderGroup, render_entry_rectangle);
-	if(Entry)
-	{
-		m3x3 M = RenderGroup->MapToScreenSpace;
-		f32 pixels_per_meter = RenderGroup->pixels_per_meter;
-
-		v2f HalfDim = 0.5f * RenderGroup->pixels_per_meter * Dim;
-
-		Entry->Origin = M * Origin - HalfDim;
-		Entry->XAxis = pixels_per_meter * XAxis;
-		Entry->YAxis = pixels_per_meter * YAxis;
-		Entry->Color = Color;
-		Entry->Dim = pixels_per_meter * Dim;
-	}
-}
-
-inline void
-clear(render_group *RenderGroup, v4f Color)
-{
-	render_entry_clear *Entry = push_render_element(RenderGroup, render_entry_clear);
-	if(Entry)
-	{
-		Entry->Color = Color;
-	}
-}
-
-//NOTE(Justin): In what units should the axes be? Pixels or meters?
-
-inline render_entry_coordinate_system * 
-coordinate_system(render_group *RenderGroup, v2f Origin, v2f XAxis, v2f YAxis, v4f Color,
-				 loaded_bitmap *Texture,
-				 loaded_bitmap *NormalMap,
-				 environment_map *Top,
-				 environment_map *Middle,
-				 environment_map *Bottom)
-{
-	render_entry_coordinate_system *Entry = push_render_element(RenderGroup, render_entry_coordinate_system);
-	if(Entry)
-	{
-		m3x3 M = RenderGroup->MapToScreenSpace;
-		f32 pixels_per_meter = RenderGroup->pixels_per_meter;
-
-
-		// NOTE(Justin): This requires the coordinate system to be defined
-		// completely in screen space. Which will need to be changed
-		Entry->Origin = Origin;
-		Entry->XAxis = XAxis;
-		Entry->YAxis = YAxis;
-#if 0
-		Entry->Origin = M * Origin - Texture->Align;
-
-		Entry->XAxis = pixels_per_meter * XAxis;
-		Entry->YAxis = pixels_per_meter * YAxis;
-#endif
-		Entry->Color = Color;
-
-		Entry->Texture = Texture;
-		Entry->NormalMap = NormalMap;
-
-		Entry->Top = Top;
-		Entry->Middle = Middle;
-		Entry->Bottom = Bottom;
-	}
-
-	return(Entry);
-}
-
-internal void
-render_group_to_output(render_group *RenderGroup, loaded_bitmap *OutputTarget)
-{
-	for(u32 base_address = 0; base_address < RenderGroup->push_buffer_size; )
-	{
-		render_group_entry_header *Header = (render_group_entry_header *)(RenderGroup->push_buffer_base + base_address);
-		base_address += sizeof(*Header);
-
-		void *render_data = (u8 *)Header + sizeof(*Header);
-		switch(Header->Type)
-		{
-			case RENDER_GROUP_ENTRY_TYPE_render_entry_clear:
-			{
-				render_entry_clear *Entry = (render_entry_clear *)render_data;
-				rectangle_draw(OutputTarget, V2F(0.0f, 0.0f), V2F((f32)OutputTarget->width, (f32)OutputTarget->height), Entry->Color);
-				base_address += sizeof(*Entry);
-			} break;
-			case RENDER_GROUP_ENTRY_TYPE_render_entry_bitmap:
-			{
-				render_entry_bitmap *Entry = (render_entry_bitmap *)render_data;
-				ASSERT(Entry->Texture);  
-				bitmap_draw(OutputTarget, Entry->Texture, Entry->Origin.x, Entry->Origin.y, Entry->Color.a);
-				base_address += sizeof(*Entry);
-			} break;
-			case RENDER_GROUP_ENTRY_TYPE_render_entry_rectangle:
-			{
-				render_entry_rectangle *Entry = (render_entry_rectangle *)render_data;
-
-				rectangle_draw(OutputTarget, Entry->Origin, Entry->Origin + Entry->Dim,
-						Entry->Color);
-				base_address += sizeof(*Entry);
-
-			} break;
-			case RENDER_GROUP_ENTRY_TYPE_render_entry_coordinate_system:
-			{
-				render_entry_coordinate_system *Entry = (render_entry_coordinate_system *)render_data;
-
-				rectangle_draw_slowly(OutputTarget, Entry->Origin, Entry->XAxis, Entry->YAxis, Entry->Color,
-						Entry->Texture, Entry->NormalMap, Entry->Top, Entry->Middle, Entry->Bottom);
-
-				v4f Color = {1, 1, 0, 1};
-				v2f Dim = {2, 2};
-
-				v2f P = Entry->Origin;
-				rectangle_draw(OutputTarget, P - Dim, P + Dim, Color);
-
-				P = Entry->Origin + Entry->XAxis;
-				rectangle_draw(OutputTarget, P - Dim, P + Dim, Color);
-
-				P = Entry->Origin + Entry->YAxis;
-				rectangle_draw(OutputTarget, P - Dim, P + Dim, Color);
-
-				P = Entry->Origin + Entry->XAxis + Entry->YAxis;
-				rectangle_draw(OutputTarget, P - Dim, P + Dim, Color);
-				
-
-				base_address += sizeof(*Entry);
-
-			} break;
-
-			INVALID_DEFAULT_CASE;
-		}
-	}
-}
-
-internal render_group *
-render_group_allocate(memory_arena *Arena, u32 push_buffer_size_max, f32 pixels_per_meter, m3x3 MapToScreenSpace)
-{
-	render_group *Result = push_struct(Arena, render_group);
-
-	Result->pixels_per_meter = pixels_per_meter;
-	Result->MapToScreenSpace = MapToScreenSpace;
-
-	Result->push_buffer_size = 0;
-	Result->push_buffer_size_max = push_buffer_size_max;
-	Result->push_buffer_base = (u8 *)push_size(Arena, push_buffer_size_max);
-
-	return(Result);
 }

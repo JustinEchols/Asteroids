@@ -1,63 +1,7 @@
-/*
-  TODO:
-Collision Detection
-	- Asteroid collisions
- 	- Projectile collisions
-	- Better collision table
-	- Free collision rules
- 
-Physics
-    - Angular velocity
-    - Mass
-    - Asteroid acceleration?
-   
- Asset loading
-
-VfX
-  	- Bitmap transformations (rotations, scaling, ...)
-  	- UV coordinate mapping
-  	- Normal mapping
-
-	- Animations
-		- Lasers/beams
-		- Warping
-		- Shield
-			- Appears on collision
-			- Fades shortly thereafter
-		- Ship phasing
-			- Ship can enter a "flux state" and temporarily phase through
-			objects avoiding collisions
-	- Particles
-		- Ship thrusters
-		- Energy beam
-		- Asteroids destruction (split asteroids, asteroid pariticles)
-
-- SFX
-	- Audio mixer
-  	- Score
-  	- Menu
-
-Optimization pass
-	- Threading
- 	- Profiling
- 	- SIMD
- 	- Intrinsics
-
-Game Design
-	- Enemies?
-	- Destorying an asteoid spawns alien
-	- Alien behavior adheres to the rules of the game of life
-	- Include a weighting so that the alien movement is biased towards the player.
- 
- */
-
-// TODO(Justin) Collision based on whether or not the
-// player is shielded.
 
 #include "game.h"
 #include "game_geometry.h"
 #include "game_geometry.cpp"
-
 #include "game_render_group.cpp"
 #include "game_random.h"
 #include "game_entity.h"
@@ -77,7 +21,7 @@ debug_sound_buffer_fill(sound_buffer *SoundBuffer)
 	s16 *sample = SoundBuffer->samples;
 	for(int sample_index = 0; sample_index < SoundBuffer->sample_count; sample_index++)
 	{
-		s16 sample_value = (s16)(wave_amplitude * sinf(t));
+		s16 sample_value = (s16)(wave_amplitude * sine(t));
 
 		*sample++ = sample_value;
 		*sample++ = sample_value;
@@ -284,7 +228,7 @@ player_collision_handle(entity *Entity)
 		Entity->Pos = V2F(0.0f, 0.0f);
 		Entity->dPos = V2F(0.0f, 0.0f);
 		Entity->Direction = V2F(0.0f, 1.0f);
-		Entity->Right= -1.0f * v2f_perp(Entity->Direction);
+		Entity->Right= -1.0f * perp(Entity->Direction);
 	}
 	else
 	{
@@ -341,7 +285,7 @@ entity_move(game_state *GameState, entity *Entity, v2f ddPos, f32 dt)
 { 
 	world *World = GameState->World;
 
-	f32 ddp_length_squared = v2f_length_squared(ddPos);
+	f32 ddp_length_squared = length_squared(ddPos);
 	if(ddp_length_squared > 1.0f)
 	{
 		ddPos *= (1.0f / f32_sqrt(ddp_length_squared));
@@ -357,7 +301,7 @@ entity_move(game_state *GameState, entity *Entity, v2f ddPos, f32 dt)
 	v2f EntityNewVel = dt * ddPos + Entity->dPos;
 
 	f32 max_speed = 50.0f;
-	f32 dp_length_squared = v2f_length_squared(EntityNewVel);
+	f32 dp_length_squared = length_squared(EntityNewVel);
 	if(dp_length_squared > 75.0f)
 	{
 		if(ABS(EntityNewVel.x) > 50.0f)
@@ -382,7 +326,7 @@ entity_move(game_state *GameState, entity *Entity, v2f ddPos, f32 dt)
 	for(u32 iteration = 0; iteration < 4; iteration++)
 	{
 		f32 t_min = 1.0f;
-		f32 entity_delta_len = v2f_length(EntityDelta);
+		f32 entity_delta_len = length(EntityDelta);
 
 		// TODO(Justin): What to do about epsilons?
 		if(entity_delta_len > 0.0f)
@@ -416,7 +360,7 @@ entity_move(game_state *GameState, entity *Entity, v2f ddPos, f32 dt)
 							if(circles_collide(Entity->Pos, EntityDelta, Entity->radius,
 										TestEntity->Pos, TestEntityDelta, TestEntity->radius, &t_min))
 							{
-								Normal = v2f_normalize(-1.0f * DeltaBetweenCenters);
+								Normal = normalize(-1.0f * DeltaBetweenCenters);
 								HitEntity = TestEntity;
 							}
 						}
@@ -431,7 +375,7 @@ entity_move(game_state *GameState, entity *Entity, v2f ddPos, f32 dt)
 								if(circles_collide(Entity->Pos, EntityDelta, Entity->radius,
 											TestEntity->Pos, TestEntityDelta, TestEntity->radius, &t_min))
 								{
-									Normal = v2f_normalize(-1.0f * DeltaBetweenCenters);
+									Normal = normalize(-1.0f * DeltaBetweenCenters);
 									HitEntity = TestEntity;
 								}
 							}
@@ -498,7 +442,7 @@ entity_move(game_state *GameState, entity *Entity, v2f ddPos, f32 dt)
 						if(Entity->is_shielded)
 						{
 							HitEntity->dPos = Entity->speed * Normal;
-							HitEntity->Direction = v2f_normalize(Entity->dPos);
+							HitEntity->Direction = normalize(Entity->dPos);
 						}
 						else
 						{
@@ -506,15 +450,15 @@ entity_move(game_state *GameState, entity *Entity, v2f ddPos, f32 dt)
 
 							//Entity->dPos = HitEntity->speed * Normal;
 
-							HitEntity->dPos = HitEntity->dPos - 2.0f * v2f_dot(HitEntity->dPos, Normal) * Normal;
-							HitEntity->Direction = v2f_normalize(HitEntity->dPos);
+							HitEntity->dPos = HitEntity->dPos - 2.0f * dot(HitEntity->dPos, Normal) * Normal;
+							HitEntity->Direction = normalize(HitEntity->dPos);
 						}
 
 					}
 					else
 					{
 						Entity->dPos = Entity->speed * Normal;
-						Entity->Direction = v2f_normalize(Entity->dPos);
+						Entity->Direction = normalize(Entity->dPos);
 
 
 					}
@@ -663,7 +607,7 @@ asteroid_add(game_state *GameState, asteroid_size SIZE)
 
 	Entity->speed = f32_rand_percent() * 19.0f;
 
-	Entity->Direction = v2f_normalize(V2F(f32_rand_between(-1.0f, 1.0f), f32_rand_between(-1.0f, 1.0f)));
+	Entity->Direction = normalize(V2F(f32_rand_between(-1.0f, 1.0f), f32_rand_between(-1.0f, 1.0f)));
 
 
 	// TODO(Justin): Make sure that asteroids cannot spwan on top of the player
@@ -717,6 +661,7 @@ projectile_add(game_state *GameState)
 
 	Entity->distance_limit = 200.0f;
 	Entity->Direction = EntityPlayer->Direction;
+	Entity->Right = EntityPlayer->Right;
 	Entity->Pos = EntityPlayer->Pos + EntityPlayer->height * Entity->Direction;
 
 	Entity->speed = 100.0f;
@@ -729,47 +674,6 @@ projectile_add(game_state *GameState)
 
 	return(Entity);
 }
-
-internal entity *
-circle_add(game_state *GameState, v2f Pos, v2f Dir)
-{
-	entity *Entity = entity_add(GameState, ENTITY_CIRCLE);
-
-	entity_flag_set(Entity, ENTITY_FLAG_COLLIDES);
-
-	world *World = GameState->World;
-
-	Entity->Pos = Pos;
-	Entity->Direction = Dir;
-
-	//Entity->Pos = v2f_rand((f32)World->width, (f32)World->height);
-	//Entity->Direction = v2f_normalize(V2F(f32_rand(-1.0f, 1.0f), f32_rand(-1.0f, 1.0f)));
-	Entity->speed = 10.0f;
-	Entity->dPos = Entity->speed * Entity->Direction;
-
-	Entity->radius = 25.0f;
-
-	return(Entity);
-}
-
-internal entity *
-square_add(game_state *GameState, v2f Pos, v2f Dir)
-{
-	entity *Entity = entity_add(GameState, ENTITY_SQUARE);
-
-	entity_flag_set(Entity, ENTITY_FLAG_COLLIDES);
-
-	world *World = GameState->World;
-
-	Entity->Pos = Pos;
-	Entity->Direction = Dir;
-
-	Entity->radius = 25.0f;
-
-	return(Entity);
-}
-
-
 
 #if 0
 internal void
@@ -790,7 +694,7 @@ familiar_update(game_state *GameState, entity *Entity, f32 dt)
 		if(TestEntity->type == ENTITY_PLAYER)
 		{
 			PlayerPos = TestEntity->Pos;
-			f32 test_distance_sq = v2f_length_squared(EntityPos - PlayerPos);
+			f32 test_distance_sq = length_squared(EntityPos - PlayerPos);
 			if(test_distance_sq < distance_sq_max)
 			{
 				Player = *TestEntity;
@@ -875,7 +779,7 @@ bitmap_empty(memory_arena *Arena, s32 width, s32 height, b32 clear_to_zero = tru
 }
 
 internal void 
-sphere_normal_map(loaded_bitmap *EmptyBitmap, f32 roughness)
+sphere_normal_map(loaded_bitmap *EmptyBitmap, f32 roughness, f32 cx = 1.0f, f32 cy = 1.0f)
 {
 	f32 inv_width = 1.0f / (f32)(EmptyBitmap->width - 1);
 	f32 inv_height = 1.0f / (f32)(EmptyBitmap->height - 1);
@@ -887,11 +791,12 @@ sphere_normal_map(loaded_bitmap *EmptyBitmap, f32 roughness)
 		for(s32 x = 0; x < EmptyBitmap->width; x++)
 		{
 			v2f BitmapUV = {inv_width * (f32)x, inv_height * (f32)y};
-			f32 Nx = 2.0f * BitmapUV.x - 1.0f;
-			f32 Ny = 2.0f * BitmapUV.y - 1.0f;
+
+			f32 Nx = cx * (2.0f * BitmapUV.x - 1.0f);
+			f32 Ny = cy * (2.0f * BitmapUV.y - 1.0f);
 
 			f32 root_term = 1.0f - Nx * Nx - Ny * Ny;
-			v3f Normal = {0, 0, 1};
+			v3f Normal = {0, ONE_OVER_ROOT_TWO, ONE_OVER_ROOT_TWO};
 			f32 Nz = 0.0f;
 			if(root_term >= 0.0f)
 			{
@@ -899,13 +804,50 @@ sphere_normal_map(loaded_bitmap *EmptyBitmap, f32 roughness)
 				Normal = {Nx, Ny, Nz};
 			}
 
-			
-			//Normal = v3f_normalize(Normal);
-
 			v4f Color = {255.0f * (0.5f * (Normal.x + 1.0f)),
 						 255.0f * (0.5f * (Normal.y + 1.0f)),
 						 255.0f * (0.5f * (Normal.z + 1.0f)),
 						 255.0f * roughness};
+
+			*pixel++ = (((u32)(Color.a + 0.5f) << 24) |
+						((u32)(Color.r + 0.5f) << 16) |
+						((u32)(Color.g + 0.5f) << 8) |
+						((u32)(Color.b + 0.5f) << 0));
+		}
+		pixel_row += EmptyBitmap->stride;
+	}
+}
+
+internal void 
+sphere_diffuse_map(loaded_bitmap *EmptyBitmap, f32 cx = 1.0f, f32 cy = 1.0f)
+{
+	f32 inv_width = 1.0f / (f32)(EmptyBitmap->width - 1);
+	f32 inv_height = 1.0f / (f32)(EmptyBitmap->height - 1);
+
+	u8 *pixel_row = (u8 *)EmptyBitmap->memory;
+	for(s32 y = 0; y < EmptyBitmap->height; y++)
+	{
+		u32 *pixel = (u32 *)pixel_row;
+		for(s32 x = 0; x < EmptyBitmap->width; x++)
+		{
+			v2f BitmapUV = {inv_width * (f32)x, inv_height * (f32)y};
+
+			f32 Nx = cx * (2.0f * BitmapUV.x - 1.0f);
+			f32 Ny = cy * (2.0f * BitmapUV.y - 1.0f);
+
+			f32 root_term = 1.0f - Nx * Nx - Ny * Ny;
+			f32 alpha = 0.0f;
+			if(root_term >= 0.0f)
+			{
+				alpha = 1.0f;
+			}
+
+			v3f BaseColor = {0.0f, 0.0f, 0.0f};
+			alpha *= 255.0f;
+			v4f Color = {alpha * BaseColor.x,
+						 alpha * BaseColor.y,
+						 alpha * BaseColor.z,
+						 alpha};
 
 			*pixel++ = (((u32)(Color.a + 0.5f) << 24) |
 						((u32)(Color.r + 0.5f) << 16) |
@@ -929,27 +871,14 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 		entity *EntityNull = entity_add(GameState, ENTITY_NULL);
 
 		//GameState->TestSound = wav_file_read_entire("sfx/bloop_00.wav");
-		GameState->Background = bitmap_file_read_entire("space_background.bmp");
 
+		GameState->Background = bitmap_file_read_entire("space_background.bmp");
 		GameState->Ship = bitmap_file_read_entire("ship/blueships1_up.bmp");
 		GameState->ShipNormalMap = bitmap_file_read_entire("ship/blueships1normal.bmp");
-
 		GameState->TestBackground= bitmap_file_read_entire("test_background.bmp");
 		GameState->TestTree = bitmap_file_read_entire("tree00.bmp");
-
-		loaded_bitmap *TestTree = &GameState->TestTree;
-
-
-		loaded_bitmap *ShipBitmap = &GameState->Ship;
-		ShipBitmap->Align = V2F((f32)ShipBitmap->width / 2.0f, (f32)ShipBitmap->height / 2.0f);
-
 		GameState->AsteroidBitmap = bitmap_file_read_entire("asteroids/01.bmp");
-		loaded_bitmap *AsteroidBitmap = &GameState->AsteroidBitmap;
-		AsteroidBitmap->Align = V2F((f32)AsteroidBitmap->width / 2.0f, (f32)AsteroidBitmap->height / 2.0f);
-
 		GameState->LaserBlueBitmap = bitmap_file_read_entire("lasers/laser_small_blue.bmp");
-		loaded_bitmap *LaserBlueBitmap = &GameState->LaserBlueBitmap;
-		LaserBlueBitmap->Align = V2F((f32)LaserBlueBitmap->width / 2.0f, (f32)LaserBlueBitmap->height / 2.0f);
 
 		memory_arena_initialize(&GameState->WorldArena, GameMemory->total_size - sizeof(game_state),
 				(u8 *)GameMemory->permanent_storage + sizeof(game_state));
@@ -957,6 +886,7 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 
 		GameState->pixels_per_meter = 5.0f;
 
+		GameState->ScreenCenter = 0.5f * V2F((f32)BackBuffer->width, (f32)BackBuffer->height);
 		world *World = GameState->World;
 		World->Dim.x = (f32)BackBuffer->width / GameState->pixels_per_meter;
 		World->Dim.y = (f32)BackBuffer->height / GameState->pixels_per_meter;
@@ -987,7 +917,8 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 		*M = InverseScreenOffset * Scale * InverseWorldTranslate;
 
 		GameState->TestBuffer = bitmap_empty(&GameState->WorldArena, GameState->Background.width, GameState->Background.height, true);
-		bitmap_draw(&GameState->TestBuffer, &GameState->Background, 0, 0);
+		//bitmap_draw(&GameState->TestBuffer, &GameState->Background, 0, 0);
+		bitmap_draw(&GameState->TestBuffer, &GameState->TestBackground, 0, 0);
 
 		GameMemory->is_initialized = true;
 	}
@@ -1000,14 +931,15 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 				GameMemory->transient_storage_size - sizeof(transient_state),
 				(u8 *)GameMemory->transient_storage + sizeof(transient_state));
 
-		GameState->TreeNormalMap = bitmap_empty(&TransientState->TransientArena, GameState->TestTree.width, GameState->TestTree.height, false);
-		
-		// NOTE(Justin): roughness = 0 samples from top env map always
-		sphere_normal_map(&GameState->TreeNormalMap, 0.0f);
+		GameState->TestDiffuse = bitmap_empty(&TransientState->TransientArena, 256, 256, false);
+		sphere_diffuse_map(&GameState->TestDiffuse);
+		rectangle_draw(&GameState->TestDiffuse, V2F(0, 0), V2F((f32)GameState->TestDiffuse.width, (f32)GameState->TestDiffuse.height), V4F(0.5f, 0.5f, 0.5f, 1.0f));
+		GameState->TestNormal = bitmap_empty(&TransientState->TransientArena, GameState->TestDiffuse.width, GameState->TestDiffuse.height, false);
+		sphere_normal_map(&GameState->TestNormal, 0.0f);
+
 
 		TransientState->env_map_width = 512;
 		TransientState->env_map_height = 256;
-
 		for(u32 map_index = 0; map_index < ARRAY_COUNT(TransientState->EnvMaps); map_index++)
 		{
 			environment_map *Map = TransientState->EnvMaps + map_index;
@@ -1023,19 +955,15 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 		TransientState->is_initialized = true;
 	}
 
-
-
 	v2f BottomLeft = {5.0f, 5.0f};
-
 	world *World = GameState->World;
-
-
 
 	entity *EntityPlayer = entity_get(GameState, GameState->player_entity_index);
 
-	f32 dt = GameInput->dt_for_frame;
 	game_controller_input *KeyboardController = &GameInput->Controller;
 
+	// TODO(Justin): Formalize push time transforms.
+	f32 dt = GameInput->dt_for_frame;
 	m3x3 R = m3x3_identity();
 	if(KeyboardController->Left.ended_down)
 	{
@@ -1066,7 +994,7 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 	render_group *RenderGroup = render_group_allocate(&TransientState->TransientArena, MEGABYTES(1),
 																						pixels_per_meter, M);
 
-	bitmap_draw(DrawBuffer, &GameState->TestBuffer, 0.0f, 0.0f);
+	bitmap_draw(DrawBuffer, &GameState->Background, 0.0f, 0.0f);
 
 	for(u32 entity_index = 1; entity_index < GameState->entity_count; entity_index++)
 	{
@@ -1105,42 +1033,34 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 				}
 
 				//push_bitmap(RenderGroup, &GameState->Ship, 0,
-				//			Entity->Pos, Entity->Right, Entity->Direction, GameState->Ship.Align);
+				//			Entity->Pos, Entity->Right, Entity->Direction);
 #if 0
-
 				v2f XAxis = Entity->base_half_width * Entity->Right;
 				v2f YAxis = Entity->height * Entity->Direction;
 				v2f Origin = Entity->Pos;
 				
 				coordinate_system(RenderGroup, Origin, XAxis, YAxis,
-								 Gray(1.0f),
-								 &GameState->TestTree, 0,0, 0, 0);
+						Gray(1.0f), &GameState->Ship, 0, 0, 0, 0);
 
-#else
+
 				v2f XAxis = (f32)GameState->Ship.width * Entity->Right;
 				v2f YAxis = (f32)GameState->Ship.height * Entity->Direction;
-				v2f Origin = Entity->Pos;
+				v2f ScreenPos = M * Entity->Pos;
+				v2f Origin = ScreenPos - 0.5f * XAxis - 0.5f * YAxis;
 				
 				coordinate_system(RenderGroup, Origin, XAxis, YAxis,
 						Gray(1.0f), &GameState->Ship, 0, 0, 0, 0);
 
-				push_rectangle(RenderGroup, Entity->Pos, V2F(1.0f, 0.0f), V2F(0.0f, 1.0f), V2F(2.0f, 2.0f), V4F(1.0f, 1.0f, 0.0f, 1.0f));
-
-				player_polygon_draw(BackBuffer, GameState, BottomLeft, Entity);
 #endif
-
-
-
-
+				push_rectangle(RenderGroup, V3F(0.0f), V2F(2.0f), V4F(1.0f, 1.0f, 0.0f, 1.0f));
+				player_polygon_draw(BackBuffer, GameState, BottomLeft, Entity);
 
 			} break;
 			case ENTITY_ASTEROID:
 			{
 				if(!entity_flag_is_set(Entity, ENTITY_FLAG_NON_SPATIAL))
 				{
-					push_bitmap(RenderGroup, &GameState->AsteroidBitmap, 0,
-							Entity->Pos, -1.0f * v2f_perp(Entity->Direction), Entity->Direction,
-							GameState->AsteroidBitmap.Align);
+					//push_bitmap(RenderGroup, &GameState->AsteroidBitmap, Entity->Pos, -1.0f * perp(Entity->Direction), Entity->Direction);
 				}
 
 			} break;
@@ -1148,8 +1068,7 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 			{
 				//familiar_update(GameState, Entity, dt);
 
-				//push_bitmap(&RenderGroup, &GameState->AsteroidBitmap, 0, Entity->Pos,
-				//		-1.0f * v2f_perp(Entity->Direction), Entity->Direction, GameState->AsteroidBitmap.Align);
+				//push_bitmap(&RenderGroup, &GameState->AsteroidBitmap, 0, Entity->Pos, -1.0f * perp(Entity->Direction), Entity->Direction);
 
 				//debug_vector_draw_at_point(BackBuffer, AsteroidScreenPos, Entity->Direction);
 				//v2f Alignment = {(f32)GameState->AsteroidBitmap.width / 2.0f,
@@ -1163,7 +1082,7 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 
 				v2f OldPos = Entity->Pos;
 
-				f32 distance_traveled = v2f_length(Entity->Pos - OldPos);
+				f32 distance_traveled = length(Entity->Pos - OldPos);
 				Entity->distance_limit -= distance_traveled;
 
 				if(Entity->distance_limit == 0.0f)
@@ -1173,9 +1092,15 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 
 				if(!entity_flag_is_set(Entity, ENTITY_FLAG_NON_SPATIAL))
 				{
-					push_bitmap(RenderGroup, &GameState->LaserBlueBitmap, 0, Entity->Pos,
-							-1.0f * v2f_perp(Entity->Direction), Entity->Direction,
-							GameState->LaserBlueBitmap.Align);
+
+					v2f XAxis = perp((f32)GameState->LaserBlueBitmap.width * Entity->Right);
+
+					v2f YAxis = perp((f32)GameState->LaserBlueBitmap.height * Entity->Direction);
+					v2f ScreenPos = M * Entity->Pos;
+					v2f Origin = ScreenPos - 0.5f * XAxis - 0.5f * YAxis;
+				
+					coordinate_system(RenderGroup, Origin, XAxis, YAxis,
+							V4F(1.0f), &GameState->LaserBlueBitmap, 0, 0, 0, 0);
 				}
 			} break;
 
@@ -1188,45 +1113,77 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 		}
 	}
 
-	//rectangle_draw(back_buffer *BackBuffer, v2f Min, v2f Max, f32 r, f32 g, f32 b);
-	//rectangle_draw(back_buffer *BackBuffer, v2f Min, v2f Max, f32 r, f32 g, f32 b);
-	//rectangle_draw(back_buffer *BackBuffer, v2f Min, v2f Max, f32 r, f32 g, f32 b);
-
-#if 0
 	GameState->time += GameInput->dt_for_frame;
 	f32 angle = GameState->time;
-	v2f Disp = 50.0f * V2F(cosf(angle), 0.0f);
+#if 0
+
+	v4f MapColors[] = 
+	{
+		{1, 0, 0, 1},
+		{0, 1, 0, 1},
+		{0, 0, 1, 1}
+	};
+
+	u32 checker_width = 16;
+	u32 checker_height = 16;
+	v2f CheckerOffset = V2F((f32)checker_width, (f32)checker_height);
+	for(u32 map_index = 0; map_index < ARRAY_COUNT(TransientState->EnvMaps); map_index++)
+	{
+		environment_map *Map = TransientState->EnvMaps + map_index;
+		loaded_bitmap *LOD = Map->LOD;
+		b32 row_checker_on = false;
+		for(s32 y = 0; y < LOD->height; y += checker_height)
+		{
+			b32 checker_on = row_checker_on;
+			for(s32 x = 0; x < LOD->width; x += checker_width)
+			{
+				v4f Color = checker_on ? MapColors[map_index] : V4F(0.0f, 0.0f, 0.0f, 1.0f);
+				v2f CheckerXY = V2F((f32)x, (f32)y);
+				rectangle_draw(LOD, CheckerXY, CheckerXY + CheckerOffset, Color);
+				checker_on = !checker_on;
+			}
+			row_checker_on = !row_checker_on;
+		}
+	}
+	TransientState->EnvMaps[0].zp = -2.5f;
+	TransientState->EnvMaps[1].zp = 0.0f;
+	TransientState->EnvMaps[2].zp = 2.5f;
+
+
+
+	v2f Disp = V2F(100.0f * cosine(angle / PI32), 0.0f);
 
 	v2f ScreenCenter = 0.5f * V2F((f32)BackBuffer->width, (f32)BackBuffer->height);
 	v2f Origin = ScreenCenter;
-	v2f XAxis = 120.0f * V2F(1.0f, 0.0f);
-	v2f YAxis = v2f_perp(XAxis);
-	v4f Color = {1,1,1,1,};
+	v2f XAxis = 100.0f * V2F(cosine(angle / PI32), sine(angle / PI32));
+	v2f YAxis = perp(XAxis);
+	v4f Color = {1,1,1,1};
 
-	coordinate_system(RenderGroup, &GameState->TestTree, &GameState->TreeNormalMap,
-			Origin, XAxis, YAxis, Color, 0, 0, 0);
+	coordinate_system(RenderGroup, Origin - 0.5f * XAxis - 0.5f * YAxis, XAxis, YAxis,
+						Color,
+						&GameState->TestDiffuse,
+						&GameState->TestNormal,
+						TransientState->EnvMaps + 2,
+						TransientState->EnvMaps + 1,
+						TransientState->EnvMaps + 0);
 
-#else
-
-	v4f Color = V4F(1.0f, 1.0f, 1.0f, 1.0f);
 	v2f MapPos = {0.0f, 0.0f};
 	for(u32 map_index = 0; map_index < ARRAY_COUNT(TransientState->EnvMaps); map_index++)
 	{
 		environment_map *EnvMap = TransientState->EnvMaps + map_index;
-		loaded_bitmap *LOD = &EnvMap->LOD[0];
+		loaded_bitmap *LOD = EnvMap->LOD;
 
 		v2f XAxis = 0.5f * V2F((f32)LOD->width, 0.0f);
 		v2f YAxis = 0.5f * V2F(0.0f, (f32)LOD->height);
 
 		coordinate_system(RenderGroup, MapPos, XAxis, YAxis,
 				Color,
-				&TransientState->EnvMaps[0].LOD[0], 0, 0, 0, 0);
+				LOD, 0, 0, 0, 0);
 
-		MapPos += {0.0f, LOD->height + 6.0f};
-
-
+		MapPos += YAxis + V2F(0.0f, 2.0f);
 	}
 #endif
+	push_bitmap(RenderGroup, &GameState->TestTree, V3F(0.0f), V4F(1.0f));
 	render_group_to_output(RenderGroup, DrawBuffer);
 	temporary_memory_end(RenderMemory);
 }
