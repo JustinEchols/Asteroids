@@ -144,6 +144,18 @@ V2F(f32 x, f32 y)
 	return(Result);
 }
 
+inline v2f
+V2F(f32 c)
+{
+	v2f Result;
+
+	Result.x = c;
+	Result.y = c;
+
+	return(Result);
+}
+
+
 inline v3f
 V3F(f32 x, f32 y, f32 z)
 {
@@ -152,6 +164,29 @@ V3F(f32 x, f32 y, f32 z)
 	Result.x = x;
 	Result.y = y;
 	Result.z = z;
+
+	return(Result);
+}
+
+inline v3f
+V3F(v2f XY, f32 z)
+{
+	v3f Result;
+	
+	Result.xy = XY;
+	Result.z = z;
+
+	return(Result);
+}
+
+inline v3f
+V3F(f32 c)
+{
+	v3f Result;
+
+	Result.x = c;
+	Result.y = c;
+	Result.z = c;
 
 	return(Result);
 }
@@ -396,6 +431,18 @@ operator +(v3f A, v3f B)
 	Result.x = A.x + B.x;
 	Result.y = A.y + B.y;
 	Result.z = A.z + B.z;
+
+	return(Result);
+}
+
+inline v3f
+operator -(v3f A, v3f B)
+{
+	v3f Result;
+
+	Result.x = A.x - B.x;
+	Result.y = A.y - B.y;
+	Result.z = A.z - B.z;
 
 	return(Result);
 }
