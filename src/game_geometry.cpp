@@ -24,7 +24,7 @@ circle_support_point(circle *Circle, v2f Dir)
 internal v2f
 circle_tangent(circle *Circle, v2f Dir)
 {
-	v2f Result = v2f_perp(Circle->radius * Dir);
+	v2f Result = perp(Circle->radius * Dir);
 
 	return(Result);
 }
@@ -71,7 +71,7 @@ sat_projected_interval(v2f *Vertices, u32 vertex_count, v2f ProjectedAxis)
 	{
 		v2f Vertex = Vertices[vertex_i];
 
-		f32 c = v2f_dot(Vertex, ProjectedAxis);
+		f32 c = dot(Vertex, ProjectedAxis);
 		min = MIN(c, min);
 		max = MAX(c, max);
 	}
@@ -93,8 +93,8 @@ circle_project_onto_axis(circle *Circle, v2f ProjectedAxis)
 	v2f CircleMin = circle_support_point(Circle, -1.0f * ProjectedAxis);
 	v2f CircleMax = circle_support_point(Circle, ProjectedAxis);
 
-	f32 projected_min = v2f_dot(CircleMin, ProjectedAxis);
-	f32 projected_max = v2f_dot(CircleMax, ProjectedAxis);
+	f32 projected_min = dot(CircleMin, ProjectedAxis);
+	f32 projected_max = dot(CircleMax, ProjectedAxis);
 
 	min = MIN(projected_min, min);
 	max = MAX(projected_max, max);
@@ -119,12 +119,12 @@ triangle_closest_point_to_circle(triangle *Triangle, circle *Circle)
 
 	v2f ClosestPoint = Triangle->Vertices[0];
 	v2f CenterToVertex = ClosestPoint - Circle->Center;
-	f32 min_sq_distance = v2f_dot(CenterToVertex, CenterToVertex);
+	f32 min_sq_distance = dot(CenterToVertex, CenterToVertex);
 	for(u32 vertex_i = 1; vertex_i < ARRAY_COUNT(Triangle->Vertices); vertex_i++)
 	{
 		v2f Vertex = Triangle->Vertices[vertex_i];
 		CenterToVertex = Vertex - Circle->Center;
-		f32 sq_distance = v2f_dot(CenterToVertex, CenterToVertex);
+		f32 sq_distance = dot(CenterToVertex, CenterToVertex);
 		if(sq_distance < min_sq_distance)
 		{
 			ClosestPoint = Vertex;
@@ -143,12 +143,12 @@ closest_point_to_circle(v2f *Vertices, u32 vertex_count, circle *Circle)
 
 	v2f ClosestPoint = Vertices[0];
 	v2f CenterToVertex = ClosestPoint - Circle->Center;
-	f32 min_sq_distance = v2f_dot(CenterToVertex, CenterToVertex);
+	f32 min_sq_distance = dot(CenterToVertex, CenterToVertex);
 	for(u32 vertex_i = 1; vertex_i < vertex_count; vertex_i++)
 	{
 		v2f Vertex = Vertices[vertex_i];
 		CenterToVertex = Vertex - Circle->Center;
-		f32 sq_distance = v2f_dot(CenterToVertex, CenterToVertex);
+		f32 sq_distance = dot(CenterToVertex, CenterToVertex);
 		if(sq_distance < min_sq_distance)
 		{
 			ClosestPoint = Vertex;
@@ -173,15 +173,15 @@ poly_and_circle_collides(v2f *Vertices, u32 vertex_count, circle Circle, v2f *No
 	{
 		v2f P0 = Vertices[vertex_i];
 		v2f P1 = Vertices[(vertex_i + 1) % vertex_count];
-		v2f D = P1 - P0;
+		v2f Edge = P1 - P0;
 
-		v2f ProjectedAxis = v2f_normalize(-1.0f * v2f_perp(D));
+		v2f ProjectedAxis = normalize(-1.0f * perp(Edge));
 
 		interval PolyInterval = sat_projected_interval(Vertices, vertex_count, ProjectedAxis);
 		interval CircleInterval = circle_project_onto_axis(&Circle, ProjectedAxis);
 
-		if(!((CircleInterval.max >= PolyInterval.min) &&
-			(PolyInterval.max >= CircleInterval.min)))
+		if(((CircleInterval.max < PolyInterval.min) ||
+			(PolyInterval.max < CircleInterval.min)))
 		{
 
 			return(collides);
@@ -193,17 +193,16 @@ poly_and_circle_collides(v2f *Vertices, u32 vertex_count, circle Circle, v2f *No
 			min_length = overlap;
 			*Normal = ProjectedAxis;
 		}
-
 	}
 
 	v2f ClosestPoint = closest_point_to_circle(Vertices, vertex_count, &Circle);
-	v2f ProjectedAxis = v2f_normalize(ClosestPoint - Circle.Center);
+	v2f ProjectedAxis = normalize(ClosestPoint - Circle.Center);
 
 	interval PolyInterval = sat_projected_interval(Vertices, vertex_count, ProjectedAxis);
 	interval CircleInterval = circle_project_onto_axis(&Circle, ProjectedAxis);
 
-	if(!((CircleInterval.max >= PolyInterval.min) &&
-		(PolyInterval.max >= CircleInterval.min)))
+	if(((CircleInterval.max < PolyInterval.min) ||
+		(PolyInterval.max < CircleInterval.min)))
 	{
 		return(collides);
 	}
@@ -230,7 +229,7 @@ circles_collide(v2f CircleACenter, v2f CircleADelta, f32 radius_a,
 	f32 radii_sum = radius_b + radius_a;
 	v2f RelVel = CircleBDelta - CircleADelta;
 
-	f32 c = v2f_dot(DeltaBetweenCenters, DeltaBetweenCenters) - SQUARE(radii_sum);
+	f32 c = dot(DeltaBetweenCenters, DeltaBetweenCenters) - SQUARE(radii_sum);
 	if(c < 0.0f)
 	{
 		// NOTE(Justin): The distance squared of the vector
@@ -240,7 +239,7 @@ circles_collide(v2f CircleACenter, v2f CircleADelta, f32 radius_a,
 	}
 	else
 	{
-		f32 a = v2f_dot(RelVel, RelVel);
+		f32 a = dot(RelVel, RelVel);
 		f32 epsilon = 0.001f;
 		if(a < epsilon)
 		{
@@ -249,7 +248,7 @@ circles_collide(v2f CircleACenter, v2f CircleADelta, f32 radius_a,
 		}
 		else
 		{
-			f32 b = v2f_dot(DeltaBetweenCenters, RelVel);
+			f32 b = dot(DeltaBetweenCenters, RelVel);
 			if(b >= 0.0f)
 			{
 				// NOTE(Justin): Circles are not moving towards each

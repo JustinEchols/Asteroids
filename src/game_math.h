@@ -217,6 +217,17 @@ V4F(f32 c)
 	return(Result);
 }
 
+inline v4f
+V4F(v3f XYZ, f32 w)
+{
+	v4f Result;
+
+	Result.xyz = XYZ;
+	Result.w = w;
+
+	return(Result);
+}
+
 //
 // NOTE(Justin): Scalar operations
 //
@@ -478,7 +489,7 @@ normalize(v3f V)
 {
 	v3f Result;
 
-	Result = (1.0f / length(V))* V;
+	Result = (1.0f / length(V)) * V;
 
 	return(Result);
 }

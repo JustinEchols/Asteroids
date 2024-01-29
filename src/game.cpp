@@ -1,15 +1,14 @@
 
 #include "game.h"
-#include "game_geometry.h"
 #include "game_geometry.cpp"
 #include "game_render_group.cpp"
 #include "game_random.h"
-#include "game_entity.h"
+#include "game_entity.cpp"
 #include "game_string.cpp"
 #include "game_asset.cpp"
 
 internal void
-debug_sound_buffer_fill(sound_buffer *SoundBuffer)
+game_output_sound(game_state *GameState, sound_buffer *SoundBuffer, s32 tone_hz)
 {
 	s16 wave_amplitude = 3000;
 	int wave_frequency = 256;
@@ -47,7 +46,7 @@ sound_buffer_fill(game_state *GameState, sound_buffer *SoundBuffer)
 internal v2f
 lerp_points(v2f P1, v2f P2, f32 t)
 {
-	v2f Result = {0};
+	v2f Result = {};
 
 	Result.x = (1 - t) * P1.x + t * P2.x;
 	Result.y = (1 - t) * P1.y + t * P2.y;
@@ -801,7 +800,7 @@ sphere_normal_map(loaded_bitmap *EmptyBitmap, f32 roughness, f32 cx = 1.0f, f32 
 			if(root_term >= 0.0f)
 			{
 				Nz = f32_sqrt(root_term);
-				Normal = {Nx, Ny, Nz};
+				Normal = V3F(Nx, Ny, Nz);
 			}
 
 			v4f Color = {255.0f * (0.5f * (Normal.x + 1.0f)),
@@ -859,28 +858,32 @@ sphere_diffuse_map(loaded_bitmap *EmptyBitmap, f32 cx = 1.0f, f32 cy = 1.0f)
 }
 
 
-internal void
-update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer *SoundBuffer, game_input *GameInput)
+extern "C" GAME_UPDATE_AND_RENDER(GameUpdateAndRender)
 {
-	ASSERT(sizeof(game_state) <= GameMemory->total_size);
+
+	ASSERT(sizeof(game_state) <= GameMemory->permanent_storage_size);
 	game_state *GameState = (game_state *)GameMemory->permanent_storage;
+
 	if(!GameMemory->is_initialized)
 	{
+
 		// NOTE(Justin): Reserve slot 0 for the null entity.
 
 		entity *EntityNull = entity_add(GameState, ENTITY_NULL);
 
 		//GameState->TestSound = wav_file_read_entire("sfx/bloop_00.wav");
 
-		GameState->Background = bitmap_file_read_entire("space_background.bmp");
-		GameState->Ship = bitmap_file_read_entire("ship/blueships1_up.bmp");
-		GameState->ShipNormalMap = bitmap_file_read_entire("ship/blueships1normal.bmp");
-		GameState->TestBackground= bitmap_file_read_entire("test_background.bmp");
-		GameState->TestTree = bitmap_file_read_entire("tree00.bmp");
-		GameState->AsteroidBitmap = bitmap_file_read_entire("asteroids/01.bmp");
-		GameState->LaserBlueBitmap = bitmap_file_read_entire("lasers/laser_small_blue.bmp");
+		GameState->Background = debug_bitmap_file_read_entire(Thread, GameMemory->debug_platform_file_read_entire, "space_background.bmp");
+		GameState->Ship = debug_bitmap_file_read_entire(Thread, GameMemory->debug_platform_file_read_entire, "ship/blueships1_up.bmp");
+		GameState->ShipNormalMap = debug_bitmap_file_read_entire(Thread, GameMemory->debug_platform_file_read_entire, "ship/blueships1normal.bmp");
+		GameState->AsteroidBitmap = debug_bitmap_file_read_entire(Thread, GameMemory->debug_platform_file_read_entire, "asteroids/01.bmp");
+		GameState->LaserBlueBitmap = debug_bitmap_file_read_entire(Thread, GameMemory->debug_platform_file_read_entire, "lasers/laser_small_blue.bmp");
+		
+		//GameState->TestBackground= bitmap_file_read_entire("test_background.bmp");
+		//GameState->TestTree = bitmap_file_read_entire("tree00.bmp");
 
-		memory_arena_initialize(&GameState->WorldArena, GameMemory->total_size - sizeof(game_state),
+
+		memory_arena_initialize(&GameState->WorldArena, GameMemory->permanent_storage_size - sizeof(game_state),
 				(u8 *)GameMemory->permanent_storage + sizeof(game_state));
 		GameState->World = push_struct(&GameState->WorldArena, world);
 
@@ -896,18 +899,6 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 
 		srand(2023);
 
-		// TODO(Justin): This size of the asteroid should be random.
-
-		//asteroid_add(GameState, ASTEROID_SMALL, V2F(0.0f, 0.5f * World->Dim.y), V2F(-1.0f, 0.0f));
-		//asteroid_add(GameState, ASTEROID_SMALL, V2F(-100.0f, 0.5f * World->Dim.y), V2F(1.0f, 0.0f));
-
-		//familiar_add(GameState);
-#if 0
-		for(u32 i = 0; i < 20; i++)
-		{
-			asteroid_add(GameState, ASTEROID_SMALL);
-		}
-#endif
 		m3x3 *M = &GameState->MapToScreenSpace;
 
 		m3x3 InverseWorldTranslate = m3x3_translation(V2F(World->Dim.x, World->Dim.y));
@@ -918,7 +909,7 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 
 		GameState->TestBuffer = bitmap_empty(&GameState->WorldArena, GameState->Background.width, GameState->Background.height, true);
 		//bitmap_draw(&GameState->TestBuffer, &GameState->Background, 0, 0);
-		bitmap_draw(&GameState->TestBuffer, &GameState->TestBackground, 0, 0);
+		bitmap_draw(&GameState->TestBuffer, &GameState->TestBackground, 0, 0.0f);
 
 		GameMemory->is_initialized = true;
 	}
@@ -932,11 +923,12 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 				(u8 *)GameMemory->transient_storage + sizeof(transient_state));
 
 		GameState->TestDiffuse = bitmap_empty(&TransientState->TransientArena, 256, 256, false);
-		sphere_diffuse_map(&GameState->TestDiffuse);
-		rectangle_draw(&GameState->TestDiffuse, V2F(0, 0), V2F((f32)GameState->TestDiffuse.width, (f32)GameState->TestDiffuse.height), V4F(0.5f, 0.5f, 0.5f, 1.0f));
+		rectangle_draw(&GameState->TestDiffuse, V2F(0.0f), V2F((f32)GameState->TestDiffuse.width, (f32)GameState->TestDiffuse.height), V4F(V3F(0.5f), 1.0f));
+		
 		GameState->TestNormal = bitmap_empty(&TransientState->TransientArena, GameState->TestDiffuse.width, GameState->TestDiffuse.height, false);
-		sphere_normal_map(&GameState->TestNormal, 0.0f);
 
+		sphere_normal_map(&GameState->TestNormal, 0.0f);
+		sphere_diffuse_map(&GameState->TestDiffuse);
 
 		TransientState->env_map_width = 512;
 		TransientState->env_map_height = 256;
@@ -994,7 +986,7 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 	render_group *RenderGroup = render_group_allocate(&TransientState->TransientArena, MEGABYTES(1),
 																						pixels_per_meter, M);
 
-	bitmap_draw(DrawBuffer, &GameState->Background, 0.0f, 0.0f);
+	bitmap_draw(DrawBuffer, &GameState->Background, 0.0f, 0.0, 1.0f);
 
 	for(u32 entity_index = 1; entity_index < GameState->entity_count; entity_index++)
 	{
@@ -1042,18 +1034,20 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 				coordinate_system(RenderGroup, Origin, XAxis, YAxis,
 						Gray(1.0f), &GameState->Ship, 0, 0, 0, 0);
 
+#else
 
 				v2f XAxis = (f32)GameState->Ship.width * Entity->Right;
 				v2f YAxis = (f32)GameState->Ship.height * Entity->Direction;
-				v2f ScreenPos = M * Entity->Pos;
+				v2f ScreenPos = M * Entity->Pos + V2F(1.0f);
 				v2f Origin = ScreenPos - 0.5f * XAxis - 0.5f * YAxis;
 				
 				coordinate_system(RenderGroup, Origin, XAxis, YAxis,
 						Gray(1.0f), &GameState->Ship, 0, 0, 0, 0);
 
-#endif
 				push_rectangle(RenderGroup, V3F(0.0f), V2F(2.0f), V4F(1.0f, 1.0f, 0.0f, 1.0f));
 				player_polygon_draw(BackBuffer, GameState, BottomLeft, Entity);
+#endif
+
 
 			} break;
 			case ENTITY_ASTEROID:
@@ -1145,9 +1139,9 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 			row_checker_on = !row_checker_on;
 		}
 	}
-	TransientState->EnvMaps[0].zp = -2.5f;
+	TransientState->EnvMaps[0].zp = -1.5f;
 	TransientState->EnvMaps[1].zp = 0.0f;
-	TransientState->EnvMaps[2].zp = 2.5f;
+	TransientState->EnvMaps[2].zp = 1.5f;
 
 
 
@@ -1183,7 +1177,14 @@ update_and_render(game_memory *GameMemory, back_buffer *BackBuffer, sound_buffer
 		MapPos += YAxis + V2F(0.0f, 2.0f);
 	}
 #endif
-	push_bitmap(RenderGroup, &GameState->TestTree, V3F(0.0f), V4F(1.0f));
 	render_group_to_output(RenderGroup, DrawBuffer);
 	temporary_memory_end(RenderMemory);
+
+}
+
+extern "C" GAME_SOUND_SAMPLES_GET(GameGetSoundSamples)
+{
+	game_state *GameState = (game_state *)GameMemory->permanent_storage;
+	//game_output_sound(GameState, SoundBuffer, 400);
+
 }

@@ -1,11 +1,6 @@
 #if !defined(GAME_INTRINSICS_H)
 
-inline f32
-square_root(f32 x)
-{
-	f32 Result = sqrtf(x);
-	return(Result);
-}
+#include "math.h"
 
 inline f32
 absolute_value(f32 x)
@@ -88,9 +83,16 @@ f32_ceil_to_s32(f32 x)
 }
 
 inline f32
-f32_sin(f32 angle)
+sine(f32 angle)
 {
 	f32 Result = sinf(angle);
+	return(Result);
+}
+
+inline f32
+cosine(f32 angle)
+{
+	f32 Result = cosf(angle);
 	return(Result);
 }
 
@@ -100,8 +102,6 @@ f32_sqrt(f32 x)
 	f32 Result = sqrtf(x);
 	return(Result);
 }
-
-
 
 struct bit_scan_result
 {

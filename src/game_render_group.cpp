@@ -89,318 +89,9 @@ srgb_bilinear_blend(bilinear_sample Sample, f32 fx, f32 fy)
 	TexelC = srgb_255_to_linear01(TexelC);
 	TexelD = srgb_255_to_linear01(TexelD);
 
-	// NOTE(Justin): Bilinear filtering
 	v4f Result = lerp(lerp(TexelA, fx, TexelB), fy, lerp(TexelC, fx, TexelD));
 
 	return(Result);
-}
-
-inline v3f
-normal_map_sample(v2f ScreenSpaceUV, environment_map *Map, v3f Normal, f32 roughness)
-{
-	v3f Result = Normal;
-
-	return(Result);
-}
-
-inline v3f
-environment_map_sample(v2f ScreenSpaceUV, v3f SampleDir, f32 roughness, environment_map *Map, f32 z_offset_to_map)
-{
-	v3f Result;
-
-	u32 lod_index = (u32)(roughness * (f32)(ARRAY_COUNT(Map->LOD) - 1) + 0.5f);
-	ASSERT(lod_index < ARRAY_COUNT(Map->LOD));
-
-	loaded_bitmap *LOD = &Map->LOD[lod_index];
-
-	// NOTE(Justin): The map_distance is a fudge factor!
-	f32 uv_per_meter = 0.01;
-	f32 c = (uv_per_meter * z_offset_to_map) / SampleDir.y;
-	v2f Offset = c * V2F(SampleDir.x, SampleDir.z);
-
-	v2f UV = ScreenSpaceUV + Offset;
-
-	UV.x = clamp01(UV.x);
-	UV.y = clamp01(UV.y);
-
-
-	f32 tx = (UV.x * (f32)(LOD->width - 2));
-	f32 ty = (UV.y * (f32)(LOD->height - 2));
-
-	s32 x = (s32)tx;
-	s32 y = (s32)ty;
-
-	f32 fx = tx - (f32)x;
-	f32 fy = ty - (f32)y;
-
-	ASSERT((x >= 0) && (x < LOD->width));
-	ASSERT((y >= 0) && (y < LOD->height));
-
-#if 0
-	u8 *texel_ptr = (u8 *)LOD->memory + y * LOD->stride + x * BITMAP_BYTES_PER_PIXEL;
-	*(u32 *)texel_ptr = 0xFFFFFFFF;
-#endif
-
-	bilinear_sample Sample = bilinear_sample_texture(LOD, x, y);
-
-	Result = srgb_bilinear_blend(Sample, fx, fy).xyz;
-
-	return(Result);
-}
-
-internal void 
-rectangle_draw_slowly(loaded_bitmap *Buffer, v2f Origin, v2f XAxis, v2f YAxis, v4f Color,
-					  loaded_bitmap *Texture, loaded_bitmap *NormalMap,
-					  environment_map *Top,
-					  environment_map *Middle,
-					  environment_map *Bottom,
-					  f32 meters_per_pixel)
-
-{
-	// NOTE(Justin): Pre-muiltiply color at the start
-	Color.rgb *= Color.a;
-
-	f32 XAxisLen = length(XAxis);
-	f32 YAxisLen = length(YAxis);
-
-	v2f NormalXAxis = (YAxisLen / XAxisLen) * XAxis;
-	v2f NormalYAxis = (XAxisLen / YAxisLen) * YAxis;
-
-	f32 z_axis_scale = 0.5f * (XAxisLen + YAxisLen);
-
-	f32 inv_x_axis_len_sq = 1.0f / dot(XAxis, XAxis);
-	f32 inv_y_axis_len_sq = 1.0f / dot(YAxis, YAxis);
-
-	s32 width_max = Buffer->width - 1;
-	s32 height_max = Buffer->height - 1;
-
-	f32 inv_width_max = 1.0f / (f32)width_max;
-	f32 inv_height_max = 1.0f / (f32)height_max;
-
-	s32 x_min = width_max;
-	s32 y_min = height_max;
-	s32 x_max = 0;
-	s32 y_max = 0;
-
-	f32 z_origin = 0.0f;
-	f32 y_origin = (Origin + 0.5f * XAxis + 0.5* YAxis).y;
-	f32 y_fixed_cast = inv_height_max * y_origin;
-
-	v2f P[4] = {Origin, Origin + XAxis, Origin + XAxis + YAxis, Origin + YAxis};
-	for(u32 p_index = 0; p_index < ARRAY_COUNT(P); p_index++)
-	{
-		v2f TestP = P[p_index];
-		s32 x_floor = f32_floor_to_s32(TestP.x);
-		s32 y_floor = f32_floor_to_s32(TestP.y);
-		s32 x_ceil = f32_ceil_to_s32(TestP.x);
-		s32 y_ceil = f32_ceil_to_s32(TestP.y);
-
-		if(x_min > x_floor) {x_min = x_floor;}
-		if(y_min > y_floor) {y_min = y_floor;}
-		if(x_max < x_ceil) {x_max = x_ceil;}
-		if(y_max < y_ceil) {y_max = y_ceil;}
-	}
-
-	if(x_min < 0) {x_min = 0;}
-	if(y_min < 0) {y_min = 0;}
-	if(x_max > width_max) {x_max = width_max;}
-	if(y_max > height_max) {y_max = height_max;}
-
-	u8 *pixel_row = (u8 *)Buffer->memory + Buffer->stride * y_min + BITMAP_BYTES_PER_PIXEL * x_min;
-	for(s32 row = y_min; row <= y_max; row++)
-	{
-		u32 *pixel = (u32 *)pixel_row;
-		for(s32 col = x_min; col <= x_max; col++)
-		{
-			v2f PixelP = V2F((f32)col, (f32)row);
-			v2f D = PixelP - Origin;
-
-			f32 e0 = dot(D, -1.0f * perp(XAxis));
-			f32 e1 = dot(D - XAxis, -1.0f * perp(YAxis));
-			f32 e2 = dot(D - XAxis - YAxis, perp(XAxis));
-			f32 e3 = dot(D - YAxis, perp(YAxis));
-
-			if((e0 < 0) && (e1 < 0) && (e2 < 0) && (e3 < 0))
-			{
-
-#if 0
-				v2f ScreenSpaceUV = {inv_width_max * (f32)col, inv_height_max * (f32)row};
-				f32 z_diff = 0.0f;
-#else
-				v2f ScreenSpaceUV = {inv_width_max * (f32)col, y_fixed_cast};
-				f32 z_diff = meters_per_pixel * ((f32)row - y_origin);
-#endif
-
-				// (u, v) in [0, 1) X [0, 1)
-				f32 u = inv_x_axis_len_sq * dot(D, XAxis);
-				f32 v = inv_y_axis_len_sq * dot(D, YAxis);
-
-				// TODO(Justin): SSE clamp.
-				//ASSERT((u >= 0.0f) && (u <= 1.0f));
-				//ASSERT((v >= 0.0f) && (v <= 1.0f));
-
-				// Scale the uv coordinates to "almost" the entire dim of the bitmap
-				f32 tx = ((u * (f32)(Texture->width - 2)));
-				f32 ty = ((v * (f32)(Texture->height - 2)));
-
-				s32 x = (s32)tx;
-				s32 y = (s32)ty;
-
-				// t values for bilinear filtering
-				f32 fx = tx - (f32)x;
-				f32 fy = ty - (f32)y;
-
-				ASSERT((x >= 0) && (x < Texture->width));
-				ASSERT((y >= 0) && (y < Texture->height));
-
-
-				bilinear_sample TexelSample = bilinear_sample_texture(Texture, x, y);
-				v4f Texel = srgb_bilinear_blend(TexelSample, fx, fy); 
-
-				if(NormalMap)
-				{
-					bilinear_sample NormalSample = bilinear_sample_texture(NormalMap, x, y);
-
-					v4f NormalA = unpack4x8(NormalSample.a);
-					v4f NormalB = unpack4x8(NormalSample.b);
-					v4f NormalC = unpack4x8(NormalSample.c);
-					v4f NormalD = unpack4x8(NormalSample.d);
-
-					v4f Normal = lerp(lerp(NormalA, fx, NormalB), fy, lerp(NormalC, fx, NormalD));
-
-					Normal = normal_scale_and_offset_01(Normal);
-					Normal.xy = Normal.x * NormalXAxis + Normal.y * NormalYAxis;
-					Normal.z *= z_axis_scale;
-					Normal.xyz = normalize(Normal.xyz);
-
-					// NOTE(Justin): The eye vector is assumed to always be [0 0 1]
-					// The BounceDir is the simplified version of the reflection R = -E + 2(E^T N)N
-
-					v3f BounceDir = 2.0f * Normal.z * Normal.xyz;
-					BounceDir.z -= 1.0f;
-					BounceDir.z = -BounceDir.z;
-
-					environment_map *FarMap = 0;
-					f32 zp = z_origin + z_diff;
-					f32 z_map = 2.0f;
-					f32 t_env_map = BounceDir.y;
-					f32 t_far_map = 0.0f;
-					if(t_env_map < -0.5f)
-					{
-						FarMap = Bottom;
-						t_far_map = -1.0f - 2.0f * t_env_map;
-					}
-					else if(t_env_map > 0.5f)
-					{
-						FarMap = Top;
-						t_far_map = 2.0f * (t_env_map - 0.5f);
-					}
-
-					t_far_map *= t_far_map;
-					t_far_map *= t_far_map;
-
-
-
-					// TODO(Justin): How to sample from the middle env map?
-					v3f LightColor = {0,0,0};
-					if(FarMap)
-					{
-						f32 z_offset_to_map = FarMap->zp - zp;
-						v3f FarMapColor = environment_map_sample(ScreenSpaceUV, BounceDir, Normal.w, FarMap,
-								z_offset_to_map);
-						LightColor = lerp(LightColor, t_far_map, FarMapColor);
-					}
-
-					Texel.rgb = Texel.rgb + Texel.a * LightColor;
-				}
-
-				// NOTE(Justin): Texture tinting
-
-				Texel = hadamard(Texel, Color);
-				Texel.r = clamp01(Texel.r);
-				Texel.g = clamp01(Texel.g);
-				Texel.b = clamp01(Texel.b);
-
-				v4f Dest = unpack4x8(*pixel);
-				Dest = srgb_255_to_linear01(Dest);
-
-				v4f Blended = (1.0f - Texel.a) * Dest + Texel;
-
-				v4f Blended255 = linear01_to_srgb_255(Blended);
-
-				*pixel = (((u32)(Blended255.a + 0.5f) << 24) |
-						  ((u32)(Blended255.r + 0.5f) << 16) |
-						  ((u32)(Blended255.g + 0.5f) << 8) |
-						  ((u32)(Blended255.b + 0.5f) << 0));
-			}
-			pixel++;
-		}
-		pixel_row += Buffer->stride;
-	}
-}
-
-internal void
-pixel_set(back_buffer *BackBuffer, v2f ScreenXY, u32 color)
-{
-	s32 screen_x = f32_round_to_s32(ScreenXY.x);
-	s32 screen_y = f32_round_to_s32(ScreenXY.y);
-
-	if(screen_x >= BackBuffer->width)
-	{
-		screen_x = screen_x - BackBuffer->width;
-	}
-	if(screen_x < 0) 
-	{
-		screen_x = screen_x + BackBuffer->width;
-	}
-	if(screen_y >= BackBuffer->height)
-	{
-		screen_y = screen_y - BackBuffer->height;
-	}
-	if(screen_y < 0)
-	{
-		screen_y = screen_y + BackBuffer->height;
-	}
-	u8 *start = (u8 *)BackBuffer->memory + BackBuffer->stride * screen_y + BITMAP_BYTES_PER_PIXEL * screen_x;
-	u32 *pixel = (u32 *)start;
-	*pixel = color;
-}
-
-internal void
-line_dda_draw(back_buffer *BackBuffer, v2f P1, v2f P2, f32 r, f32 g, f32 b)
-{
-	u32 step_count;
-
-	v2f Pos = P1;
-
-	v2f Delta = P2 - P1;
-
-	if(ABS(Delta.x) > ABS(Delta.y))
-	{
-		step_count = (u32)ABS(Delta.x);
-	}
-	else
-	{
-		step_count = (u32)ABS(Delta.y);
-	}
-
-	u32 red = f32_round_to_u32(255.0f * r);
-	u32 green = f32_round_to_u32(255.0f * g);
-	u32 blue = f32_round_to_u32(255.0f * b);
-	u32 color = ((red << 16) | (green << 8) | (blue << 0));
-
-	v2f Step = (1.0f / (f32)step_count) * Delta;
-	for(u32 k = 0; k < step_count; k++)
-	{
-		Pos += Step;
-		pixel_set(BackBuffer, Pos, color);
-	}
-}
-
-internal void
-line_dda_draw(back_buffer *BackBuffer, v2f P1, v2f P2, v3f Color)
-{
-	line_dda_draw(BackBuffer, P1, P2, Color.r, Color.g, Color.b);
 }
 
 internal void 
@@ -654,12 +345,257 @@ bitmap_draw(loaded_bitmap *Buffer, loaded_bitmap *Bitmap, f32 x, f32 y, f32 c_al
 	}
 }
 
-internal void
-debug_vector_draw_at_point(back_buffer * BackBuffer, v2f Point, v2f Direction, v3f Color)
+inline v3f
+normal_map_sample(v2f ScreenSpaceUV, environment_map *Map, v3f Normal, f32 roughness)
 {
-	f32 c = 60.0f;
-	line_dda_draw(BackBuffer, Point, Point + c * Direction, Color.r, Color.g, Color.b);
+	v3f Result = Normal;
+
+	return(Result);
 }
+
+inline v3f
+environment_map_sample(v2f ScreenSpaceUV, v3f SampleDir, f32 roughness, environment_map *Map, f32 z_offset_to_map)
+{
+	v3f Result;
+
+	u32 lod_index = (u32)(roughness * (f32)(ARRAY_COUNT(Map->LOD) - 1) + 0.5f);
+	ASSERT(lod_index < ARRAY_COUNT(Map->LOD));
+
+	loaded_bitmap *LOD = &Map->LOD[lod_index];
+
+	// NOTE(Justin): The map_distance is a fudge factor!
+	f32 uv_per_meter = 0.01f;
+	f32 c = (uv_per_meter * z_offset_to_map) / SampleDir.y;
+	v2f Offset = c * V2F(SampleDir.x, SampleDir.z);
+
+	v2f UV = ScreenSpaceUV + Offset;
+
+	UV.x = clamp01(UV.x);
+	UV.y = clamp01(UV.y);
+
+
+	f32 tx = (UV.x * (f32)(LOD->width - 2));
+	f32 ty = (UV.y * (f32)(LOD->height - 2));
+
+	s32 x = (s32)tx;
+	s32 y = (s32)ty;
+
+	f32 fx = tx - (f32)x;
+	f32 fy = ty - (f32)y;
+
+	ASSERT((x >= 0) && (x < LOD->width));
+	ASSERT((y >= 0) && (y < LOD->height));
+
+#if 0
+	// NOTE(Justin): Texture sampling visualization
+	u8 *texel_ptr = (u8 *)LOD->memory + y * LOD->stride + x * BITMAP_BYTES_PER_PIXEL;
+	*(u32 *)texel_ptr = 0xFFFFFFFF;
+#endif
+
+	bilinear_sample Sample = bilinear_sample_texture(LOD, x, y);
+
+	Result = srgb_bilinear_blend(Sample, fx, fy).xyz;
+
+	return(Result);
+}
+
+internal void 
+rectangle_draw_slowly(loaded_bitmap *Buffer, v2f Origin, v2f XAxis, v2f YAxis, v4f Color,
+					  loaded_bitmap *Texture, loaded_bitmap *NormalMap,
+					  environment_map *Top,
+					  environment_map *Middle,
+					  environment_map *Bottom,
+					  f32 meters_per_pixel)
+
+{
+	// NOTE(Justin): Pre-muiltiply color at the start
+	Color.rgb *= Color.a;
+
+	f32 XAxisLen = length(XAxis);
+	f32 YAxisLen = length(YAxis);
+
+	v2f NormalXAxis = (YAxisLen / XAxisLen) * XAxis;
+	v2f NormalYAxis = (XAxisLen / YAxisLen) * YAxis;
+
+	f32 z_axis_scale = 0.5f * (XAxisLen + YAxisLen);
+
+	f32 inv_x_axis_len_sq = 1.0f / dot(XAxis, XAxis);
+	f32 inv_y_axis_len_sq = 1.0f / dot(YAxis, YAxis);
+
+	s32 width_max = Buffer->width - 1;
+	s32 height_max = Buffer->height - 1;
+
+	f32 inv_width_max = 1.0f / (f32)width_max;
+	f32 inv_height_max = 1.0f / (f32)height_max;
+
+	s32 x_min = width_max;
+	s32 y_min = height_max;
+	s32 x_max = 0;
+	s32 y_max = 0;
+
+	f32 z_origin = 0.0f;
+	f32 y_origin = (Origin + 0.5f * XAxis + 0.5* YAxis).y;
+	f32 y_fixed_cast = inv_height_max * y_origin;
+
+	v2f P[4] = {Origin, Origin + XAxis, Origin + XAxis + YAxis, Origin + YAxis};
+	for(u32 p_index = 0; p_index < ARRAY_COUNT(P); p_index++)
+	{
+		v2f TestP = P[p_index];
+		s32 x_floor = f32_floor_to_s32(TestP.x);
+		s32 y_floor = f32_floor_to_s32(TestP.y);
+		s32 x_ceil = f32_ceil_to_s32(TestP.x);
+		s32 y_ceil = f32_ceil_to_s32(TestP.y);
+
+		if(x_min > x_floor) {x_min = x_floor;}
+		if(y_min > y_floor) {y_min = y_floor;}
+		if(x_max < x_ceil) {x_max = x_ceil;}
+		if(y_max < y_ceil) {y_max = y_ceil;}
+	}
+
+	if(x_min < 0) {x_min = 0;}
+	if(y_min < 0) {y_min = 0;}
+	if(x_max > width_max) {x_max = width_max;}
+	if(y_max > height_max) {y_max = height_max;}
+
+	u8 *pixel_row = (u8 *)Buffer->memory + Buffer->stride * y_min + BITMAP_BYTES_PER_PIXEL * x_min;
+	for(s32 row = y_min; row <= y_max; row++)
+	{
+		u32 *pixel = (u32 *)pixel_row;
+		for(s32 col = x_min; col <= x_max; col++)
+		{
+			v2f PixelP = V2F((f32)col, (f32)row);
+			v2f D = PixelP - Origin;
+
+			f32 e0 = dot(D, -1.0f * perp(XAxis));
+			f32 e1 = dot(D - XAxis, -1.0f * perp(YAxis));
+			f32 e2 = dot(D - XAxis - YAxis, perp(XAxis));
+			f32 e3 = dot(D - YAxis, perp(YAxis));
+
+			if((e0 < 0) && (e1 < 0) && (e2 < 0) && (e3 < 0))
+			{
+
+#if 0
+				v2f ScreenSpaceUV = {inv_width_max * (f32)col, inv_height_max * (f32)row};
+				f32 z_diff = 0.0f;
+#else
+				v2f ScreenSpaceUV = {inv_width_max * (f32)col, y_fixed_cast};
+				f32 z_diff = meters_per_pixel * ((f32)row - y_origin);
+#endif
+
+				// (u, v) in [0, 1) X [0, 1)
+				f32 u = inv_x_axis_len_sq * dot(D, XAxis);
+				f32 v = inv_y_axis_len_sq * dot(D, YAxis);
+
+				// TODO(Justin): SSE clamp.
+				//ASSERT((u >= 0.0f) && (u <= 1.0f));
+				//ASSERT((v >= 0.0f) && (v <= 1.0f));
+
+				// Scale the uv coordinates to "almost" the entire dim of the bitmap
+				f32 tx = ((u * (f32)(Texture->width - 2)));
+				f32 ty = ((v * (f32)(Texture->height - 2)));
+
+				s32 x = (s32)tx;
+				s32 y = (s32)ty;
+
+				// t values for bilinear filtering
+				f32 fx = tx - (f32)x;
+				f32 fy = ty - (f32)y;
+
+				ASSERT((x >= 0) && (x < Texture->width));
+				ASSERT((y >= 0) && (y < Texture->height));
+
+
+				bilinear_sample TexelSample = bilinear_sample_texture(Texture, x, y);
+				v4f Texel = srgb_bilinear_blend(TexelSample, fx, fy); 
+
+				if(NormalMap)
+				{
+					bilinear_sample NormalSample = bilinear_sample_texture(NormalMap, x, y);
+
+					v4f NormalA = unpack4x8(NormalSample.a);
+					v4f NormalB = unpack4x8(NormalSample.b);
+					v4f NormalC = unpack4x8(NormalSample.c);
+					v4f NormalD = unpack4x8(NormalSample.d);
+
+					v4f Normal = lerp(lerp(NormalA, fx, NormalB), fy, lerp(NormalC, fx, NormalD));
+
+					Normal = normal_scale_and_offset_01(Normal);
+					Normal.xy = Normal.x * NormalXAxis + Normal.y * NormalYAxis;
+					Normal.z *= z_axis_scale;
+					Normal.xyz = normalize(Normal.xyz);
+
+					// NOTE(Justin): The eye vector is assumed to always be [0 0 1]
+					// The BounceDir is the simplified version of the reflection R = -E + 2(E^T N)N
+
+					v3f BounceDir = 2.0f * Normal.z * Normal.xyz;
+					BounceDir.z -= 1.0f;
+					BounceDir.z = -BounceDir.z;
+
+					environment_map *FarMap = 0;
+					f32 zp = z_origin + z_diff;
+					f32 z_map = 2.0f;
+					f32 t_env_map = BounceDir.y;
+					f32 t_far_map = 0.0f;
+					if(t_env_map < -0.5f)
+					{
+						FarMap = Bottom;
+						t_far_map = -1.0f - 2.0f * t_env_map;
+					}
+					else if(t_env_map > 0.5f)
+					{
+						FarMap = Top;
+						t_far_map = 2.0f * (t_env_map - 0.5f);
+					}
+
+					t_far_map *= t_far_map;
+					t_far_map *= t_far_map;
+
+
+
+					// TODO(Justin): How to sample from the middle env map?
+					v3f LightColor = {0,0,0};
+					if(FarMap)
+					{
+						f32 z_offset_to_map = FarMap->zp - zp;
+						v3f FarMapColor = environment_map_sample(ScreenSpaceUV, BounceDir, Normal.w, FarMap, z_offset_to_map);
+						LightColor = lerp(LightColor, t_far_map, FarMapColor);
+					}
+
+					Texel.rgb = Texel.rgb + Texel.a * LightColor;
+
+#if 0
+					// NOTE(Justin): Bounce direction visualization
+					Texel.rgb = V3F(0.5f) + 0.5f * BounceDir;
+					Texel.rgb *= Texel.a;
+#endif
+				}
+
+				// NOTE(Justin): Texture tinting
+
+				Texel = hadamard(Texel, Color);
+				Texel.r = clamp01(Texel.r);
+				Texel.g = clamp01(Texel.g);
+				Texel.b = clamp01(Texel.b);
+
+				v4f Dest = unpack4x8(*pixel);
+				Dest = srgb_255_to_linear01(Dest);
+
+				v4f Blended = (1.0f - Texel.a) * Dest + Texel;
+
+				v4f Blended255 = linear01_to_srgb_255(Blended);
+
+				*pixel = (((u32)(Blended255.a + 0.5f) << 24) |
+						  ((u32)(Blended255.r + 0.5f) << 16) |
+						  ((u32)(Blended255.g + 0.5f) << 8) |
+						  ((u32)(Blended255.b + 0.5f) << 0));
+			}
+			pixel++;
+		}
+		pixel_row += Buffer->stride;
+	}
+}
+
+
 
 internal void
 circle_draw(back_buffer *BackBuffer, circle *Circle, f32 r, f32 b, f32 g)
@@ -790,13 +726,9 @@ coordinate_system(render_group *RenderGroup, v2f Origin, v2f XAxis, v2f YAxis, v
 		m3x3 M = RenderGroup->MapToScreenSpace;
 		f32 pixels_per_meter = RenderGroup->pixels_per_meter;
 
-		v2f X = pixels_per_meter * XAxis;
-		v2f Y = pixels_per_meter * YAxis;
-		v2f O = M * Origin - 0.5f * XAxis - 0.5f * YAxis;
-
-		Entry->Origin = O - Texture->Align;//M * Origin;
-		Entry->XAxis = X;//pixels_per_meter * XAxis;
-		Entry->YAxis = Y;//pixels_per_meter * YAxis;
+		Entry->Origin = Origin;
+		Entry->XAxis = XAxis;
+		Entry->YAxis = YAxis;
 		Entry->Color = Color;
 		Entry->Texture = Texture;
 		Entry->NormalMap = NormalMap;
@@ -903,6 +835,72 @@ render_group_allocate(memory_arena *Arena, u32 push_buffer_size_max, f32 pixels_
 }
 
 internal void
+pixel_set(back_buffer *BackBuffer, v2f ScreenXY, u32 color)
+{
+	s32 screen_x = f32_round_to_s32(ScreenXY.x);
+	s32 screen_y = f32_round_to_s32(ScreenXY.y);
+
+	if(screen_x >= BackBuffer->width)
+	{
+		screen_x = screen_x - BackBuffer->width;
+	}
+	if(screen_x < 0) 
+	{
+		screen_x = screen_x + BackBuffer->width;
+	}
+	if(screen_y >= BackBuffer->height)
+	{
+		screen_y = screen_y - BackBuffer->height;
+	}
+	if(screen_y < 0)
+	{
+		screen_y = screen_y + BackBuffer->height;
+	}
+	u8 *start = (u8 *)BackBuffer->memory + BackBuffer->stride * screen_y + BITMAP_BYTES_PER_PIXEL * screen_x;
+	u32 *pixel = (u32 *)start;
+	*pixel = color;
+}
+
+internal void
+line_dda_draw(back_buffer *BackBuffer, v2f P1, v2f P2, f32 r, f32 g, f32 b)
+{
+	u32 step_count;
+
+	v2f Pos = P1;
+
+	v2f Delta = P2 - P1;
+
+	if(ABS(Delta.x) > ABS(Delta.y))
+	{
+		step_count = (u32)ABS(Delta.x);
+	}
+	else
+	{
+		step_count = (u32)ABS(Delta.y);
+	}
+
+	u32 red = f32_round_to_u32(255.0f * r);
+	u32 green = f32_round_to_u32(255.0f * g);
+	u32 blue = f32_round_to_u32(255.0f * b);
+	u32 color = ((red << 16) | (green << 8) | (blue << 0));
+
+	v2f Step = (1.0f / (f32)step_count) * Delta;
+	for(u32 k = 0; k < step_count; k++)
+	{
+		Pos += Step;
+		pixel_set(BackBuffer, Pos, color);
+	}
+}
+
+internal void
+line_dda_draw(back_buffer *BackBuffer, v2f P1, v2f P2, v3f Color)
+{
+	line_dda_draw(BackBuffer, P1, P2, Color.r, Color.g, Color.b);
+}
+
+
+
+internal void
 circle_draw(back_buffer *BackBuffer, circle *Circle, v3f Color)
 {
 	circle_draw(BackBuffer, Circle, Color.r, Color.g, Color.b);
@@ -944,3 +942,4 @@ line_horizontal_draw(back_buffer *BackBuffer, f32 y, f32 r, f32 g, f32 b)
 		*pixel++ = color;
 	}
 }
+

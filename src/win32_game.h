@@ -1,5 +1,24 @@
 #if !defined(WIN32_GAME_H)
 
+
+typedef struct
+{
+	BITMAPINFO Info;
+	int width;
+	int height;
+	int bytes_per_pixel;
+	int stride;
+	void *memory;
+
+} win32_back_buffer;
+
+typedef struct
+{
+	int width;
+	int height;
+
+} win32_client_dimensions;
+
 typedef struct
 {
 	int samples_per_second;
@@ -13,24 +32,15 @@ typedef struct
 
 } win32_sound_buffer;
 
-typedef struct
+struct win32_game_code
 {
-	int width;
-	int height;
+	HMODULE GameCodeDLL;
+	FILETIME DLLLastWriteTime;
+	game_update_and_render *UpdateAndRender;
+	game_get_sound_samples *GetSoundSamples;
 
-} win32_client_dimensions;
-
-typedef struct
-{
-	BITMAPINFO Info;
-	int width;
-	int height;
-	int bytes_per_pixel;
-	int stride;
-	void *memory;
-
-} win32_back_buffer;
-
+	b32 is_valid;
+};
 
 #define WIN32_GAME_H
 #endif

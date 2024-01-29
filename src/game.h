@@ -1,8 +1,91 @@
+/*
+  TODO:
+Collision Detection
+	- Asteroid collisions
+ 	- Projectile collisions
+	- Better collision table
+	- Free collision rules
+ 
+Physics
+    - Angular velocity
+    - Mass
+    - Asteroid acceleration?
+   
+ Asset loading
+
+VfX
+  	- Bitmap transformations (rotations, scaling, ...)
+  	- UV coordinate mapping
+  	- Normal mapping
+
+	- Animations
+		- Lasers/beams
+		- Warping
+		- Shield
+			- Appears on collision
+			- Fades shortly thereafter
+		- Ship phasing
+			- Ship can enter a "flux state" and temporarily phase through
+			objects avoiding collisions
+	- Particles
+		- Ship thrusters
+		- Energy beam
+		- Asteroids destruction (split asteroids, asteroid pariticles)
+
+
+Basics of DSound
+
+	2-channels (stereo)
+	stereo L/R channel two channels 8 bits per channel
+	Block is a Sample which has two channels [L R]
+	the member is in units of bytes so byte_count([L R]) = 2 channels * 16 bits per channel / 8 = 4 
+	(# samples * sizeof(sample)) / seconds = bytes / second
+
+	DSound setup
+		- Load dsound.dll							
+		- Get function ptr to DirectSoundCreate
+		- DirectSoundCreate
+		- SetCooperativeLevel
+		- SetFormat of the PrimaryBuffer
+		- Create GlobaalSecondaryBuffer
+
+	Loading a WAV file into a DSound buffer
+		- Read the header
+		- If WAV file small create a secondary buffer large enought to hold sample
+		- data. If WAV file large stream data to the buffer.
+		- Fill buffer with data using Lock
+		- If not streaming lock entire buffer otherwise
+		- After copying unlock
+
+- Audio/SFX
+	- Audio mixer
+  	- Score
+  	- Menu
+	- Play any audio
+ 	- Play any audio file
+ 	- open wav
+ 	- decode
+ 	- uncompress
+ 	- pan audio?
+ 	- change pitch 
+
+Optimization pass
+	- Threading
+ 	- Profiling
+ 	- SIMD
+ 	- Intrinsics
+
+Game Design
+	- Enemies?
+	- Destorying an asteoid spawns alien
+	- Alien behavior adheres to the rules of the game of life
+	- Include a weighting so that the alien movement is biased towards the player.
+
+*/
+
 #if !defined(GAME_H)
 
 #include "game_platform.h"
-
-
 
 struct memory_arena
 {
@@ -84,6 +167,8 @@ zero_size(void *ptr, memory_index size)
 #include "game_math.h"
 #include "game_geometry.h"
 #include "game_render_group.h"
+#include "game_sim_region.h"
+#include "game_entity.h"
 #include "game_asset.h"
 #include "game_string.h"
 
@@ -103,73 +188,9 @@ enum asteroid_size
 	ASTEROID_SIZE_COUNT
 };
 
-struct projectile_trail
-{
-	v2f Pos;
-	f32 time_left;
-};
-
-enum entity_type
-{
-	ENTITY_NULL,
-	ENTITY_PLAYER,
-	ENTITY_ASTEROID,
-	ENTITY_FAMILIAR,
-	ENTITY_PROJECTILE,
-	ENTITY_TRIANGLE,
-	ENTITY_CIRCLE,
-	ENTITY_SQUARE,
-};
-
 // NOTE(Justin): We can use u32 for the enums so that we can do bitwise
 // operations on the flags. Otherwise we cannot do bitwise operations.
 
-enum entity_flags
-{
-	ENTITY_FLAG_COLLIDES = (1 << 1),
-	ENTITY_FLAG_NON_SPATIAL = (1 << 2),
-};
-
-struct hit_point
-{
-	u8 flags;
-	u8 count;
-};
-
-struct entity
-{
-	u32 index;
-
-	entity_type type;
-	shape_type shape;
-	u32 flags;
-
-	b32 is_shooting;
-	b32 is_warping;
-	b32 is_shielded;
-
-	f32 height;
-	f32 base_half_width;
-
-	b32 use_normalized_accel;
-	f32 speed;
-	f32 max_speed;
-	f32 angular_speed;
-	f32 mass;
-	f32 radius;
-
-	f32 distance_limit;
-
-	v2f Pos;
-	v2f dPos;
-	v2f Right;
-	v2f Direction;
-
-	u8 hit_point_max;
-	hit_point HitPoints;
-
-	player_polygon Poly;
-};
 
 struct world
 {
@@ -201,14 +222,14 @@ struct game_state
 	loaded_sound TestSound;
 	u32 test_sample_index;
 
+	v2f ScreenCenter;
+
 	loaded_bitmap Background;
 
 	loaded_bitmap Ship;
 	loaded_bitmap ShipNormalMap;
 
-	loaded_bitmap TestTree;
-	loaded_bitmap TreeNormalMap;
-	loaded_bitmap TestBackground;
+
 
 	loaded_bitmap WarpFrames[8];
 	u32 warp_frame_index;
@@ -232,18 +253,25 @@ struct game_state
 	b32 is_initialized;
 
 	loaded_bitmap TestBuffer;
+
+	loaded_bitmap TestTree;
+	loaded_bitmap TreeNormalMap;
+	loaded_bitmap TestBackground;
+
+	loaded_bitmap TestDiffuse;
+	loaded_bitmap TestNormal;
+	
 };
 
 struct transient_state
 {
 	b32 is_initialized;
+
 	memory_arena TransientArena;
 
 	u32 env_map_width;
 	u32 env_map_height;
 	environment_map EnvMaps[3];
-
-
 };
 
 #define GAME_H

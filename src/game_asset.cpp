@@ -87,12 +87,13 @@ struct wave_format_chunk
 //	(4) Bitwise OR each channel to create the pixel value that is in the
 //	correct format
 
+#if 1
 internal loaded_bitmap
-bitmap_file_read_entire(char *filename)
+debug_bitmap_file_read_entire(thread_context *Thread, DebugPlatformFileReadEntire *file_read_entire, char *filename)
 {
 	loaded_bitmap Result = {};
 
-	debug_file_read  BitmapFile = platform_file_read_entire(filename);
+	debug_file_read_result  BitmapFile = file_read_entire(Thread, filename);
 	if(BitmapFile.size != 0)
 	{
 		bitmap_header *BitmapHeader = (bitmap_header *)BitmapFile.contents;
@@ -100,8 +101,10 @@ bitmap_file_read_entire(char *filename)
 		Result.memory = (void *)pixels;
 		Result.width = BitmapHeader->width;
 		Result.height = BitmapHeader->height;
-		Result.bytes_per_pixel = BitmapHeader->bits_per_pixel / 8;
-		Result.stride = BitmapHeader->width * Result.bytes_per_pixel;
+		Result.stride = BitmapHeader->width * BITMAP_BYTES_PER_PIXEL;
+		// NOTE(Justin): This is a top-down game. All alignments are used to
+		// offset the bitmap center to the screen position.
+		Result.Align = V2F((f32)Result.width / 2.0f, (f32)Result.height / 2.0f);
 
 		ASSERT(BitmapHeader->compression == 3);
 
@@ -138,11 +141,13 @@ bitmap_file_read_entire(char *filename)
 							 (f32)((c & alpha_mask) >> alpha_shift_down)};
 
 
-				Texel = srgb_255_to_linear1(Texel);
+				// NOTE(Justin): Gamma correct approximation.
+				Texel = srgb_255_to_linear01(Texel);
 
+				// NOTE(Justin): Correct pre-multiplied alpha in linear space
 				Texel.rgb *= Texel.a;
 
-				Texel = linear1_to_srgb_255(Texel);
+				Texel = linear01_to_srgb_255(Texel);
 
 				*pixel++ = (((u32)(Texel.a + 0.5f) << 24) |
 							((u32)(Texel.r + 0.5f) << 16) |
@@ -153,6 +158,7 @@ bitmap_file_read_entire(char *filename)
 	}
 	return(Result);
 }
+#endif
 
 typedef struct
 {
@@ -210,11 +216,12 @@ get_chunk_data_size(riff_iterator Iter)
 	return(Result);
 }
 
+#if 0
 internal loaded_sound
 wav_file_read_entire(char *filename)
 {
 	loaded_sound Result = {0};
-	debug_file_read WavFile = platform_file_read_entire(filename);
+	debug_file_read_result WavFile = platform_file_read_entire(filename);
 	if(WavFile.size != 0)
 	{
 		wave_header *WaveHeader = (wave_header *)WavFile.contents;
@@ -277,4 +284,5 @@ wav_file_read_entire(char *filename)
 	}
 	return(Result);
 }
+#endif
 
